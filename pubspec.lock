@@ -627,10 +627,9 @@ packages:
   quickjs_engine:
     dependency: "direct main"
     description:
-      name: quickjs_engine
-      sha256: ca54bb6db18f820bbc23c2fab44b1e9f660b274792be38c9db5d89c8a17caace
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/quickjs_engine"
+      relative: true
+    source: path
     version: "0.1.1"
   record:
     dependency: "direct main"

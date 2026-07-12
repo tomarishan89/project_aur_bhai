@@ -1,0 +1,27 @@
+{
+  "buildFiles": [
+    "C:\\Users\\tomar\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\quickjs_engine-0.1.1\\native\\CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "C:\\Users\\tomar\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+      "-C",
+      "C:\\Users\\tomar\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\quickjs_engine-0.1.1\\android\\.cxx\\Debug\\3z1rb33t\\arm64-v8a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "C:\\Users\\tomar\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+    "-C",
+    "C:\\Users\\tomar\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\quickjs_engine-0.1.1\\android\\.cxx\\Debug\\3z1rb33t\\arm64-v8a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "quickjs_c_bridge_plugin::@6890427a1f51a3e7e1df": {
+      "artifactName": "quickjs_c_bridge_plugin",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\tomar\\Documents\\Vidyaman\\project_aur_bhai_workspace\\project_aur_bhai\\build\\quickjs_engine\\intermediates\\cxx\\Debug\\3z1rb33t\\obj\\arm64-v8a\\libquickjs_c_bridge_plugin.so",
+      "runtimeFiles": []
+    }
+  }
+}

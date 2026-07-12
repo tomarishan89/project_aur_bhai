@@ -52,6 +52,13 @@ dependencies:
   quickjs_engine: ^0.1.1
   local_auth: ^3.0.1
 
+# Windows desktop: upstream quickjs_engine 0.1.1 exports
+# QuickjsEnginePluginCApiRegisterWithRegistrar, but Flutter codegen expects
+# QuickjsEnginePluginRegisterWithRegistrar. Use the patched path fork.
+dependency_overrides:
+  quickjs_engine:
+    path: third_party/quickjs_engine
+
 
 dev_dependencies:
   flutter_test:

@@ -1,0 +1,22 @@
+                        -HC:\Users\tomar\AppData\Local\Pub\Cache\hosted\pub.dev\quickjs_engine-0.1.1\native
+-DCMAKE_SYSTEM_NAME=Android
+-DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+-DCMAKE_SYSTEM_VERSION=21
+-DANDROID_PLATFORM=android-21
+-DANDROID_ABI=x86
+-DCMAKE_ANDROID_ARCH_ABI=x86
+-DANDROID_NDK=C:\Users\tomar\AppData\Local\Android\sdk\ndk\28.2.13676358
+-DCMAKE_ANDROID_NDK=C:\Users\tomar\AppData\Local\Android\sdk\ndk\28.2.13676358
+-DCMAKE_TOOLCHAIN_FILE=C:\Users\tomar\AppData\Local\Android\sdk\ndk\28.2.13676358\build\cmake\android.toolchain.cmake
+-DCMAKE_MAKE_PROGRAM=C:\Users\tomar\AppData\Local\Android\Sdk\cmake\3.22.1\bin\ninja.exe
+-DCMAKE_C_FLAGS=-std=c11 -DCONFIG_VERSION=\"ng-0.14.0\" -Wno-unused-function -Wno-unused-variable -Wno-unused-parameter -Wno-unused-but-set-variable
+-DCMAKE_CXX_FLAGS=-std=c++17 -DCONFIG_VERSION=\"ng-0.14.0\"
+-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=C:\Users\tomar\Documents\Vidyaman\project_aur_bhai_workspace\project_aur_bhai\build\quickjs_engine\intermediates\cxx\Debug\3z1rb33t\obj\x86
+-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=C:\Users\tomar\Documents\Vidyaman\project_aur_bhai_workspace\project_aur_bhai\build\quickjs_engine\intermediates\cxx\Debug\3z1rb33t\obj\x86
+-DCMAKE_BUILD_TYPE=Debug
+-BC:\Users\tomar\AppData\Local\Pub\Cache\hosted\pub.dev\quickjs_engine-0.1.1\android\.cxx\Debug\3z1rb33t\x86
+-GNinja
+-DANDROID_STL=c++_static
+-DCMAKE_SHARED_LINKER_FLAGS=-llog
+                        Build command args: []
+                        Version: 2

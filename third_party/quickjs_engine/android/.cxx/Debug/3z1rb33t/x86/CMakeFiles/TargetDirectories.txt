@@ -1,0 +1,3 @@
+C:/Users/tomar/AppData/Local/Pub/Cache/hosted/pub.dev/quickjs_engine-0.1.1/android/.cxx/Debug/3z1rb33t/x86/CMakeFiles/quickjs_c_bridge_plugin.dir
+C:/Users/tomar/AppData/Local/Pub/Cache/hosted/pub.dev/quickjs_engine-0.1.1/android/.cxx/Debug/3z1rb33t/x86/CMakeFiles/edit_cache.dir
+C:/Users/tomar/AppData/Local/Pub/Cache/hosted/pub.dev/quickjs_engine-0.1.1/android/.cxx/Debug/3z1rb33t/x86/CMakeFiles/rebuild_cache.dir
