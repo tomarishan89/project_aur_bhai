@@ -37,7 +37,9 @@ HARD REQUIREMENTS:
   they must NOT appear as live QuickJS calls outside the template string.
 - Spoken return should direct users to the Vault Dashboards panel — not a bare /vault/ path.
 - Never hardcode API secrets; use Settings BYOK keys with System.sendHTTP when needed.
-- When returning JSON, escape the script string correctly (quotes, newlines, backticks).
+- OUTPUT TRANSPORT: put the full JavaScript source in "scriptBase64" (standard Base64 of
+  the UTF-8 source). Do NOT put raw JS/HTML inside a JSON "script" string — large dashboard
+  templates truncate and break JSON. Optional legacy "script" is only for tiny agents.
 
 KNOWN-GOOD SHAPE (abbreviated — follow this pattern for dashboards):
 async function execute(params) {
@@ -54,4 +56,9 @@ async function execute(params) {
   return 'Dashboard ready. Open it from the Vault Dashboards panel on the Agents page.';
 }
 ''';
+
+  /// Shown when the model returns truncated/invalid JSON for a large patch.
+  static const String incompleteJsonUserMessage =
+      'The model returned incomplete JSON (often when rewriting large dashboard HTML). '
+      'Tap Retry, or ask to fix only the SyntaxError without regenerating the HTML template.';
 }

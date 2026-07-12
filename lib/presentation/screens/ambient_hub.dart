@@ -23,6 +23,7 @@ import '../../core/services/device_auth_service.dart';
 import '../../core/services/telemetry_bus.dart';
 import '../../core/services/app_spec.dart';
 import '../../core/services/author_prompts.dart';
+import '../../core/services/agent_bridge_spec.dart';
 import 'package:flutter_riverpod/legacy.dart' show ChangeNotifierProvider;
 
 /// Bumped after agent RUN so the Vault Dashboards banner reloads.
@@ -2436,7 +2437,11 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
               msg.toLowerCase().contains('timed out')
           ? 'Patch generation timed out — script may be too large. '
               'Tap GENERATE PATCH to retry, or shorten the change request.'
-          : msg;
+          : (msg.contains('FormatException') ||
+                  msg.toLowerCase().contains('unterminated string') ||
+                  msg.contains('incomplete JSON'))
+              ? AgentBridgeSpec.incompleteJsonUserMessage
+              : msg;
       setState(() => _error = friendly);
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -2662,7 +2667,9 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
                   style:
                       const TextStyle(color: Colors.redAccent, fontSize: 11)),
               if (_error!.toLowerCase().contains('timed out') ||
-                  _error!.contains('TimeoutException')) ...[
+                  _error!.contains('TimeoutException') ||
+                  _error!.contains('incomplete JSON') ||
+                  _error!.toLowerCase().contains('unterminated')) ...[
                 const SizedBox(height: 8),
                 OutlinedButton(
                   onPressed: _busy ? null : _generatePatch,

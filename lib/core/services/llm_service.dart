@@ -13,6 +13,37 @@ import 'author_prompts.dart';
 import 'agent_bridge_spec.dart';
 import 'app_spec.dart';
 
+/// Extracts JS source from author/refine model JSON.
+///
+/// Prefers `scriptBase64` (avoids truncation of HTML-in-JS inside JSON strings);
+/// falls back to legacy `script`.
+String scriptFromDraftJson(Map<String, dynamic> decoded) {
+  final b64 = decoded['scriptBase64'] as String?;
+  if (b64 != null && b64.trim().isNotEmpty) {
+    final cleaned = b64.replaceAll(RegExp(r'\s+'), '');
+    try {
+      return utf8.decode(base64Decode(cleaned));
+    } on FormatException catch (e) {
+      throw FormatException('Invalid scriptBase64: ${e.message}');
+    }
+  }
+  final script = decoded['script'] as String?;
+  if (script != null && script.isNotEmpty) return script;
+  throw Exception('Model did not return a script (expected scriptBase64 or script).');
+}
+
+/// User-facing message when patch JSON cannot be parsed.
+String authoredJsonParseFailureMessage(Object error) {
+  final msg = error.toString();
+  if (error is FormatException ||
+      msg.contains('FormatException') ||
+      msg.toLowerCase().contains('unterminated string') ||
+      msg.toLowerCase().contains('unexpected end')) {
+    return AgentBridgeSpec.incompleteJsonUserMessage;
+  }
+  return msg;
+}
+
 /// A reviewable draft produced by LLM agent authoring (MS-USER-ECOSYSTEM-ENG1).
 class AuthoredAgentDraft {
   final String name;
@@ -501,7 +532,7 @@ Respond ONLY in RAW JSON (no markdown fences):
   "name": "PascalCaseAgentName",
   "description": "one sentence describing what the agent does",
   "inputSchema": { "paramName": { "type": "string|number|boolean", "description": "...", "required": true|false } },
-  "script": "the full javascript source as a JSON-escaped string",
+  "scriptBase64": "BASE64 of the full javascript UTF-8 source",
   "notes": "one short sentence on how to invoke it"
 }
 ''';
@@ -510,15 +541,20 @@ Respond ONLY in RAW JSON (no markdown fences):
       prompt: systemPrompt,
       jsonMode: true,
       timeout: const Duration(seconds: 40),
-      maxTokens: 8192,
+      maxTokens: 12288,
     );
-    final decoded = jsonDecode(_cleanJsonString(raw)) as Map<String, dynamic>;
+    Map<String, dynamic> decoded;
+    try {
+      decoded = jsonDecode(_cleanJsonString(raw)) as Map<String, dynamic>;
+    } on FormatException catch (e) {
+      throw Exception(authoredJsonParseFailureMessage(e));
+    }
 
     final name = (decoded['name'] as String?)?.trim();
-    final script = decoded['script'] as String?;
-    if (name == null || name.isEmpty || script == null || script.isEmpty) {
-      throw Exception('Model did not return a valid agent (missing name/script).');
+    if (name == null || name.isEmpty) {
+      throw Exception('Model did not return a valid agent (missing name).');
     }
+    final script = scriptFromDraftJson(decoded);
 
     return AuthoredAgentDraft(
       name: name,
@@ -595,9 +631,10 @@ Respond ONLY in RAW JSON: {"answer": "..."}
 
     final slimHint = slimRetry
         ? '''
-SLIM RETRY MODE: Prefer fixing only the broken execute() / syntax issue.
-Keep any existing HTML dashboard template string unchanged unless the error
-is inside that template. Return the full valid script still.
+SLIM RETRY MODE:
+- Fix only the reported SyntaxError / issue in execute().
+- Keep any existing HTML dashboard template unchanged unless the error is inside it.
+- You MUST return the full source ONLY via "scriptBase64" (Base64 UTF-8). Never use raw "script".
 '''
         : '';
 
@@ -618,15 +655,15 @@ $currentScript
 USER CHANGE REQUEST:
 "$changeRequest"
 
-Fix the reported issue(s). Preserve unrelated behavior. Ensure valid QuickJS
-syntax and correctly JSON-escaped script output.
+Fix the reported issue(s). Preserve unrelated behavior. Ensure valid QuickJS syntax.
+Put the FULL patched source in scriptBase64 (standard Base64 of UTF-8). Do not use a raw script string.
 
 Respond ONLY in RAW JSON:
 {
   "name": "$agentName",
   "description": "updated one-line description",
   "inputSchema": { ... },
-  "script": "full patched javascript as JSON-escaped string",
+  "scriptBase64": "BASE64 of the full patched javascript UTF-8 source",
   "notes": "what changed"
 }
 ''';
@@ -637,7 +674,7 @@ Respond ONLY in RAW JSON:
         prompt: prompt,
         jsonMode: true,
         timeout: const Duration(seconds: 90),
-        maxTokens: 8192,
+        maxTokens: 12288,
       );
     } on TimeoutException {
       if (slimRetry) {
@@ -659,10 +696,42 @@ Respond ONLY in RAW JSON:
       );
     }
 
-    final decoded = jsonDecode(_cleanJsonString(raw)) as Map<String, dynamic>;
-    final script = decoded['script'] as String?;
-    if (script == null || script.isEmpty) {
-      throw Exception('Model did not return patched script.');
+    Map<String, dynamic> decoded;
+    try {
+      decoded = jsonDecode(_cleanJsonString(raw)) as Map<String, dynamic>;
+    } on FormatException catch (e) {
+      if (!slimRetry) {
+        return refineAgentScript(
+          agentName: agentName,
+          currentScript: currentScript,
+          changeRequest: changeRequest,
+          currentDescription: currentDescription,
+          currentInputSchema: currentInputSchema,
+          lastRunError: lastRunError,
+          dueDiligenceFindings: dueDiligenceFindings,
+          slimRetry: true,
+        );
+      }
+      throw Exception(authoredJsonParseFailureMessage(e));
+    }
+
+    late final String script;
+    try {
+      script = scriptFromDraftJson(decoded);
+    } catch (e) {
+      if (!slimRetry) {
+        return refineAgentScript(
+          agentName: agentName,
+          currentScript: currentScript,
+          changeRequest: changeRequest,
+          currentDescription: currentDescription,
+          currentInputSchema: currentInputSchema,
+          lastRunError: lastRunError,
+          dueDiligenceFindings: dueDiligenceFindings,
+          slimRetry: true,
+        );
+      }
+      throw Exception(authoredJsonParseFailureMessage(e));
     }
 
     return AuthoredAgentDraft(
