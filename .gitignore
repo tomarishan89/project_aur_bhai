@@ -49,3 +49,11 @@ android/.gradle/
 android/build/
 **/local.properties
 
+# Feedback Related:
+feedback/
+
+
+# Vendored plugin build caches (must never be committed)
+third_party/**/.cxx/
+third_party/**/.gradle/
+third_party/**/build/
