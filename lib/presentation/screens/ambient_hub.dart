@@ -23,7 +23,11 @@ import '../../core/services/device_auth_service.dart';
 import '../../core/services/telemetry_bus.dart';
 import '../../core/services/app_spec.dart';
 import '../../core/services/author_prompts.dart';
-import '../../core/services/agent_bridge_spec.dart';
+import '../../core/pipeline/bro_code_coding_agent.dart';
+import '../../core/pipeline/bro_code_fixture_report.dart';
+import '../../core/pipeline/bro_code_workspace.dart';
+import '../../core/pipeline/context_estimate.dart';
+import '../widgets/context_usage_gauge.dart';
 import 'package:flutter_riverpod/legacy.dart' show ChangeNotifierProvider;
 
 /// Bumped after agent RUN so the Vault Dashboards banner reloads.
@@ -1088,7 +1092,7 @@ class _PluginsPage extends ConsumerWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("ECOSYSTEM AGENTS",
+                  const Text("BHAI LOG",
                       style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1)),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
@@ -1098,7 +1102,7 @@ class _PluginsPage extends ConsumerWidget {
                     ),
                     onPressed: () => _openAuthoringSheet(context, ref),
                     icon: const Icon(Icons.auto_awesome, size: 16),
-                    label: const Text("CREATE AGENT", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    label: const Text("CREATE BRO CODE", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -1452,7 +1456,7 @@ class _AgentAuthoringSheetState extends ConsumerState<_AgentAuthoringSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text("INTRODUCE AGENT TO ECOSYSTEM",
+            const Text("INTRODUCE BRO CODE TO BHAI LOG",
                 style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 1)),
             const SizedBox(height: 12),
             Row(
@@ -1618,13 +1622,14 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
     );
   }
 
-  Future<void> _run() async {
-    if (widget.agent is JsAgentAdapter &&
+  Future<void> _run({bool sandbox = false}) async {
+    if (!sandbox &&
+        widget.agent is JsAgentAdapter &&
         !(widget.agent as JsAgentAdapter).canExecute) {
       setState(() {
         _runWasError = true;
         _runResult =
-            'Promote to C2 Verified before running. Use IMPROVE if due diligence flagged issues.';
+            'Promote to C2 Verified before running against the real vault. Use TEST IN SANDBOX or IMPROVE first.';
         _dashboardKey = null;
         _dashboardUrl = null;
       });
@@ -1639,7 +1644,13 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
       _dashboardUrl = null;
     });
     try {
-      final result = await widget.agent.execute(const {});
+      final String result;
+      if (sandbox && widget.agent is JsAgentAdapter) {
+        result = await (widget.agent as JsAgentAdapter)
+            .executeInSandbox(const {});
+      } else {
+        result = await widget.agent.execute(const {});
+      }
       final server = ref.read(localServerProvider);
 
       String? matchedKey;
@@ -1648,12 +1659,12 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
         final exec = (widget.agent as JsAgentAdapter).lastExecutionResult;
         isError = exec?.isError ?? false;
         final keys = exec?.vaultHtmlKeysWritten ?? const <String>[];
-        if (!isError && keys.isNotEmpty) {
+        // Sandbox HTML never lives in the sovereign vault / edge server.
+        if (!sandbox && !isError && keys.isNotEmpty) {
           matchedKey = keys.last;
         }
       }
 
-      // Heuristic fallback for string-only native path.
       if (!isError &&
           (result.toLowerCase().contains('error') ||
               result.toLowerCase().contains('syntaxerror'))) {
@@ -1661,7 +1672,9 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
       }
 
       setState(() {
-        _runResult = result;
+        _runResult = sandbox
+            ? '[SANDBOX] $result'
+            : result;
         _runWasError = isError;
         _dashboardKey = matchedKey;
         _dashboardUrl = (matchedKey != null && server.isRunning)
@@ -1914,7 +1927,7 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
                     padding: const EdgeInsets.symmetric(
                         vertical: 12, horizontal: 12),
                   ),
-                  onPressed: (_running || !canRun) ? null : _run,
+                  onPressed: (_running || !canRun) ? null : () => _run(),
                   icon: _running
                       ? const SizedBox(
                           width: 14,
@@ -1932,6 +1945,20 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
                         fontSize: 11, fontWeight: FontWeight.bold),
                   ),
                 ),
+                if (isJs)
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.orangeAccent,
+                      side: const BorderSide(color: Colors.orangeAccent),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 12),
+                    ),
+                    onPressed: _running ? null : () => _run(sandbox: true),
+                    icon: const Icon(Icons.science, size: 16),
+                    label: const Text('TEST IN SANDBOX',
+                        style: TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
                 if (isJs)
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
@@ -2360,6 +2387,14 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
   bool _busy = false;
   String? _error;
   AuthoredAgentDraft? _draft;
+  bool _verified = false;
+  final List<String> _progressLog = [];
+  int _attempt = 0;
+  String? _lastFailureForRetry;
+  int _contextUsed = 0;
+  int _contextBudget = kDefaultContextBudgetTokens;
+  int _lastTurnsUsed = 0;
+  final _progressScroll = ScrollController();
 
   @override
   void initState() {
@@ -2373,7 +2408,29 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
   @override
   void dispose() {
     _changeCtrl.dispose();
+    _progressScroll.dispose();
     super.dispose();
+  }
+
+  void _appendProgress(String message) {
+    if (!mounted) return;
+    setState(() => _progressLog.add(message));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_progressScroll.hasClients) return;
+      _progressScroll.animateTo(
+        _progressScroll.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  void _onContextUpdate(int used, int budget) {
+    if (!mounted) return;
+    setState(() {
+      _contextUsed = used;
+      _contextBudget = budget;
+    });
   }
 
   List<String> _suggestedChips() {
@@ -2411,40 +2468,119 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
     return suggestions.where((s) => seen.add(s)).toList();
   }
 
-  Future<void> _generatePatch() async {
+  Future<void> _generatePatch({bool isRetry = false}) async {
     if (_changeCtrl.text.trim().isEmpty) return;
     setState(() {
       _busy = true;
       _error = null;
       _draft = null;
+      _verified = false;
+      if (!isRetry) {
+        _progressLog.clear();
+        _attempt = 0;
+        _lastFailureForRetry = null;
+        _contextUsed = 0;
+      } else {
+        _attempt++;
+        _progressLog.add('── Retry $_attempt ──');
+      }
     });
     try {
-      final draft = await ref.read(llmServiceProvider).refineAgentScript(
-            agentName: widget.agent.name,
-            currentScript: widget.agent.script,
+      final registry = ref.read(jsAgentRegistryProvider);
+      final assets = await registry.readAgentAssets(widget.agent.name);
+      if (assets.isNotEmpty) {
+        _appendProgress('Loaded ${assets.length} related vault asset(s)');
+      }
+
+      final workspace = BroCodeWorkspace(
+        name: widget.agent.name,
+        description: widget.agent.description,
+        inputSchema: widget.agent.inputSchema.map(
+          (k, v) => MapEntry(k, v.toJson()),
+        ),
+        script: widget.agent.script,
+        assets: assets,
+      );
+
+      _appendProgress('Handing off to coding agent (tools + observe + retry)…');
+
+      final result = await ref.read(broCodeCodingAgentProvider).improve(
+            workspace: workspace,
             changeRequest: _changeCtrl.text.trim(),
-            currentDescription: widget.agent.description,
-            currentInputSchema: widget.agent.inputSchema.map(
-              (k, v) => MapEntry(k, v.toJson()),
-            ),
             lastRunError: widget.lastRunError,
             dueDiligenceFindings: widget.dueDiligenceFindings,
+            priorFailureContext: isRetry ? _lastFailureForRetry : null,
+            onProgress: _appendProgress,
+            onContextUpdate: _onContextUpdate,
           );
-      setState(() => _draft = draft);
+
+      setState(() {
+        _draft = result.draft;
+        _verified = result.verified;
+        _contextUsed = result.estimatedTokensUsed;
+        _contextBudget = result.contextBudgetTokens;
+        _lastTurnsUsed = result.turnsUsed;
+      });
+
+      if (result.verified) {
+        _appendProgress(
+          'Ready for APPLY (${result.turnsUsed} turns, '
+          'est. context $_contextUsed tokens)',
+        );
+      } else {
+        _lastFailureForRetry = result.message;
+        _appendProgress('Not verified: ${result.message}');
+        setState(() => _error = result.message);
+      }
     } catch (e) {
-      final msg = e.toString();
-      final friendly = msg.contains('TimeoutException') ||
-              msg.toLowerCase().contains('timed out')
-          ? 'Patch generation timed out — script may be too large. '
-              'Tap GENERATE PATCH to retry, or shorten the change request.'
-          : (msg.contains('FormatException') ||
-                  msg.toLowerCase().contains('unterminated string') ||
-                  msg.contains('incomplete JSON'))
-              ? AgentBridgeSpec.incompleteJsonUserMessage
-              : msg;
+      final friendly =
+          e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+      _lastFailureForRetry = friendly;
+      _appendProgress('Failed: $friendly');
       setState(() => _error = friendly);
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _sendToTestCases() async {
+    final registry = ref.read(jsAgentRegistryProvider);
+    final assets = await registry.readAgentAssets(widget.agent.name);
+    final workspace = BroCodeWorkspace(
+      name: widget.agent.name,
+      description: widget.agent.description,
+      inputSchema: widget.agent.inputSchema.map(
+        (k, v) => MapEntry(k, v.toJson()),
+      ),
+      script: _draft?.script ?? widget.agent.script,
+      assets: assets,
+    );
+
+    final report = BroCodeFixtureReport(
+      exportedAt: DateTime.now(),
+      appVersion: '1.0.0+1',
+      workspace: workspace,
+      changeRequest: _changeCtrl.text.trim(),
+      lastRunError: widget.lastRunError,
+      dueDiligenceFindings: widget.dueDiligenceFindings,
+      agentActivity: List<String>.from(_progressLog),
+      failureMessage: _error ?? _lastFailureForRetry ?? 'IMPROVE not verified',
+      turnsUsed: _lastTurnsUsed,
+      estimatedTokensUsed: _contextUsed,
+      expectSyntaxOk: false,
+      expectSandboxOk: false,
+    );
+
+    await Clipboard.setData(ClipboardData(text: report.toJsonString()));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Fixture report copied. Save as test/fixtures/bro_code/<name>.bundle.json on your dev machine, then run flutter test.',
+          ),
+          duration: Duration(seconds: 5),
+        ),
+      );
     }
   }
 
@@ -2462,6 +2598,7 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
         script: draft.script,
         description: draft.description,
         inputSchema: draft.toAgentParameters(),
+        assetUpdates: draft.assetUpdates,
       );
       final verification = ref.read(agentVerificationProvider);
       final scan = verification.scanScript(draft.script);
@@ -2500,18 +2637,29 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'IMPROVE ${widget.agent.name.toUpperCase()}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'IMPROVE ${widget.agent.name.toUpperCase()}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+                ContextUsageGauge(
+                  usedTokens: _contextUsed,
+                  budgetTokens: _contextBudget,
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             const Text(
-              'Describe what is wrong. Tap a suggestion to use it, then generate a patch.',
+              'A coding agent will edit, test in the sandbox, and retry until verified. '
+              'Live steps appear below — you can leave APPLY until the agent finishes green.',
               style: TextStyle(color: Colors.white38, fontSize: 11),
             ),
             if (chips.isNotEmpty) ...[
@@ -2598,35 +2746,108 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
                 foregroundColor: Colors.lightBlueAccent,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              onPressed: _busy ? null : _generatePatch,
-              icon: _busy && _draft == null
+              onPressed: _busy ? null : () => _generatePatch(),
+
+              icon: _busy && !_verified
                   ? const SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.tune, size: 18),
+                  : const Icon(Icons.auto_fix_high, size: 18),
               label: Text(
-                _busy && _draft == null
-                    ? 'GENERATING PATCH…'
-                    : 'GENERATE PATCH',
+                _busy && !_verified
+                    ? 'CODING AGENT WORKING…'
+                    : 'RUN CODING AGENT',
                 style: const TextStyle(
                     fontWeight: FontWeight.bold, fontSize: 12),
               ),
             ),
-            if (_draft != null) ...[
+            if (_busy) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Stay on this sheet — steps and heartbeats update while the model thinks.',
+                style: TextStyle(color: Colors.white30, fontSize: 10),
+              ),
+            ],
+            if (_progressLog.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Text('AGENT ACTIVITY',
+                      style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1)),
+                  const Spacer(),
+                  if (_contextUsed > 0)
+                    Text(
+                      'Est. $_contextUsed / $_contextBudget',
+                      style: const TextStyle(
+                          color: Colors.white38, fontSize: 9),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 220),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D0D0D),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _busy
+                        ? Colors.lightBlueAccent.withValues(alpha: 0.4)
+                        : Colors.white12,
+                  ),
+                ),
+                child: ListView.builder(
+                  controller: _progressScroll,
+                  itemCount: _progressLog.length,
+                  itemBuilder: (context, i) {
+                    final line = _progressLog[i];
+                    final isHeartbeat = line.contains('Still waiting');
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        isHeartbeat ? '… $line' : '• $line',
+                        style: TextStyle(
+                          color: isHeartbeat
+                              ? Colors.white38
+                              : Colors.white70,
+                          fontSize: 11,
+                          fontFamily: 'Courier',
+                          fontStyle: isHeartbeat
+                              ? FontStyle.italic
+                              : FontStyle.normal,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+            if (_draft != null && _verified) ...[
               const SizedBox(height: 16),
-              const Text('PATCH PREVIEW',
+              const Text('VERIFIED DRAFT',
                   style: TextStyle(
-                      color: Colors.white54,
+                      color: Colors.greenAccent,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1)),
               const SizedBox(height: 6),
               Text(
-                _draft!.notes ?? 'Patch ready.',
+                _draft!.notes ?? 'Sandbox + syntax verified.',
                 style: const TextStyle(color: Colors.white70, fontSize: 12),
               ),
+              if (_draft!.assetUpdates.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Also updates asset(s): ${_draft!.assetUpdates.keys.join(', ')}',
+                  style: const TextStyle(color: Colors.white38, fontSize: 10),
+                ),
+              ],
               const SizedBox(height: 8),
               Container(
                 constraints: const BoxConstraints(maxHeight: 140),
@@ -2655,33 +2876,48 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
                 ),
                 onPressed: _busy ? null : _apply,
                 child: Text(
-                  _busy ? 'APPLYING…' : 'APPLY PATCH',
+                  _busy ? 'APPLYING…' : 'APPLY TO VAULT (C4)',
                   style: const TextStyle(
                       fontWeight: FontWeight.bold, fontSize: 12),
                 ),
               ),
             ],
-            if (_error != null) ...[
+            if (_error != null || (!_verified && _progressLog.isNotEmpty && !_busy)) ...[
               const SizedBox(height: 12),
-              Text(_error!,
-                  style:
-                      const TextStyle(color: Colors.redAccent, fontSize: 11)),
-              if (_error!.toLowerCase().contains('timed out') ||
-                  _error!.contains('TimeoutException') ||
-                  _error!.contains('incomplete JSON') ||
-                  _error!.toLowerCase().contains('unterminated')) ...[
-                const SizedBox(height: 8),
-                OutlinedButton(
-                  onPressed: _busy ? null : _generatePatch,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.lightBlueAccent,
-                    side: const BorderSide(color: Colors.lightBlueAccent),
-                  ),
-                  child: const Text('RETRY PATCH',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 11)),
+              if (_error != null)
+                Text(_error!,
+                    style:
+                        const TextStyle(color: Colors.redAccent, fontSize: 11)),
+              const SizedBox(height: 8),
+              const Text(
+                'Improvement did not succeed yet. Retry, or send this Bro Code to test cases so we can fix the agent in a future update.',
+                style: TextStyle(color: Colors.white38, fontSize: 10),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _sendToTestCases,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.amberAccent,
+                  side: const BorderSide(color: Colors.amberAccent),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-              ],
+                icon: const Icon(Icons.science_outlined, size: 18),
+                label: const Text('SEND TO TEST CASES',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 11)),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed:
+                    _busy ? null : () => _generatePatch(isRetry: true),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.lightBlueAccent,
+                  side: const BorderSide(color: Colors.lightBlueAccent),
+                ),
+                child: const Text('RETRY AGENT',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 11)),
+              ),
             ],
           ],
         ),

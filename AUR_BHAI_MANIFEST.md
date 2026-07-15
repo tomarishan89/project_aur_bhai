@@ -1,5 +1,5 @@
 # PROJECT AUR BHAI - MASTER ECOSYSTEM MANIFEST & KNOWLEDGE TRANSFER
-**Document State:** FROZEN (Arch v3.7 | Eng v2.7)
+**Document State:** FROZEN (Arch v3.8 | Eng v2.8)
 
 ## 1. PRODUCT CONCEPT & ULTIMATE VISION
 **The Concept:** Project Aur Bhai is a decentralized, voice-orchestrated **Mobile Agentic OS** and local **Edge Server** acting as a proxy for human activity. It is completely use-case agnostic. It natively runs as a secure, headless execution environment managing hardware sensors, acoustic handshakes, and an AI-driven Model Context Protocol (MCP). All features are dynamically added via local, sandboxed "Plugins."
@@ -37,12 +37,16 @@ Moving beyond the limitations of native OS dictation (Speech-to-Text), which act
     *   **Single Tap (Recording):** Ends the recording early and immediately processes the command.
     *   **Double Tap (Recording):** Cancels the recording, deletes the audio, and silently returns to idle.
 
-### 2.4 Ecosystem Agent Classifications
-Rather than passive plugins, features are built as active, collaborative **Agents**:
-1. **Action Agents:** Perform straightforward utility commands on request (e.g., `CalculatorAgent`).
-2. **Telemetry Agents:** Continuously monitor background hardware sensors (e.g., GPS, Accelerometer buffers) and commit logs to the local SQLite database.
-3. **Server/Dashboard Agents:** Spin up background HTTP routes on the local edge server to expose real-time UI dashboards (e.g. `pothole_telemetry` live graph).
-4. **Orchestrator Agents:** High-level coordinator agents capable of chaining other agents together (e.g. A *Pothole Reporter* Orchestrator that detects a pothole via telemetry, gets a frame from the Dashcam agent, reads GPS, and triggers the Twitter agent).
+### 2.4 Bro Code (Bhai log) & Internal Agents
+User-generated codebases are **Bro Code** (collectively **Bhai log**). The word **Agent** is reserved for internal AI workers that build and verify them (Coder, Tester, Deployer).
+
+Bro Code classifications (formerly "Agents"):
+1. **Action Bro Code:** Utility commands on request (e.g. Calculator).
+2. **Telemetry Bro Code:** Background sensor monitors writing to SQLite.
+3. **Server/Dashboard Bro Code:** Local edge HTML5 dashboards.
+4. **Orchestrator Bro Code:** Chains other Bro Code units (deferred).
+
+**Author / refine pipeline:** Coder Agent emits full `scriptBase64` rewrites (surgical Base64 patches are last-resort). Tester Agent runs smoke tests in an **in-memory sandbox vault** so C4 Bro Code never touches sovereign data until promoted to C2.
 
 ### 2.5 The JS Bridge Paradigm & Caching (Arch v3.5 Update)
 To prevent recompiling Dart and allow dynamic Agent generation:
@@ -72,11 +76,12 @@ Not Verified (C4)  →  Due Diligence (C3)  →  Verified (C2)
 1. **Entry — Not Verified (C4):** Every newly created or marketplace-picked agent starts here. **RUN is disabled** in UI and engine until promotion to Verified (C2). Voice/UI authoring creates and registers at C4 after explicit BUILD approval, but does not execute until the user promotes. Zero real-world sensor access until C2.
 2. **Agent Marketplace:** The Not Verified (C4) pool doubles as the **Agent Marketplace** — a browsable catalog where users discover and pick up community or third-party agents. Picked-up agents enter at C4.
 3. **Due Diligence (C3):** When the user requests promotion, the agent undergoes an automated and/or assisted **malicious-intent check** against the user (data exfiltration patterns, credential harvesting, destructive SQL, etc.). C3 agents are restricted to delegated scoping — the user must explicitly invoke them ("Ask [Agent] to..."). **RUN remains disabled** until C2.
+    * **Important:** Due diligence is **static policy / malicious-intent scanning** of source text. It does **not** execute the agent. Syntax and runtime errors come from QuickJS `validateScriptSyntax` / RUN. IMPROVE **verify-before-handoff** gates on QuickJS syntax before offering APPLY. A SyntaxError on last RUN and a due-diligence finding can appear together because they are independent checks.
 4. **Verified (C2):** Agents that pass due diligence (or are force-promoted with device authentication) gain **RUN enabled**, real sensor access, and background execution privileges. The JS bridge refuses execution for non-C1/C2 agents as defense in depth.
 5. **Self-Authored + Flagged Path:** If a user self-authors an agent that the due-diligence check flags as potentially harmful to the user (self-harm scenario), the system:
     * Displays a **reconsideration warning** listing the specific reasons.
     * If the user insists on proceeding, requires a **device screen lock / biometric gate** (`FlutterFragmentActivity` + `local_auth`) to force-promote to Verified (C2).
-6. **Promotion Gate:** No agent may advance from C4 → C3 → C2 without passing (or explicitly overriding) the due-diligence check. **IMPROVE** is the path to fix flagged scripts (syntax errors, false-positive DOM flags in dashboard HTML, bad outputs) before promotion.
+6. **Promotion Gate:** No agent may advance from C4 → C3 → C2 without passing (or explicitly overriding) the due-diligence check. **IMPROVE** is the path to fix flagged scripts (syntax errors, false-positive DOM flags in dashboard HTML, bad outputs) before promotion. See `[MS-DUE-DILIGENCE]` for scan hardening (false-positive HTML stripping, finding codes, UX that separates syntax vs policy).
 
 ### 2.8 Single-Call Elicitation Protocol & Conversational Agent Authoring (Arch v3.7)
 The Core is a verb-first intent dispatcher with multi-turn conversational state. **Every user turn uses exactly one LLM call** — audio/text + fat App Spec template in, merged spec + spoken confirmation out. No chained extract/paraphrase/classify calls on the hot path.
@@ -214,7 +219,7 @@ The Core is a verb-first intent dispatcher with multi-turn conversational state.
 *   **Engineering & Architecture:**
     *   [x] *`[MS-USER-ECOSYSTEM-ENG1]` LLM agent authoring flow — user prompt "Create an agent that..." → BYOK generates JS + metadata → vault → register (distinct from agent execution). [IN REVIEW]*
     *   [x] *`[MS-USER-ECOSYSTEM-ENG2]` Agent lifecycle — list, delete, run, and export vault-stored agent bundles. [IN REVIEW]*
-    *   [ ] *`[MS-USER-ECOSYSTEM-ENG3]` Agent verification state machine (C4 → C3 → C2) with automated malicious-intent due-diligence checks per §2.7; RUN gated until C2 in UI + JS adapter. [IN REVIEW]*
+    *   [ ] *`[MS-USER-ECOSYSTEM-ENG3]` Agent verification state machine (C4 → C3 → C2) with automated malicious-intent due-diligence checks per §2.7; RUN gated until C2 in UI + JS adapter. Extended by **`[MS-DUE-DILIGENCE]`** (scan ≠ RUN, false-positive hardening). [IN REVIEW]*
     *   [ ] *`[MS-USER-ECOSYSTEM-ENG4]` Reconsideration warning + device-auth force-promotion (`FlutterFragmentActivity` + local_auth) for self-authored agents flagged as harmful. [IN REVIEW]*
 *   **Ecosystem & Agents:**
     *   [x] *`[MS-USER-ECOSYSTEM-AGT1]` Vault key convention (`agent:<Name>`, `agent:<Name>:schema`) and dynamic registration into AgentService + LLM router. [IN REVIEW]*
@@ -257,9 +262,44 @@ The Core is a verb-first intent dispatcher with multi-turn conversational state.
 *   **User Perspective (UI/UX):**
     *   [x] *`[MS-AGENT-REFINE-UX1]` "Fix / Improve <agent>" (voice) or IMPROVE button on agent detail → patch dialogue / sheet until apply (e.g. teach Calculator the `^` power operator). [IN REVIEW]*
 *   **Engineering & Architecture:**
-    *   [x] *`[MS-AGENT-REFINE-ENG1]` Load existing source + schema from vault; LLM patch generation; version history with rollback. [IN REVIEW]*
+    *   [x] *`[MS-AGENT-REFINE-ENG1]` Load existing source + schema from vault; LLM surgical patch generation (Base64 edits, excerpt, local SyntaxError fix, verify-before-handoff); version history with rollback. [IN REVIEW]*
 *   **Ecosystem & Agents:**
     *   [x] *`[MS-AGENT-REFINE-AGT1]` Re-register the refined agent as a new version; a material code change resets its tier to C4 per §2.7. [IN REVIEW]*
+
+### - [x] `[MS-BROCODE-AGENT]` MILESTONE: **Agentic Bro Code IMPROVE (tool loop) [IN REVIEW — awaiting on-device IMPROVE of Telemetry/Locator]**
+*   **User Perspective (UI/UX):**
+    *   [x] *`[MS-BROCODE-AGENT-UX1]`* IMPROVE sheet shows live AGENT ACTIVITY (turns, tools, heartbeats while model thinks) + Est. context circle; APPLY only when sandbox+syntax verified. [IN REVIEW]
+*   **Engineering & Architecture:**
+    *   [x] *`[MS-BROCODE-AGENT-ENG1]`* BroCodeWorkspace + tools (`read_*`, `apply_edit`, `write_full`, `validate_syntax`, `sandbox_run`, `scan_policy`) with structured observations. [IN REVIEW]
+    *   [x] *`[MS-BROCODE-AGENT-ENG2]`* CodingAgent JSON action loop: host reject-done, turn/sandbox/context budgets; wire IMPROVE + voice refine. [IN REVIEW]
+*   **Ecosystem & Agents:**
+    *   [ ] **`[MS-BROCODE-AGENT-AGT1]`** Successful agent IMPROVE of existing Bro Code (e.g. Telemetry/Locator) to verified draft without manual Base64 patch ritual. [TARGETED FOR NEXT ACTION]
+
+### - [x] `[MS-BROCODE-FIXTURES]` MILESTONE: **Bro Code fixture tests + SEND TO TEST CASES [BUILT]**
+*   **User Perspective (UI/UX):**
+    *   [x] *`[MS-BROCODE-FIXTURES-UX1]`* IMPROVE failure shows **SEND TO TEST CASES** — copies `BroCodeFixtureReport` JSON to clipboard with path hint for dev ingest. [BUILT]
+*   **Engineering & Architecture:**
+    *   [x] *`[MS-BROCODE-FIXTURES-ENG1]`* `test/fixtures/bro_code/` + `bro_code_fixture_loader.dart` + `bro_code_fixtures_test.dart` (syntax, due diligence, sandbox per bundle; QuickJS native guard). [BUILT]
+    *   [x] *`[MS-BROCODE-FIXTURES-ENG2]`* `BroCodeFixtureReport` + `reportToBundleJson` helper; Cursor rule `bro-code-fixtures.mdc`. [BUILT]
+*   **Ecosystem & Agents:**
+    *   [ ] **`[MS-BROCODE-FIXTURES-AGT1]`** First committed repro fixture (e.g. Locator from phone) passes after agent fix; flip `expect*` flags in repo. [TARGETED FOR NEXT ACTION]
+*   **Deferred:**
+    *   [ ] `[MS-BROCODE-REPORT]` User-consented upload of fixture reports to a dev centre (no silent egress); v1 is clipboard-only.
+
+### - [ ] `[MS-DUE-DILIGENCE]` MILESTONE: **Due Diligence Hardening (scan ≠ RUN) [TARGETED FOR NEXT ACTION]**
+*   **User Perspective (UI/UX):**
+    *   [ ] **`[MS-DUE-DILIGENCE-UX1]` Findings UI separates syntax/runtime (last RUN / QuickJS) vs policy scan (due diligence), with copy: "This check does not execute your agent." [TARGETED FOR NEXT ACTION]**
+    *   [ ] **`[MS-DUE-DILIGENCE-UX2]` Each finding shows severity + why flagged + suggested IMPROVE chip (and "likely false positive" when HTML template–related). [TARGETED FOR NEXT ACTION]**
+    *   [ ] **`[MS-DUE-DILIGENCE-UX3]` Promotion sheet distinguishes blocking findings vs informational warnings; DOM-in-dashboard false positives are not styled like real sandbox DOM abuse. [TARGETED FOR NEXT ACTION]**
+*   **Engineering & Architecture:**
+    *   [ ] **`[MS-DUE-DILIGENCE-ENG1]` Enforce pipeline on BUILD / APPLY / promote: (1) QuickJS validateScriptSyntax, (2) static scanScript, (3) optional capped smoke execute only for empty/trivial inputSchema — never claim scan ≡ run. [TARGETED FOR NEXT ACTION]**
+    *   [ ] **`[MS-DUE-DILIGENCE-ENG2]` Harden HTML-template stripping so document/fetch inside dashboards do not false-flag; regression tests with Locator-like / TelemetryDashboard shapes. [TARGETED FOR NEXT ACTION]**
+    *   [ ] **`[MS-DUE-DILIGENCE-ENG3]` Structured finding codes (DOM_OUTSIDE_SANDBOX, EXTERNAL_HTTP, DESTRUCTIVE_SQL, …); IMPROVE chips map from codes. [TARGETED FOR NEXT ACTION]**
+    *   [ ] `[MS-DUE-DILIGENCE-ENG4]` Optional assisted pass: ambiguous static findings may offer read-only QuickJS parse + explain-via-LLM (not a substitute for syntax verify-before-handoff).
+*   **Ecosystem & Agents:**
+    *   [ ] **`[MS-DUE-DILIGENCE-AGT1]` Golden fixtures: clean Calculator; dashboard agent that must pass DD; malicious patterns that must fail; syntax-broken script fails QuickJS before promotion UI. [TARGETED FOR NEXT ACTION]**
+    *   [ ] **`[MS-DUE-DILIGENCE-AGT2]` Tie refine verify-before-handoff to promotion: APPLY only after syntax OK; DD findings remain visible but labeled correctly. [TARGETED FOR NEXT ACTION]**
+
 ### - [ ] `[MS-CORE-JS-MIGRATION]` MILESTONE: Core Agents as Refinable JS Vault Agents [IN REVIEW — awaiting on-device physical test]
 *   **User Perspective (UI/UX):**
     *   [x] *`[MS-CORE-JS-MIGRATION-UX1]` Core agents appear in the catalog as refinable JS agents, not opaque native modules. [IN REVIEW]*
@@ -395,13 +435,21 @@ To guarantee extreme robustness of the native edge runtime before compiling furt
 ---
 
 ## 7. ARCHITECTURE & ENGINEERING HISTORY (Changelog)
-* **Arch v3.7 / Eng v2.7 (Current):**
+* **Arch v3.8 / Eng v2.8 (Current):**
+  * *Terminology:* User scripts are **Bro Code** (Bhai log). **Agent** means internal Coder / Tester / Deployer workers.
+  * *Agentic IMPROVE (`[MS-BROCODE-AGENT]`):* Tool-loop coding agent (`apply_edit` / `sandbox_run` / …), host reject-done, live AGENT ACTIVITY + model-wait heartbeats, Est. context circle; APPLY only when verified.
+  * *Coder Agent:* IMPROVE / refine prefers full `scriptBase64` rewrite; surgical Base64 patches are fallback only.
+  * *Sandbox vault:* In-memory SQLite for C4 smoke tests via `TEST IN SANDBOX` and Tester Agent — never sovereign vault.
+  * *Types:* `BroCode` / `BroCodeService` with typedefs for `AurBhaiAgent` / `AgentService` during migration.
+
+* **Arch v3.7 / Eng v2.7 (Legacy):**
   * *Paradigm:* Single-Call Elicitation Protocol (§2.8). One LLM call per turn fuses intent classification + App Spec template fill + spoken confirmation. Eliminates 3–4 chained round trips that caused ~5s authoring latency.
   * *App Spec:* 13 conditional slots with implicit-consent lifecycle (empty → proposed → confirmed); **mandatory final BUILD gate** (review phase) replaces auto-build-on-silence; concise per-turn echo; visual authoring panel.
   * *Intent safety net:* Deterministic AUTHOR reclassification when the LLM returns DIRECT for "build/make/create … agent/app/dashboard".
   * *Execution gate (§2.7):* RUN disabled for C4/C3 in UI and JS adapter; enabled only at C1/C2 after promotion (or force-promote with `FlutterFragmentActivity` + `local_auth`). No sandbox-trial execution of unverified agents.
   * *Dashboard UX:* OPEN DASHBOARD only for HTML keys written in the current run; run errors styled distinctly; due-diligence scan strips embedded dashboard HTML templates to avoid DOM/fetch false positives.
   * *Refine UI:* Agents page IMPROVE sheet with contextual chips from run errors and scan findings; build date/time on agent cards.
+  * *IMPROVE verify-before-handoff:* Surgical Base64 edits + local SyntaxError fix + capped multi-turn repair; QuickJS syntax must pass before APPLY. Due diligence clarified as static scan ≠ RUN (§2.7); follow-on `[MS-DUE-DILIGENCE]` for false-positive / UX hardening (Locator-class DOM + SyntaxError coexistence).
   * *English only:* Removed hi-IN default and multilingual prompt branching until re-enabled.
   * *External integrations:* Slot 13 captures X/FB/Instagram/YouTube/Threads/webhook actions; BYOK platform keys in Settings; C2 egress gate per §2.6/§2.7.
   * *Performance:* Default Gemini model `gemini-2.0-flash`; removed hardcoded 1500ms wake delay after custom response playback.

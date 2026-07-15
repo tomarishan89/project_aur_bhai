@@ -25,6 +25,10 @@ class ConversationalSessionService extends ChangeNotifier {
   Map<String, dynamic>? _refineLoadedSchema;
   String? _refineLoadedDescription;
   String? _pendingPatchDescription;
+  String? _pendingPatchScript;
+  String? _pendingPatchAgentDescription;
+  Map<String, dynamic>? _pendingPatchInputSchema;
+  Map<String, String> _pendingAssetUpdates = const {};
 
   SessionKind get kind => _kind;
   SessionPhase get phase => _phase;
@@ -46,6 +50,11 @@ class ConversationalSessionService extends ChangeNotifier {
   Map<String, dynamic>? get refineLoadedSchema => _refineLoadedSchema;
   String? get refineLoadedDescription => _refineLoadedDescription;
   String? get pendingPatchDescription => _pendingPatchDescription;
+  String? get pendingPatchScript => _pendingPatchScript;
+  String? get pendingPatchAgentDescription => _pendingPatchAgentDescription;
+  Map<String, dynamic>? get pendingPatchInputSchema => _pendingPatchInputSchema;
+  Map<String, String> get pendingAssetUpdates =>
+      Map.unmodifiable(_pendingAssetUpdates);
 
   /// Last due-diligence findings surfaced during review/build (for UI).
   DueDiligenceSnapshot? _lastScan;
@@ -324,6 +333,22 @@ class ConversationalSessionService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Caches the generated refine draft so affirm applies without a second LLM call.
+  void setPendingRefineDraft({
+    required String script,
+    required String description,
+    required Map<String, dynamic> inputSchema,
+    String? notes,
+    Map<String, String> assetUpdates = const {},
+  }) {
+    _pendingPatchScript = script;
+    _pendingPatchAgentDescription = description;
+    _pendingPatchInputSchema = inputSchema;
+    _pendingPatchDescription = notes ?? description;
+    _pendingAssetUpdates = Map<String, String>.from(assetUpdates);
+    notifyListeners();
+  }
+
   void cancel() {
     _kind = SessionKind.none;
     _phase = SessionPhase.eliciting;
@@ -353,6 +378,10 @@ class ConversationalSessionService extends ChangeNotifier {
     _refineLoadedSchema = null;
     _refineLoadedDescription = null;
     _pendingPatchDescription = null;
+    _pendingPatchScript = null;
+    _pendingPatchAgentDescription = null;
+    _pendingPatchInputSchema = null;
+    _pendingAssetUpdates = const {};
   }
 
   static bool isProceedCommand(String text) =>

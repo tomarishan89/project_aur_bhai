@@ -18,6 +18,8 @@ import 'app_spec.dart';
 import 'conversational_session_service.dart';
 import 'agent_verification_service.dart';
 import 'js_agent_registry.dart';
+import '../pipeline/bro_code_coding_agent.dart';
+import '../pipeline/bro_code_workspace.dart';
 
 enum VoiceState { idle, listening, processing, awaitingHandshake }
 
@@ -553,74 +555,102 @@ class VoiceHandshakeEngine extends ChangeNotifier {
     final script = _session.refineLoadedScript;
     if (target == null || issue == null || script == null) return;
 
-    _addLog('Refine Patch', 'Generating patch for: $issue');
+    _addLog('Coding Agent', 'Improving $target — live steps follow');
     notifyListeners();
 
     try {
-      final llm = _ref.read(llmServiceProvider);
+      final registry = _ref.read(jsAgentRegistryProvider);
+      final assets = await registry.readAgentAssets(target);
       final schema = _session.refineLoadedSchema?['inputSchema'];
-      final draft = await llm.refineAgentScript(
-        agentName: target,
-        currentScript: script,
-        changeRequest: issue,
-        currentDescription: _session.refineLoadedDescription,
-        currentInputSchema:
-            schema is Map ? Map<String, dynamic>.from(schema) : null,
-        lastRunError: (_session.lastScan?.findings.isNotEmpty ?? false)
-            ? _session.lastScan!.findings.join('; ')
-            : null,
-        dueDiligenceFindings: _session.lastScan?.findings ?? const [],
+      final workspace = BroCodeWorkspace(
+        name: target,
+        description: _session.refineLoadedDescription ?? '',
+        inputSchema:
+            schema is Map ? Map<String, dynamic>.from(schema) : <String, dynamic>{},
+        script: script,
+        assets: assets,
       );
-      _session.setPendingPatchDescription(draft.notes ?? issue);
-      _addLog('Refine Preview', draft.notes ?? 'Patch ready.');
+
+      final result = await _ref.read(broCodeCodingAgentProvider).improve(
+            workspace: workspace,
+            changeRequest: issue,
+            lastRunError: (_session.lastScan?.findings.isNotEmpty ?? false)
+                ? _session.lastScan!.findings.join('; ')
+                : null,
+            dueDiligenceFindings: _session.lastScan?.findings ?? const [],
+            onProgress: (msg) {
+              _addLog('Agent', msg);
+              notifyListeners();
+            },
+          );
+
+      if (!result.verified || result.draft == null) {
+        _addLog('Coding Agent', result.message, isError: true);
+        notifyListeners();
+        await speak(
+          'The coding agent could not verify a fix yet. ${result.message} Try IMPROVE on the Bhai log page, or describe the change again.',
+        );
+        return;
+      }
+
+      final draft = result.draft!;
+      _session.setPendingRefineDraft(
+        script: draft.script,
+        description: draft.description,
+        inputSchema: draft.inputSchema,
+        notes: draft.notes ?? issue,
+        assetUpdates: draft.assetUpdates,
+      );
+      _addLog('Coding Agent', draft.notes ?? 'Verified draft ready.');
       notifyListeners();
       await speak(
-        'I prepared a patch. ${draft.notes ?? ''} ${AuthorPrompts.refineProceedHint}',
+        'I verified a fix in the sandbox. ${draft.notes ?? ''} ${AuthorPrompts.refineProceedHint}',
       );
     } catch (e) {
-      _addLog('Refine Error', '$e', isError: true);
+      _addLog('Coding Agent Error', '$e', isError: true);
       notifyListeners();
       await speak(
-          'I had trouble generating the patch. Please describe the change again.');
+          'The coding agent hit an error. Please describe the change again.');
     }
   }
 
   Future<void> _finalizeRefine() async {
     final target = _session.refineTarget;
-    final issue = _session.refineIssue;
-    final script = _session.refineLoadedScript;
-    if (target == null || issue == null || script == null) return;
+    final cachedScript = _session.pendingPatchScript;
+    if (target == null || cachedScript == null) {
+      await speak('I do not have a prepared patch yet. Describe the change first.');
+      return;
+    }
 
     _session.enterCompiling();
-    _addLog('Refine Apply', 'Applying patch to $target...');
+    _addLog('Refine Apply', 'Applying cached patch to $target...');
     notifyListeners();
 
     try {
-      final llm = _ref.read(llmServiceProvider);
-      final schema = _session.refineLoadedSchema?['inputSchema'];
-      final draft = await llm.refineAgentScript(
-        agentName: target,
-        currentScript: script,
-        changeRequest: issue,
-        currentDescription: _session.refineLoadedDescription,
-        currentInputSchema:
-            schema is Map ? Map<String, dynamic>.from(schema) : null,
-        lastRunError: (_session.lastScan?.findings.isNotEmpty ?? false)
-            ? _session.lastScan!.findings.join('; ')
-            : null,
-        dueDiligenceFindings: _session.lastScan?.findings ?? const [],
-      );
-
       final registry = _ref.read(jsAgentRegistryProvider);
+      final inputSchema = _session.pendingPatchInputSchema;
       await registry.refineAndReregister(
         name: target,
-        script: draft.script,
-        description: draft.description,
-        inputSchema: draft.toAgentParameters(),
+        script: cachedScript,
+        description: _session.pendingPatchAgentDescription,
+        inputSchema: inputSchema == null
+            ? null
+            : inputSchema.map((key, value) {
+                final field = value is Map ? value : <String, dynamic>{};
+                return MapEntry(
+                  key,
+                  AgentParameter(
+                    type: field['type']?.toString() ?? 'string',
+                    description: field['description']?.toString() ?? '',
+                    required: field['required'] as bool? ?? true,
+                  ),
+                );
+              }),
+        assetUpdates: _session.pendingAssetUpdates,
       );
 
       final verification = _ref.read(agentVerificationProvider);
-      final scan = verification.scanScript(draft.script);
+      final scan = verification.scanScript(cachedScript);
       _addLog(
         'Due Diligence',
         scan.passed

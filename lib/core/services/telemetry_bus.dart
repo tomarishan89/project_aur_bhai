@@ -47,10 +47,14 @@ class TelemetryRecord {
 /// The Telemetry Bus Service manages the SQLite Sovereign Data Vault.
 class TelemetryBusService extends ChangeNotifier {
   Database? _db;
+  Database? _sandboxDb;
   Timer? _purgeTimer;
   final Duration ttlDuration;
 
   TelemetryBusService({this.ttlDuration = const Duration(hours: 24)});
+
+  /// True while Bro Code is executing against the in-memory sandbox vault.
+  bool get isSandboxActive => _sandboxDb != null;
 
   Future<void> initialize() async {
     final dbPath = await getDatabasesPath();
@@ -60,23 +64,7 @@ class TelemetryBusService extends ChangeNotifier {
       path,
       version: 2, // Bump to support dynamic vault tables
       onCreate: (db, version) async {
-        await db.execute('''
-          CREATE TABLE telemetry (
-            id TEXT PRIMARY KEY,
-            timestamp TEXT,
-            latitude REAL,
-            longitude REAL,
-            accelerometerZ REAL,
-            compassDirection REAL
-          )
-        ''');
-        await db.execute('''
-          CREATE TABLE sovereign_vault (
-            key TEXT PRIMARY KEY,
-            value TEXT,
-            mime_type TEXT
-          )
-        ''');
+        await _createVaultSchema(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -93,6 +81,64 @@ class TelemetryBusService extends ChangeNotifier {
     debugPrint('[TelemetryBus] SQLite Sovereign Vault Initialized at $path');
     _startPurgeFirewall();
   }
+
+  Future<void> _createVaultSchema(Database db) async {
+    await db.execute('''
+      CREATE TABLE telemetry (
+        id TEXT PRIMARY KEY,
+        timestamp TEXT,
+        latitude REAL,
+        longitude REAL,
+        accelerometerZ REAL,
+        compassDirection REAL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE sovereign_vault (
+        key TEXT PRIMARY KEY,
+        value TEXT,
+        mime_type TEXT
+      )
+    ''');
+  }
+
+  /// Opens (or resets) an isolated in-memory DB for unverified Bro Code tests.
+  ///
+  /// Seeded with empty `telemetry` + `sovereign_vault` — never the real vault.
+  Future<void> openSandbox({bool reset = true}) async {
+    if (_sandboxDb != null && reset) {
+      await _sandboxDb!.close();
+      _sandboxDb = null;
+    }
+    if (_sandboxDb != null) return;
+
+    _sandboxDb = await openDatabase(
+      inMemoryDatabasePath,
+      version: 1,
+      onCreate: (db, version) async {
+        await _createVaultSchema(db);
+      },
+    );
+    // Fixture rows so SQL-backed Bro Code can exercise SELECT paths.
+    await _sandboxDb!.insert('telemetry', {
+      'id': 'sandbox-seed-1',
+      'timestamp': DateTime.now().toIso8601String(),
+      'latitude': 0.0,
+      'longitude': 0.0,
+      'accelerometerZ': 9.8,
+      'compassDirection': 0.0,
+    });
+    debugPrint('[TelemetryBus] Sandbox vault opened (in-memory)');
+  }
+
+  Future<void> closeSandbox() async {
+    if (_sandboxDb == null) return;
+    await _sandboxDb!.close();
+    _sandboxDb = null;
+    debugPrint('[TelemetryBus] Sandbox vault closed');
+  }
+
+  Database? get _activeDb => _sandboxDb ?? _db;
 
   Future<void> addRecord({
     required double latitude,
@@ -133,29 +179,44 @@ class TelemetryBusService extends ChangeNotifier {
     return maps.map((e) => TelemetryRecord.fromMap(e)).toList();
   }
 
-  // Raw Database Getter for the JS Bridge & Agents
+  /// Sovereign (on-disk) DB only — never the sandbox.
   Database? get database => _db;
 
-  /// Generic SQLite query method for high-performance agent operations
-  Future<List<Map<String, dynamic>>> executeQuery(String sql, [List<dynamic>? arguments]) async {
-    if (_db == null) return [];
+  /// Active target for JS Bridge: sandbox when open, else sovereign vault.
+  Database? get bridgeDatabase => _activeDb;
+
+  /// Generic SQLite query for Bro Code / JS Bridge.
+  ///
+  /// When [openSandbox] is active, reads hit the in-memory DB only.
+  Future<List<Map<String, dynamic>>> executeQuery(
+    String sql, [
+    List<dynamic>? arguments,
+  ]) async {
+    final db = _activeDb;
+    if (db == null) return [];
     try {
-      return await _db!.rawQuery(sql, arguments);
+      return await db.rawQuery(sql, arguments);
     } catch (e) {
       debugPrint('[TelemetryBus] Query Error: $e');
       rethrow;
     }
   }
 
-  /// Write dynamic string asset to the sovereign vault (e.g. dynamic HTML or generated code)
-  Future<void> writeVaultData(String key, String value, {String mimeType = 'text/plain'}) async {
-    if (_db == null) return;
-    await _db!.insert(
+  /// Write a string asset. Sandbox-active writes never touch the sovereign vault.
+  Future<void> writeVaultData(
+    String key,
+    String value, {
+    String mimeType = 'text/plain',
+  }) async {
+    final db = _activeDb;
+    if (db == null) return;
+    await db.insert(
       'sovereign_vault',
       {'key': key, 'value': value, 'mime_type': mimeType},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    debugPrint('[TelemetryBus] Wrote dynamic asset to Vault: $key ($mimeType)');
+    final target = _sandboxDb != null ? 'sandbox' : 'sovereign';
+    debugPrint('[TelemetryBus] Wrote $target vault asset: $key ($mimeType)');
   }
 
   /// List vault keys, optionally filtered by prefix (e.g. `agent:`).
@@ -237,6 +298,8 @@ class TelemetryBusService extends ChangeNotifier {
   @override
   void dispose() {
     _purgeTimer?.cancel();
+    _sandboxDb?.close();
+    _sandboxDb = null;
     _db?.close();
     super.dispose();
   }

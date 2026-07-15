@@ -9,9 +9,11 @@ import 'agent_service.dart';
 import 'js_bridge_service.dart';
 import 'telemetry_bus.dart';
 
-/// Loads Javascript agents from the sovereign vault and registers them.
+/// Loads Javascript Bro Code from the sovereign vault and registers it.
 class JsAgentRegistry {
+  /// Canonical vault prefix for Bro Code units (legacy `agent:` still loaded).
   static const vaultPrefix = 'agent:';
+  static const broVaultPrefix = 'bro:';
 
   final Ref _ref;
 
@@ -19,49 +21,74 @@ class JsAgentRegistry {
 
   String vaultKeyFor(String name) => '$vaultPrefix$name';
   String schemaKeyFor(String name) => '$vaultPrefix$name:schema';
+  String assetKeyFor(String name, String assetId) =>
+      '$vaultPrefix$name:asset:$assetId';
 
-  /// Scans `sovereign_vault` for `agent:<Name>` entries and registers adapters.
+  /// Lists related vault assets for an agent (`agent:<Name>:asset:<id>` → content).
+  Future<Map<String, String>> readAgentAssets(String name) async {
+    final telemetry = _ref.read(telemetryBusProvider);
+    final prefix = '$vaultPrefix$name:asset:';
+    final keys = await telemetry.listVaultKeys(prefix: prefix);
+    final assets = <String, String>{};
+    for (final key in keys) {
+      if (!key.startsWith(prefix)) continue;
+      final id = key.substring(prefix.length);
+      if (id.isEmpty) continue;
+      final entry = await telemetry.readVaultData(key);
+      final value = entry?['value'];
+      if (value != null) assets[id] = value;
+    }
+    return assets;
+  }
+
+  /// Scans `sovereign_vault` for `agent:<Name>` / `bro:<Name>` and registers.
   Future<int> loadAndRegisterAgents() async {
     final telemetry = _ref.read(telemetryBusProvider);
     final agentService = _ref.read(agentServiceProvider);
-    final keys = await telemetry.listVaultKeys(prefix: vaultPrefix);
     var registered = 0;
 
-    for (final key in keys) {
-      if (key.endsWith(':schema')) continue;
+    for (final prefix in [vaultPrefix, broVaultPrefix]) {
+      final keys = await telemetry.listVaultKeys(prefix: prefix);
 
-      final vaultEntry = await telemetry.readVaultData(key);
-      if (vaultEntry == null) continue;
+      for (final key in keys) {
+        if (key.endsWith(':schema')) continue;
+        // Skip version archives and related assets — not top-level scripts.
+        if (RegExp(r':v\d+$').hasMatch(key)) continue;
+        if (key.contains(':asset:')) continue;
 
-      final agentName = key.substring(vaultPrefix.length);
-      if (agentName.isEmpty) continue;
+        final vaultEntry = await telemetry.readVaultData(key);
+        if (vaultEntry == null) continue;
 
-      final schemaEntry = await telemetry.readVaultData('$key:schema');
-      final schema = schemaEntry != null
-          ? jsonDecode(schemaEntry['value']!) as Map<String, dynamic>
-          : <String, dynamic>{};
+        final agentName = key.substring(prefix.length);
+        if (agentName.isEmpty) continue;
 
-      final displayName = schema['name'] as String? ?? agentName;
-      final description = schema['description'] as String? ??
-          'Javascript agent loaded from vault ($key)';
-      final createdAt = _parseDate(schema['createdAt'] as String?);
-      final updatedAt = _parseDate(schema['updatedAt'] as String?);
+        final schemaEntry = await telemetry.readVaultData('$key:schema');
+        final schema = schemaEntry != null
+            ? jsonDecode(schemaEntry['value']!) as Map<String, dynamic>
+            : <String, dynamic>{};
 
-      agentService.registerAgent(
-        JsAgentAdapter(
-          ref: _ref,
-          name: displayName,
-          description: description,
-          inputSchema: _parseInputSchema(schema['inputSchema']),
-          script: vaultEntry['value']!,
-          securityClass:
-              AgentSecurityClassX.fromId(schema['securityClass'] as String?),
-          createdAt: createdAt,
-          updatedAt: updatedAt,
-        ),
-      );
-      registered++;
-      debugPrint('[JsAgentRegistry] Registered vault agent: $displayName');
+        final displayName = schema['name'] as String? ?? agentName;
+        final description = schema['description'] as String? ??
+            'Bro Code loaded from vault ($key)';
+        final createdAt = _parseDate(schema['createdAt'] as String?);
+        final updatedAt = _parseDate(schema['updatedAt'] as String?);
+
+        agentService.registerAgent(
+          JsAgentAdapter(
+            ref: _ref,
+            name: displayName,
+            description: description,
+            inputSchema: _parseInputSchema(schema['inputSchema']),
+            script: vaultEntry['value']!,
+            securityClass:
+                AgentSecurityClassX.fromId(schema['securityClass'] as String?),
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+          ),
+        );
+        registered++;
+        debugPrint('[JsAgentRegistry] Registered Bro Code: $displayName');
+      }
     }
 
     return registered;
@@ -215,6 +242,7 @@ class JsAgentRegistry {
     required String script,
     String? description,
     Map<String, AgentParameter>? inputSchema,
+    Map<String, String> assetUpdates = const {},
   }) async {
     final telemetry = _ref.read(telemetryBusProvider);
     final existingScript = await telemetry.readVaultData(vaultKeyFor(name));
@@ -227,6 +255,18 @@ class JsAgentRegistry {
         mimeType: 'application/javascript',
       );
       debugPrint('[JsAgentRegistry] Archived $name as v$nextVersion');
+    }
+
+    for (final entry in assetUpdates.entries) {
+      final mime = entry.key.toLowerCase().endsWith('.html')
+          ? 'text/html'
+          : 'text/plain';
+      await telemetry.writeVaultData(
+        assetKeyFor(name, entry.key),
+        entry.value,
+        mimeType: mime,
+      );
+      debugPrint('[JsAgentRegistry] Updated asset ${entry.key} for $name');
     }
 
     final bundle = await readAgentBundle(name);

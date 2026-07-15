@@ -201,6 +201,16 @@ class QuickJsRuntime extends JavascriptRuntime {
     Pointer<Pointer<Utf8NullTerminated>> stringResult =
         calloc<Pointer<Utf8NullTerminated>>();
     Pointer<Int32> errors = calloc<Int32>();
+    
+    // #region agent log
+    try {
+      final jsByteLen = utf8.encode(js).length;
+      File('debug-c55aa3.log').writeAsStringSync(
+          '{"sessionId":"c55aa3","id":"log_\${DateTime.now().millisecondsSinceEpoch}_3","timestamp":\${DateTime.now().millisecondsSinceEpoch},"location":"quickjs_runtime.dart:205","message":"jsEval length mismatch check","data":{"dartLength":\${js.length},"utf8Length":\$jsByteLen},"runId":"run1","hypothesisId":"H1"}\\n',
+          mode: FileMode.append);
+    } catch(e) {}
+    // #endregion
+
     _jsEvalWrapper(ctx, Utf8NullTerminated.toUtf8(js), js.length,
         Utf8NullTerminated.toUtf8(fileName), 0, errors, result, stringResult);
 

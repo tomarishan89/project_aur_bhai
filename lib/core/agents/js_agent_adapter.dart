@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/js_bridge_service.dart';
 import 'agent_base.dart';
 
-/// 4-tier trust classification for ecosystem agents.
+/// 4-tier trust classification for Bro Code (Bhai log).
 enum AgentSecurityClass {
   c1Core,
   c2Verified,
@@ -42,21 +42,21 @@ extension AgentSecurityClassX on AgentSecurityClass {
   }
 }
 
-/// Thin [AurBhaiAgent] wrapper that delegates execution to the QuickJS sandbox.
-class JsAgentAdapter extends AurBhaiAgent {
+/// Thin [BroCode] wrapper that delegates execution to QuickJS.
+class JsAgentAdapter extends BroCode {
   final Ref _ref;
   final String _name;
   final String _description;
-  final Map<String, AgentParameter> _inputSchema;
+  final Map<String, BroCodeParameter> _inputSchema;
   final String _script;
 
   /// Trust tier assigned at import/authoring time.
   final AgentSecurityClass securityClass;
 
-  /// When the agent was first saved to the vault (ISO-8601).
+  /// When the Bro Code was first saved to the vault (ISO-8601).
   final DateTime? createdAt;
 
-  /// When the agent was last refined/saved (ISO-8601).
+  /// When last refined/saved (ISO-8601).
   final DateTime? updatedAt;
 
   /// Raw JS source (exposed for lifecycle / export).
@@ -69,20 +69,27 @@ class JsAgentAdapter extends AurBhaiAgent {
   AgentExecutionResult? lastExecutionResult;
 
   JsAgentAdapter({
-    required this._ref,
-    required this._name,
-    required this._description,
-    required this._inputSchema,
-    required this._script,
+    required Ref ref,
+    required String name,
+    required String description,
+    required Map<String, BroCodeParameter> inputSchema,
+    required String script,
     this.securityClass = AgentSecurityClass.c4Unverified,
     this.createdAt,
     this.updatedAt,
-  });
+  })  : _ref = ref,
+        _name = name,
+        _description = description,
+        _inputSchema = inputSchema,
+        _script = script;
 
-  /// Execution is allowed only for Core (C1) or Verified (C2) agents.
+  /// Production RUN allowed only for Core (C1) or Verified (C2).
   bool get canExecute =>
       securityClass == AgentSecurityClass.c1Core ||
       securityClass == AgentSecurityClass.c2Verified;
+
+  /// Unverified Bro Code may still be exercised against the mock vault.
+  bool get canTestInSandbox => true;
 
   @override
   String get name => _name;
@@ -91,25 +98,38 @@ class JsAgentAdapter extends AurBhaiAgent {
   String get description => _description;
 
   @override
-  Map<String, AgentParameter> get inputSchema => _inputSchema;
+  Map<String, BroCodeParameter> get inputSchema => _inputSchema;
 
   @override
   Future<String> execute(Map<String, dynamic> parameters) async {
     if (!canExecute) {
       lastExecutionResult = AgentExecutionResult(
         message:
-            '$_name is not verified yet (${securityClass.id}). Promote it to C2 from the Agents page after due diligence before running.',
+            '$_name is not verified yet (${securityClass.id}). Promote it to C2 from Bhai log after due diligence before running against the real vault. Use Test in Sandbox to exercise it safely.',
         isError: true,
       );
       return lastExecutionResult!.message;
     }
 
+    return _run(parameters, sandboxMode: false);
+  }
+
+  /// Runs against the in-memory sandbox vault (never sovereign data).
+  Future<String> executeInSandbox(Map<String, dynamic> parameters) async {
+    return _run(parameters, sandboxMode: true);
+  }
+
+  Future<String> _run(
+    Map<String, dynamic> parameters, {
+    required bool sandboxMode,
+  }) async {
     final bridge = _ref.read(jsBridgeServiceProvider);
     final result = await bridge.executeAgentScript(
       agentName: _name,
       script: _script,
       parameters: parameters,
       onStepLog: bridgeLogSink,
+      sandboxMode: sandboxMode,
     );
     lastExecutionResult = result;
     return result.message;

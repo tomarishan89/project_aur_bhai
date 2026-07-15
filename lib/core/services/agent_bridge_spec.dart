@@ -37,9 +37,6 @@ HARD REQUIREMENTS:
   they must NOT appear as live QuickJS calls outside the template string.
 - Spoken return should direct users to the Vault Dashboards panel — not a bare /vault/ path.
 - Never hardcode API secrets; use Settings BYOK keys with System.sendHTTP when needed.
-- OUTPUT TRANSPORT: put the full JavaScript source in "scriptBase64" (standard Base64 of
-  the UTF-8 source). Do NOT put raw JS/HTML inside a JSON "script" string — large dashboard
-  templates truncate and break JSON. Optional legacy "script" is only for tiny agents.
 
 KNOWN-GOOD SHAPE (abbreviated — follow this pattern for dashboards):
 async function execute(params) {
@@ -57,8 +54,42 @@ async function execute(params) {
 }
 ''';
 
-  /// Shown when the model returns truncated/invalid JSON for a large patch.
-  static const String incompleteJsonUserMessage =
-      'The model returned incomplete JSON (often when rewriting large dashboard HTML). '
-      'Tap Retry, or ask to fix only the SyntaxError without regenerating the HTML template.';
+  /// Authoring (create new agent): full source via Base64.
+  static const String authorOutputTransport = '''
+OUTPUT TRANSPORT (new agents): put the FULL JavaScript source in "scriptBase64"
+(standard Base64 of the UTF-8 source). Do NOT put raw JS/HTML inside a JSON "script"
+string — large dashboard templates truncate and break JSON.
+''';
+
+  /// Refine / IMPROVE: prefer a complete script rewrite (Coder Agent).
+  /// Surgical edits remain a last-resort fallback.
+  static const String refineOutputTransport = '''
+OUTPUT TRANSPORT (Bro Code refine — Coder Agent):
+Return the FULL JavaScript source in "scriptBase64" (standard Base64 of UTF-8).
+Do NOT rely on surgical search/replace patches — they fail on large templates.
+
+Respond ONLY in RAW JSON:
+{
+  "name": "<same name>",
+  "description": "updated one-line description",
+  "inputSchema": { },
+  "scriptBase64": "BASE64 of the complete javascript UTF-8 source",
+  "notes": "what changed"
+}
+
+Rules:
+- Preserve unrelated behavior; apply the USER CHANGE REQUEST completely.
+- Ensure valid QuickJS syntax and async function execute(params).
+- Dashboard HTML stays inside the JS template string; Base64 the whole file once.
+- Optional legacy: tiny "edits"[] arrays are accepted only when the Bro Code is
+  under ~2KB and a one-line fix is clearer than a rewrite.
+''';
+
+  /// Shown when refine JSON cannot be parsed.
+  static const String invalidPatchJsonUserMessage =
+      'Model returned invalid Bro Code JSON (often unescaped quotes in script text). '
+      'Retry — the Coder Agent expects scriptBase64 for the full source.';
+
+  /// @Deprecated Prefer [invalidPatchJsonUserMessage].
+  static const String incompleteJsonUserMessage = invalidPatchJsonUserMessage;
 }

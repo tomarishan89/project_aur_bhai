@@ -1,0 +1,16 @@
+# Platform boilerplate — excluded from semantic search, still @-mentionable
+
+# Native runner scaffold (standard Flutter template)
+windows/runner/
+linux/runner/
+
+# UI asset metadata (binary images already default-ignored)
+ios/Runner/Assets.xcassets/
+macos/Runner/Assets.xcassets/
+ios/Runner/Base.lproj/
+android/app/src/main/res/mipmap-*/
+android/app/src/main/res/drawable*/
+android/app/src/main/res/drawable-v21*/
+
+# Web static icons (PNGs already default-ignored; JSON/HTML low priority)
+web/icons/

@@ -70,6 +70,45 @@ class GeminiProvider extends LlmProvider {
   }
 
   @override
+  Future<String> completeChat({
+    required List<LlmChatMessage> messages,
+    bool jsonMode = false,
+    Duration timeout = const Duration(seconds: 20),
+    int maxTokens = 4000,
+  }) async {
+    final contents = <Map<String, dynamic>>[];
+    for (final m in messages) {
+      final role = (m.role == 'assistant' || m.role == 'model') ? 'model' : 'user';
+      contents.add({
+        'role': role,
+        'parts': [
+          {'text': m.content},
+        ],
+      });
+    }
+    final url = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}',
+    );
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'contents': contents,
+        'generationConfig': {
+          'maxOutputTokens': maxTokens,
+          if (jsonMode) 'responseMimeType': 'application/json',
+        },
+      }),
+    ).timeout(timeout);
+
+    if (response.statusCode != 200) {
+      throw Exception('Gemini status ${response.statusCode}');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return data['candidates'][0]['content']['parts'][0]['text'] as String;
+  }
+
+  @override
   Future<String> completeWithAudio({
     required String prompt,
     required File audio,

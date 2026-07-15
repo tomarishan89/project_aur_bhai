@@ -53,7 +53,7 @@ $script
       }
       if (raw.contains('missing_execute')) {
         return const ScriptSyntaxCheck.fail(
-          'Agent must define async function execute(params)',
+          'Bro Code must define async function execute(params)',
         );
       }
       return const ScriptSyntaxCheck.ok();
@@ -64,18 +64,26 @@ $script
     }
   }
 
-  /// Executes a vault-stored JS agent script.
+  /// Executes vault-stored Bro Code (JS).
   ///
-  /// Agent scripts must define `async function execute(params)` returning a
+  /// Scripts must define `async function execute(params)` returning a
   /// human-readable string for TTS.
+  ///
+  /// When [sandboxMode] is true, System.querySQL / writeVault hit an in-memory
+  /// DB — never the sovereign vault (safe for C4 / Tester Agent runs).
   Future<AgentExecutionResult> executeAgentScript({
     required String agentName,
     required String script,
     required Map<String, dynamic> parameters,
     void Function(String step)? onStepLog,
+    bool sandboxMode = false,
   }) async {
     final runtime = getJavascriptRuntime(xhr: false);
     final htmlKeys = <String>[];
+    if (sandboxMode) {
+      await _telemetry.openSandbox(reset: true);
+      onStepLog?.call('Sandbox vault opened (in-memory, isolated)');
+    }
     try {
       _registerBridges(runtime, agentName, onStepLog, htmlKeys);
 
@@ -86,16 +94,20 @@ $script
 
 (async function() {
   if (typeof execute !== 'function') {
-    throw new Error('Agent must define async function execute(params)');
+    throw new Error('Bro Code must define async function execute(params)');
   }
   return await execute(${jsonEncode(parameters)});
 })()
 ''';
 
-      onStepLog?.call('QuickJS sandbox initialized for $agentName');
+      onStepLog?.call(
+        sandboxMode
+            ? 'QuickJS sandbox + mock vault for $agentName'
+            : 'QuickJS sandbox initialized for $agentName',
+      );
       var result = runtime.evaluate(wrapped);
       result = await runtime.handlePromise(result);
-      onStepLog?.call('Agent execution completed');
+      onStepLog?.call('Bro Code execution completed');
 
       final message = _parseJsResult(result);
       final looksLikeError = message.toLowerCase().contains('error') ||
@@ -109,11 +121,15 @@ $script
       debugPrint('[JsBridge] Execution error ($agentName): $e\n$st');
       onStepLog?.call('Execution error: $e');
       return AgentExecutionResult(
-        message: '$agentName agent encountered an error: $e',
+        message: '$agentName Bro Code encountered an error: $e',
         isError: true,
         vaultHtmlKeysWritten: List.unmodifiable(htmlKeys),
       );
     } finally {
+      if (sandboxMode) {
+        await _telemetry.closeSandbox();
+        onStepLog?.call('Sandbox vault closed');
+      }
       runtime.dispose();
     }
   }
@@ -238,7 +254,7 @@ const System = {
       final decoded = jsonDecode(raw);
       if (decoded is String) return decoded;
       if (decoded is num || decoded is bool) return 'Result: $decoded';
-      if (decoded == null) return 'Agent completed with no return value.';
+      if (decoded == null) return 'Bro Code completed with no return value.';
       return decoded.toString();
     } catch (_) {
       return raw;

@@ -12,6 +12,8 @@ import 'llm/llm_provider_factory.dart';
 import 'author_prompts.dart';
 import 'agent_bridge_spec.dart';
 import 'app_spec.dart';
+import 'script_edits.dart';
+import 'js_bridge_service.dart';
 
 /// Extracts JS source from author/refine model JSON.
 ///
@@ -33,15 +35,22 @@ String scriptFromDraftJson(Map<String, dynamic> decoded) {
 }
 
 /// User-facing message when patch JSON cannot be parsed.
-String authoredJsonParseFailureMessage(Object error) {
+String authoredJsonParseFailureMessage(Object error, {String? rawSnippet}) {
   final msg = error.toString();
+  final detail = error is FormatException
+      ? error.message
+      : msg.replaceFirst(RegExp(r'^Exception:\s*'), '');
+  final snippet = (rawSnippet != null && rawSnippet.trim().isNotEmpty)
+      ? ' Raw: ${truncateForLog(rawSnippet)}'
+      : '';
   if (error is FormatException ||
       msg.contains('FormatException') ||
       msg.toLowerCase().contains('unterminated string') ||
-      msg.toLowerCase().contains('unexpected end')) {
-    return AgentBridgeSpec.incompleteJsonUserMessage;
+      msg.toLowerCase().contains('unexpected end') ||
+      msg.toLowerCase().contains('unexpected character')) {
+    return '${AgentBridgeSpec.invalidPatchJsonUserMessage} ($detail)$snippet';
   }
-  return msg;
+  return '$detail$snippet';
 }
 
 /// A reviewable draft produced by LLM agent authoring (MS-USER-ECOSYSTEM-ENG1).
@@ -52,12 +61,16 @@ class AuthoredAgentDraft {
   final String script;
   final String? notes;
 
+  /// Optional side assets after surgical edits (`asset id` → full content).
+  final Map<String, String> assetUpdates;
+
   AuthoredAgentDraft({
     required this.name,
     required this.description,
     required this.inputSchema,
     required this.script,
     this.notes,
+    this.assetUpdates = const {},
   });
 
   Map<String, AgentParameter> toAgentParameters() {
@@ -525,6 +538,8 @@ The user will describe an agent they want. You MUST output a single JavaScript a
 
 ${AgentBridgeSpec.bridgeSpecForLlm}
 
+${AgentBridgeSpec.authorOutputTransport}
+
 User request: "$userRequest"
 
 Respond ONLY in RAW JSON (no markdown fences):
@@ -598,6 +613,164 @@ Respond ONLY in RAW JSON: {"answer": "..."}
     return AuthorPrompts.capabilitiesBlurb;
   }
 
+  Future<AuthoredAgentDraft> rewriteBroCodeScript({
+    required String broCodeName,
+    required String currentScript,
+    required String changeRequest,
+    String? currentDescription,
+    Map<String, dynamic>? currentInputSchema,
+    String? lastRunError,
+    List<String> dueDiligenceFindings = const [],
+    void Function(String message)? onProgress,
+  }) async {
+    final byok = _ref.read(byokServiceProvider);
+    if (!byok.hasApiKey) {
+      throw Exception('Configure your API Key in Settings.');
+    }
+
+    void progress(String message) => onProgress?.call(message);
+    final bridge = _ref.read(jsBridgeServiceProvider);
+    final schemaJson =
+        currentInputSchema != null ? jsonEncode(currentInputSchema) : '{}';
+
+    final contextBlocks = StringBuffer();
+    if (lastRunError != null && lastRunError.trim().isNotEmpty) {
+      contextBlocks.writeln('LAST RUN ERROR:\n$lastRunError\n');
+    }
+    if (dueDiligenceFindings.isNotEmpty) {
+      contextBlocks.writeln(
+        'DUE DILIGENCE FINDINGS (policy scan — does not execute):',
+      );
+      for (final f in dueDiligenceFindings) {
+        contextBlocks.writeln('• $f');
+      }
+      contextBlocks.writeln();
+    }
+
+    progress('Coder Agent: generating full Bro Code rewrite…');
+
+    final prompt = '''
+You are the Coder Agent for Project Aur Bhai.
+Rewrite the existing Bro Code (Javascript) to satisfy the change request.
+Respond in English only. Prefer a complete, clean script — not surgical patches.
+
+Bro Code name: $broCodeName
+Current description: ${currentDescription ?? 'n/a'}
+Current input schema: $schemaJson
+
+${AgentBridgeSpec.bridgeSpecForLlm}
+
+${AgentBridgeSpec.refineOutputTransport}
+
+$contextBlocks
+CURRENT SCRIPT:
+$currentScript
+
+USER CHANGE REQUEST:
+"$changeRequest"
+
+Respond ONLY in RAW JSON with scriptBase64 containing the FULL updated source.
+''';
+
+    Object? lastFailure;
+    String? lastRaw;
+    final messages = <LlmChatMessage>[
+      LlmChatMessage(role: 'user', content: prompt),
+    ];
+
+    for (var turn = 1; turn <= kMaxRefineModelTurns; turn++) {
+      progress('Coder Agent turn $turn/$kMaxRefineModelTurns…');
+      String raw;
+      try {
+        raw = await _provider().completeChat(
+          messages: messages,
+          jsonMode: true,
+          timeout: const Duration(seconds: 60),
+          maxTokens: 12288,
+        );
+      } on TimeoutException {
+        lastFailure = TimeoutException(
+          'Coder Agent timed out. Tap Retry.',
+          const Duration(seconds: 60),
+        );
+        break;
+      }
+
+      lastRaw = raw;
+      progress('Received (${raw.length} chars)');
+      messages.add(LlmChatMessage(role: 'model', content: raw));
+
+      Map<String, dynamic> decoded;
+      try {
+        decoded = jsonDecode(_cleanJsonString(raw)) as Map<String, dynamic>;
+      } on FormatException catch (e) {
+        lastFailure = e;
+        progress('Parse error: ${e.message}');
+        if (turn >= kMaxRefineModelTurns) break;
+        messages.add(LlmChatMessage(
+          role: 'user',
+          content:
+              'Invalid JSON (${e.message}). Return ONLY valid JSON with scriptBase64 of the full Bro Code.',
+        ));
+        continue;
+      }
+
+      late final String script;
+      try {
+        script = scriptFromDraftJson(decoded);
+      } catch (e) {
+        lastFailure = e;
+        progress('Missing scriptBase64: $e');
+        if (turn >= kMaxRefineModelTurns) break;
+        messages.add(const LlmChatMessage(
+          role: 'user',
+          content:
+              'Missing scriptBase64. Return the complete Bro Code as scriptBase64.',
+        ));
+        continue;
+      }
+
+      final syntax = bridge.validateScriptSyntax(script);
+      if (!syntax.ok) {
+        lastFailure = Exception(syntax.message ?? 'QuickJS syntax check failed');
+        progress('Syntax check failed: ${syntax.message}');
+        if (turn >= kMaxRefineModelTurns) break;
+        messages.add(LlmChatMessage(
+          role: 'user',
+          content:
+              'QuickJS rejected the script: ${syntax.message}. Return corrected scriptBase64.',
+        ));
+        continue;
+      }
+
+      progress('Coder Agent: QuickJS syntax OK');
+      return AuthoredAgentDraft(
+        name: broCodeName,
+        description: (decoded['description'] as String?)?.trim() ??
+            currentDescription ??
+            'Refined Bro Code.',
+        inputSchema: decoded['inputSchema'] is Map
+            ? Map<String, dynamic>.from(decoded['inputSchema'] as Map)
+            : currentInputSchema ?? <String, dynamic>{},
+        script: script,
+        notes: decoded['notes'] as String? ?? 'Full rewrite by Coder Agent.',
+      );
+    }
+
+    throw Exception(
+      authoredJsonParseFailureMessage(
+        lastFailure ??
+            Exception(
+              'Coder Agent exhausted $kMaxRefineModelTurns turns. Tap Retry.',
+            ),
+        rawSnippet: lastRaw,
+      ),
+    );
+  }
+
+  /// @Deprecated Prefer [rewriteBroCodeScript] / [BroCodePipeline.refineAndTest].
+  ///
+  /// Kept for Improve UI fallback; tries Coder rewrite first, then surgical edits.
   Future<AuthoredAgentDraft> refineAgentScript({
     required String agentName,
     required String currentScript,
@@ -606,12 +779,85 @@ Respond ONLY in RAW JSON: {"answer": "..."}
     Map<String, dynamic>? currentInputSchema,
     String? lastRunError,
     List<String> dueDiligenceFindings = const [],
-    bool slimRetry = false,
+    Map<String, String> currentAssets = const {},
+    void Function(String message)? onProgress,
+    List<LlmChatMessage>? chatSeed,
+  }) async {
+    void progress(String message) => onProgress?.call(message);
+
+    // --- Local-first SyntaxError fix (no LLM) ---
+    final bridge = _ref.read(jsBridgeServiceProvider);
+    final localCandidates =
+        localSyntaxFixCandidates(currentScript, lastRunError);
+    if (localCandidates.isNotEmpty) {
+      progress('Trying local SyntaxError fix…');
+      for (final candidate in localCandidates) {
+        final check = bridge.validateScriptSyntax(candidate.script);
+        if (check.ok) {
+          progress('Verified: QuickJS syntax OK (local fix)');
+          return AuthoredAgentDraft(
+            name: agentName,
+            description: currentDescription ?? 'Refined Bro Code.',
+            inputSchema: currentInputSchema ?? <String, dynamic>{},
+            script: candidate.script,
+            notes: candidate.notes,
+          );
+        }
+      }
+      progress('Local fix failed — Coder Agent…');
+    }
+
+    // Primary path: full rewrite (avoids brittle Base64 patches).
+    try {
+      return await rewriteBroCodeScript(
+        broCodeName: agentName,
+        currentScript: currentScript,
+        changeRequest: changeRequest,
+        currentDescription: currentDescription,
+        currentInputSchema: currentInputSchema,
+        lastRunError: lastRunError,
+        dueDiligenceFindings: dueDiligenceFindings,
+        onProgress: onProgress,
+      );
+    } catch (e) {
+      progress('Coder rewrite failed ($e) — falling back to surgical edits…');
+    }
+
+    return _refineWithSurgicalEdits(
+      agentName: agentName,
+      currentScript: currentScript,
+      changeRequest: changeRequest,
+      currentDescription: currentDescription,
+      currentInputSchema: currentInputSchema,
+      lastRunError: lastRunError,
+      dueDiligenceFindings: dueDiligenceFindings,
+      currentAssets: currentAssets,
+      onProgress: onProgress,
+      chatSeed: chatSeed,
+    );
+  }
+
+  Future<AuthoredAgentDraft> _refineWithSurgicalEdits({
+    required String agentName,
+    required String currentScript,
+    required String changeRequest,
+    String? currentDescription,
+    Map<String, dynamic>? currentInputSchema,
+    String? lastRunError,
+    List<String> dueDiligenceFindings = const [],
+    Map<String, String> currentAssets = const {},
+    void Function(String message)? onProgress,
+    List<LlmChatMessage>? chatSeed,
   }) async {
     final byok = _ref.read(byokServiceProvider);
     if (!byok.hasApiKey) {
       throw Exception('Configure your API Key in Settings.');
     }
+
+    void progress(String message) => onProgress?.call(message);
+    final bridge = _ref.read(jsBridgeServiceProvider);
+
+    progress('Loaded vault script (${currentScript.length} chars)');
 
     final schemaJson = currentInputSchema != null
         ? jsonEncode(currentInputSchema)
@@ -622,128 +868,205 @@ Respond ONLY in RAW JSON: {"answer": "..."}
       contextBlocks.writeln('LAST RUN ERROR:\n$lastRunError\n');
     }
     if (dueDiligenceFindings.isNotEmpty) {
-      contextBlocks.writeln('DUE DILIGENCE FINDINGS:');
+      contextBlocks.writeln('DUE DILIGENCE FINDINGS (policy scan — does not execute):');
       for (final f in dueDiligenceFindings) {
         contextBlocks.writeln('• $f');
       }
       contextBlocks.writeln();
     }
 
-    final slimHint = slimRetry
-        ? '''
-SLIM RETRY MODE:
-- Fix only the reported SyntaxError / issue in execute().
-- Keep any existing HTML dashboard template unchanged unless the error is inside it.
-- You MUST return the full source ONLY via "scriptBase64" (Base64 UTF-8). Never use raw "script".
-'''
-        : '';
+    final assetsBlock = StringBuffer();
+    if (currentAssets.isNotEmpty) {
+      assetsBlock.writeln('RELATED ASSETS (edit with "asset": "<id>"):');
+      currentAssets.forEach((id, content) {
+        assetsBlock.writeln('--- asset:$id ---');
+        assetsBlock.writeln(content);
+        assetsBlock.writeln('--- end asset:$id ---');
+      });
+      assetsBlock.writeln();
+    }
 
-    final prompt = '''
-You are patching an existing Javascript agent for Project Aur Bhai.
-Respond in English only.
-Agent name: $agentName
+    final errorLoc = parseScriptErrorLocation(lastRunError);
+    final useExcerpt = errorLoc != null &&
+        (lastRunError?.toLowerCase().contains('syntax') ?? false);
+    final scriptBlock = useExcerpt
+        ? '''
+${buildScriptExcerpt(currentScript, location: errorLoc)}
+
+(Full script is ${currentScript.length} chars. Apply edits against the FULL source;
+oldStringBase64 must still match the full file exactly — copy from the excerpt lines.)
+'''
+        : '''
+CURRENT SCRIPT:
+$currentScript
+''';
+
+    final initialUserPrompt = '''
+You are applying a last-resort surgical patch to Bro Code for Project Aur Bhai.
+Prefer scriptBase64 full rewrite if edits are hard. Respond in English only.
+Bro Code name: $agentName
 Current description: ${currentDescription ?? 'n/a'}
 Current input schema: $schemaJson
 
 ${AgentBridgeSpec.bridgeSpecForLlm}
 
 $contextBlocks
-$slimHint
-CURRENT SCRIPT:
-$currentScript
-
+$assetsBlock
+$scriptBlock
 USER CHANGE REQUEST:
 "$changeRequest"
 
-Fix the reported issue(s). Preserve unrelated behavior. Ensure valid QuickJS syntax.
-Put the FULL patched source in scriptBase64 (standard Base64 of UTF-8). Do not use a raw script string.
-
-Respond ONLY in RAW JSON:
-{
-  "name": "$agentName",
-  "description": "updated one-line description",
-  "inputSchema": { ... },
-  "scriptBase64": "BASE64 of the full patched javascript UTF-8 source",
-  "notes": "what changed"
-}
+Respond ONLY in RAW JSON with either scriptBase64 OR edits[] (Base64 snippets).
 ''';
 
-    String raw;
-    try {
-      raw = await _provider().complete(
-        prompt: prompt,
-        jsonMode: true,
-        timeout: const Duration(seconds: 90),
-        maxTokens: 12288,
+    final messages = <LlmChatMessage>[
+      LlmChatMessage(role: 'user', content: initialUserPrompt),
+    ];
+    if (chatSeed != null && chatSeed.isNotEmpty) {
+      messages.add(const LlmChatMessage(
+        role: 'model',
+        content:
+            '{"notes":"previous attempt did not produce a valid verified patch"}',
+      ));
+      messages.addAll(chatSeed);
+    }
+
+    Object? lastFailure;
+    String? lastRaw;
+
+    for (var turn = 1; turn <= kMaxRefineModelTurns; turn++) {
+      progress(
+        turn == 1
+            ? 'Surgical fallback turn $turn/$kMaxRefineModelTurns…'
+            : 'Repair turn $turn/$kMaxRefineModelTurns…',
       );
-    } on TimeoutException {
-      if (slimRetry) {
-        throw TimeoutException(
-          'Patch generation timed out — script may be too large. '
-          'Tap Retry or shorten the change request.',
-          const Duration(seconds: 90),
+
+      String raw;
+      try {
+        raw = await _provider().completeChat(
+          messages: messages,
+          jsonMode: true,
+          timeout: const Duration(seconds: 60),
+          maxTokens: 12288,
         );
+      } on TimeoutException {
+        lastFailure = TimeoutException(
+          'Patch generation timed out. Tap Retry.',
+          const Duration(seconds: 60),
+        );
+        progress('Model timed out on turn $turn');
+        break;
       }
-      return refineAgentScript(
-        agentName: agentName,
-        currentScript: currentScript,
-        changeRequest: changeRequest,
-        currentDescription: currentDescription,
-        currentInputSchema: currentInputSchema,
-        lastRunError: lastRunError,
-        dueDiligenceFindings: dueDiligenceFindings,
-        slimRetry: true,
+
+      lastRaw = raw;
+      progress('Received response (${raw.length} chars)');
+      messages.add(LlmChatMessage(role: 'model', content: raw));
+
+      Map<String, dynamic> decoded;
+      try {
+        decoded = jsonDecode(_cleanJsonString(raw)) as Map<String, dynamic>;
+      } on FormatException catch (e) {
+        lastFailure = e;
+        progress(
+          'Parse error: ${e.message}. Raw: ${truncateForLog(raw)}',
+        );
+        if (turn >= kMaxRefineModelTurns) break;
+        messages.add(LlmChatMessage(
+          role: 'user',
+          content: '''
+Your previous reply was invalid JSON (${e.message}).
+Return scriptBase64 of the FULL Bro Code, or edits with oldStringBase64/newStringBase64.
+''',
+        ));
+        continue;
+      }
+
+      late final String script;
+      var assetUpdates = <String, String>{};
+      try {
+        if (decoded.containsKey('scriptBase64') ||
+            decoded.containsKey('script')) {
+          progress('Applying full scriptBase64 rewrite…');
+          script = scriptFromDraftJson(decoded);
+        } else {
+          final edits = parseScriptEdits(decoded);
+          if (edits == null) {
+            throw const FormatException(
+              'Expected scriptBase64 or edits[].',
+            );
+          }
+          final grouped = groupEditsByAsset(edits);
+          final mainEdits = grouped[null] ?? const <ScriptEdit>[];
+          progress('Applying ${edits.length} edit(s) locally…');
+          script = mainEdits.isEmpty
+              ? currentScript
+              : applyScriptEdits(currentScript, mainEdits);
+
+          for (final entry in grouped.entries) {
+            final assetId = entry.key;
+            if (assetId == null) continue;
+            final existing = currentAssets[assetId];
+            if (existing == null) {
+              throw FormatException(
+                'Edit targets unknown asset "$assetId".',
+              );
+            }
+            assetUpdates[assetId] = applyScriptEdits(existing, entry.value);
+          }
+        }
+      } catch (e) {
+        lastFailure = e;
+        progress('Apply failed: ${scriptEditFailureMessage(e)}');
+        if (turn >= kMaxRefineModelTurns) break;
+        messages.add(LlmChatMessage(
+          role: 'user',
+          content: '''
+Apply failed: ${scriptEditFailureMessage(e)}
+Return scriptBase64 of the complete Bro Code (preferred).
+''',
+        ));
+        continue;
+      }
+
+      progress('QuickJS syntax check…');
+      final syntax = bridge.validateScriptSyntax(script);
+      if (!syntax.ok) {
+        lastFailure = Exception(syntax.message ?? 'QuickJS syntax check failed');
+        progress('Syntax check failed: ${syntax.message}');
+        if (turn >= kMaxRefineModelTurns) break;
+        messages.add(LlmChatMessage(
+          role: 'user',
+          content: '''
+QuickJS rejected the script: ${syntax.message}
+Return corrected scriptBase64 for the full Bro Code.
+''',
+        ));
+        continue;
+      }
+
+      progress('Verified: QuickJS syntax OK — Bro Code ready');
+      return AuthoredAgentDraft(
+        name: agentName,
+        description: (decoded['description'] as String?)?.trim() ??
+            currentDescription ??
+            'Refined Bro Code.',
+        inputSchema: decoded['inputSchema'] is Map
+            ? Map<String, dynamic>.from(decoded['inputSchema'] as Map)
+            : currentInputSchema ?? <String, dynamic>{},
+        script: script,
+        notes: decoded['notes'] as String?,
+        assetUpdates: assetUpdates,
       );
     }
 
-    Map<String, dynamic> decoded;
-    try {
-      decoded = jsonDecode(_cleanJsonString(raw)) as Map<String, dynamic>;
-    } on FormatException catch (e) {
-      if (!slimRetry) {
-        return refineAgentScript(
-          agentName: agentName,
-          currentScript: currentScript,
-          changeRequest: changeRequest,
-          currentDescription: currentDescription,
-          currentInputSchema: currentInputSchema,
-          lastRunError: lastRunError,
-          dueDiligenceFindings: dueDiligenceFindings,
-          slimRetry: true,
-        );
-      }
-      throw Exception(authoredJsonParseFailureMessage(e));
-    }
-
-    late final String script;
-    try {
-      script = scriptFromDraftJson(decoded);
-    } catch (e) {
-      if (!slimRetry) {
-        return refineAgentScript(
-          agentName: agentName,
-          currentScript: currentScript,
-          changeRequest: changeRequest,
-          currentDescription: currentDescription,
-          currentInputSchema: currentInputSchema,
-          lastRunError: lastRunError,
-          dueDiligenceFindings: dueDiligenceFindings,
-          slimRetry: true,
-        );
-      }
-      throw Exception(authoredJsonParseFailureMessage(e));
-    }
-
-    return AuthoredAgentDraft(
-      name: agentName,
-      description: (decoded['description'] as String?)?.trim() ??
-          currentDescription ??
-          'Refined agent.',
-      inputSchema: decoded['inputSchema'] is Map
-          ? Map<String, dynamic>.from(decoded['inputSchema'] as Map)
-          : currentInputSchema ?? <String, dynamic>{},
-      script: script,
-      notes: decoded['notes'] as String?,
+    throw Exception(
+      authoredJsonParseFailureMessage(
+        lastFailure ??
+            Exception(
+              'Repair loop exhausted after $kMaxRefineModelTurns turns. Tap Retry.',
+            ),
+        rawSnippet: lastRaw,
+      ),
     );
   }
 

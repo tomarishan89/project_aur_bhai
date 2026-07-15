@@ -1,0 +1,25 @@
+---
+description: When a plan is fully implemented, mark its plan.md as built (not build)
+alwaysApply: true
+---
+
+# Plan status after implementation
+
+When you finish implementing an agreed plan (all todos done, or the user confirms the work is complete):
+
+1. Open the corresponding `*.plan.md` file (under `.cursor/plans/` or the workspace plans directory).
+2. Set the plan's status language to **built**, not "build" or "building".
+3. Mark frontmatter todos as `status: completed` (or `status: built` if that field exists).
+4. In the plan body, replace any CTA or heading that says **Build** / "Ready to build" with **Built** / "Built" so the file clearly shows the plan was realized.
+
+Example frontmatter after completion:
+
+```yaml
+status: built
+todos:
+  - id: rename-bhai
+    content: ...
+    status: completed
+```
+
+Do this in the same session as the implementation, before claiming the work is done.

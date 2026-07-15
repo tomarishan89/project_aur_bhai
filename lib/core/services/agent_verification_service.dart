@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -68,6 +70,14 @@ class AgentVerificationService extends ChangeNotifier {
     final findings = <String>[];
     final sandboxOnly = _stripEmbeddedHtmlTemplates(script);
     final lower = sandboxOnly.toLowerCase();
+
+    // #region agent log
+    try {
+      File('debug-c55aa3.log').writeAsStringSync(
+          '{"sessionId":"c55aa3","id":"log_\${DateTime.now().millisecondsSinceEpoch}_5","timestamp":\${DateTime.now().millisecondsSinceEpoch},"location":"agent_verification_service.dart:71","message":"Due diligence check","data":{"scriptLength":\${script.length},"sandboxOnlyLength":\${sandboxOnly.length},"findings":\${jsonEncode(findings)},"snippet":\${jsonEncode(script.length > 500 ? script.substring(0, 500) : script)}},"runId":"run1","hypothesisId":"H4"}\\n',
+          mode: FileMode.append);
+    } catch(e) {}
+    // #endregion
 
     if (RegExp(r'\b(delete|drop|truncate|alter)\s+(from|table|into)\b',
             caseSensitive: false)

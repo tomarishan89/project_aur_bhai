@@ -2,41 +2,61 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import '../agents/agent_base.dart';
 
-class AgentService extends ChangeNotifier {
-  final List<AurBhaiAgent> _agents = [];
+/// In-memory registry of installed Bro Code units (Bhai log).
+class BroCodeService extends ChangeNotifier {
+  final List<BroCode> _items = [];
 
-  void registerAgent(AurBhaiAgent agent) {
-    // Replace any existing agent with the same name so re-authoring/imports refresh in place.
-    _agents.removeWhere((a) => a.name.toLowerCase() == agent.name.toLowerCase());
-    _agents.add(agent);
+  void register(BroCode broCode) {
+    _items.removeWhere(
+      (a) => a.name.toLowerCase() == broCode.name.toLowerCase(),
+    );
+    _items.add(broCode);
     notifyListeners();
-    debugPrint('[AgentService] Registered agent: ${agent.name}');
+    debugPrint('[BroCodeService] Registered: ${broCode.name}');
   }
 
-  bool removeAgent(String name) {
-    final before = _agents.length;
-    _agents.removeWhere((a) => a.name.toLowerCase() == name.toLowerCase());
-    final removed = _agents.length != before;
+  /// @Deprecated Use [register].
+  void registerAgent(BroCode agent) => register(agent);
+
+  bool remove(String name) {
+    final before = _items.length;
+    _items.removeWhere((a) => a.name.toLowerCase() == name.toLowerCase());
+    final removed = _items.length != before;
     if (removed) {
       notifyListeners();
-      debugPrint('[AgentService] Removed agent: $name');
+      debugPrint('[BroCodeService] Removed: $name');
     }
     return removed;
   }
 
-  List<AurBhaiAgent> get agents => List.unmodifiable(_agents);
+  /// @Deprecated Use [remove].
+  bool removeAgent(String name) => remove(name);
 
-  AurBhaiAgent? findAgent(String name) {
+  List<BroCode> get all => List.unmodifiable(_items);
+
+  /// @Deprecated Use [all].
+  List<BroCode> get agents => all;
+
+  BroCode? find(String name) {
     try {
-      return _agents.firstWhere(
+      return _items.firstWhere(
         (a) => a.name.toLowerCase() == name.toLowerCase(),
       );
     } catch (_) {
       return null;
     }
   }
+
+  /// @Deprecated Use [find].
+  BroCode? findAgent(String name) => find(name);
 }
 
-final agentServiceProvider = ChangeNotifierProvider<AgentService>((ref) {
-  return AgentService();
+/// @Deprecated Use [BroCodeService].
+typedef AgentService = BroCodeService;
+
+final broCodeServiceProvider = ChangeNotifierProvider<BroCodeService>((ref) {
+  return BroCodeService();
 });
+
+/// @Deprecated Use [broCodeServiceProvider].
+final agentServiceProvider = broCodeServiceProvider;

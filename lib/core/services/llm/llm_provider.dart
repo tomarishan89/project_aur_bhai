@@ -13,6 +13,14 @@ class LlmProviderConfig {
   });
 }
 
+/// One turn in a multi-turn refine repair chat.
+class LlmChatMessage {
+  final String role; // 'user' | 'model' | 'assistant'
+  final String content;
+
+  const LlmChatMessage({required this.role, required this.content});
+}
+
 /// Abstract BYOK LLM provider (MS-LLM-AGNOSTIC).
 abstract class LlmProvider {
   /// Stable identifier matching the Settings dropdown value.
@@ -42,6 +50,30 @@ abstract class LlmProvider {
     Duration timeout = const Duration(seconds: 20),
     int maxTokens = 4000,
   });
+
+  /// Multi-turn chat completion (refine repair loops).
+  ///
+  /// Default: concatenates messages into a single [complete] prompt so providers
+  /// without native chat still work.
+  Future<String> completeChat({
+    required List<LlmChatMessage> messages,
+    bool jsonMode = false,
+    Duration timeout = const Duration(seconds: 20),
+    int maxTokens = 4000,
+  }) {
+    final buf = StringBuffer();
+    for (final m in messages) {
+      buf.writeln('${m.role.toUpperCase()}:');
+      buf.writeln(m.content);
+      buf.writeln();
+    }
+    return complete(
+      prompt: buf.toString(),
+      jsonMode: jsonMode,
+      timeout: timeout,
+      maxTokens: maxTokens,
+    );
+  }
 
   /// Multimodal completion (audio + text prompt in one call).
   /// Only callable when [supportsAudioInput] && [prefersAudioDirect].

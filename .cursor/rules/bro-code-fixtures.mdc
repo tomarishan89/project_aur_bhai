@@ -1,0 +1,40 @@
+---
+description: Bro Code fixture tests — where exports live and when to run them
+globs:
+  - test/fixtures/bro_code/**
+  - test/bro_code_fixtures_test.dart
+  - test/support/bro_code_fixture_loader.dart
+  - lib/core/pipeline/bro_code_fixture_report.dart
+  - lib/core/pipeline/bro_code_coding_agent.dart
+alwaysApply: false
+---
+
+# Bro Code fixtures
+
+## Canonical location
+
+Committed Bro Code test inputs live in `test/fixtures/bro_code/*.bundle.json`.
+
+Ingest phone exports from **SEND TO TEST CASES** (IMPROVE sheet) or agent **EXPORT**:
+- Paste report JSON → normalize to `<name>.bundle.json` (see `test/fixtures/bro_code/README.md`).
+- Include `fixture.expectSyntaxOk`, `fixture.expectSandboxOk`, `fixture.improveGoal`, and `tags` when known.
+
+## When to run
+
+After changing Bro Code agent logic, sandbox, syntax validation, or due-diligence scan:
+
+```bash
+flutter test test/bro_code_fixtures_test.dart
+```
+
+Run full `flutter test` before merge when fixtures or agent pipeline changed.
+
+## Fixing repro cases
+
+1. Add or update a `*.bundle.json` with failing expectations (`expectSyntaxOk: false`, etc.).
+2. Fix the coding agent, prompts, or Bro Code script.
+3. Flip `fixture.expect*` to `true` once the case passes — fixtures document the baseline.
+
+## Deferred
+
+`[MS-BROCODE-REPORT]`: user-consented upload of `BroCodeFixtureReport` to a dev centre (not v1). Clipboard-only for now.
