@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:project_aur_bhai/core/services/agent_verification_service.dart';
 import 'package:project_aur_bhai/core/services/js_bridge_service.dart';
 import 'package:project_aur_bhai/core/services/telemetry_bus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'support/bro_code_fixture_loader.dart';
@@ -21,6 +22,9 @@ bool _quickJsNativeLibAvailable() {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  SharedPreferences.setMockInitialValues({});
+
   setUpAll(() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
@@ -47,23 +51,23 @@ void main() {
 
     for (final fix in fixtures) {
       group(fix.fileName, () {
-        late ProviderContainer container;
-        late JsBridgeService bridge;
+        ProviderContainer? container;
+        JsBridgeService? bridge;
         late AgentVerificationService verification;
 
         setUp(() async {
+          verification = AgentVerificationService();
           if (!_quickJsNativeLibAvailable()) {
             return;
           }
           container = ProviderContainer();
-          final bus = container.read(telemetryBusProvider);
+          final bus = container!.read(telemetryBusProvider);
           await bus.initialize();
-          bridge = container.read(jsBridgeServiceProvider);
-          verification = AgentVerificationService();
+          bridge = container!.read(jsBridgeServiceProvider);
         });
 
         tearDown(() {
-          container.dispose();
+          container?.dispose();
         });
 
         test('validate_syntax matches fixture.expectSyntaxOk', () async {
@@ -71,7 +75,7 @@ void main() {
             markTestSkipped('QuickJS native lib not built on this machine');
             return;
           }
-          final syntax = bridge.validateScriptSyntax(fix.script);
+          final syntax = bridge!.validateScriptSyntax(fix.script);
           final expected = fix.expectSyntaxOk;
           if (expected != null) {
             expect(syntax.ok, expected,
@@ -100,7 +104,7 @@ void main() {
             markTestSkipped('QuickJS native lib not built on this machine');
             return;
           }
-          final syntax = bridge.validateScriptSyntax(fix.script);
+          final syntax = bridge!.validateScriptSyntax(fix.script);
           if (!syntax.ok) {
             if (fix.expectSandboxOk == false) return;
             if (fix.expectSyntaxOk == false) return;
@@ -108,7 +112,7 @@ void main() {
           }
 
           final params = smokeParamsFromSchema(fix.inputSchemaFromSchema());
-          final result = await bridge.executeAgentScript(
+          final result = await bridge!.executeAgentScript(
             agentName: fix.name,
             script: fix.script,
             parameters: params,

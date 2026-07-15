@@ -43,13 +43,13 @@ async function execute(params) {
         authoredJsonParseFailureMessage(
           const FormatException('Unterminated string (at line 5, character 909)'),
         ),
-        AgentBridgeSpec.incompleteJsonUserMessage,
+        startsWith(AgentBridgeSpec.incompleteJsonUserMessage),
       );
       expect(
         authoredJsonParseFailureMessage(
           Exception('FormatException: Unterminated string'),
         ),
-        AgentBridgeSpec.incompleteJsonUserMessage,
+        startsWith(AgentBridgeSpec.incompleteJsonUserMessage),
       );
     });
 

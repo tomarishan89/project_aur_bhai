@@ -75,6 +75,12 @@ void main() {
     });
 
     test('MS-USER-ECOSYSTEM lifecycle: save, list, export, delete', () async {
+      if (!quickJsAvailable) {
+        markTestSkipped(
+          'Saving validates syntax; QuickJS native library is not built on this host',
+        );
+        return;
+      }
       final registry = container.read(jsAgentRegistryProvider);
       final agentService = container.read(agentServiceProvider);
 

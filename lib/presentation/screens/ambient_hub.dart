@@ -2893,6 +2893,11 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
                 'Improvement did not succeed yet. Retry, or send this Bro Code to test cases so we can fix the agent in a future update.',
                 style: TextStyle(color: Colors.white38, fontSize: 10),
               ),
+              const SizedBox(height: 4),
+              const Text(
+                'This copies a diagnostic JSON report to your clipboard. Nothing is uploaded automatically.',
+                style: TextStyle(color: Colors.amberAccent, fontSize: 10),
+              ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: _busy ? null : _sendToTestCases,

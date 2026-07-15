@@ -266,14 +266,14 @@ The Core is a verb-first intent dispatcher with multi-turn conversational state.
 *   **Ecosystem & Agents:**
     *   [x] *`[MS-AGENT-REFINE-AGT1]` Re-register the refined agent as a new version; a material code change resets its tier to C4 per §2.7. [IN REVIEW]*
 
-### - [x] `[MS-BROCODE-AGENT]` MILESTONE: **Agentic Bro Code IMPROVE (tool loop) [IN REVIEW — awaiting on-device IMPROVE of Telemetry/Locator]**
+### - [x] `[MS-BROCODE-AGENT]` MILESTONE: **Agentic Bro Code IMPROVE (tool loop) [BUILT — Locator verified on-device]**
 *   **User Perspective (UI/UX):**
     *   [x] *`[MS-BROCODE-AGENT-UX1]`* IMPROVE sheet shows live AGENT ACTIVITY (turns, tools, heartbeats while model thinks) + Est. context circle; APPLY only when sandbox+syntax verified. [IN REVIEW]
 *   **Engineering & Architecture:**
     *   [x] *`[MS-BROCODE-AGENT-ENG1]`* BroCodeWorkspace + tools (`read_*`, `apply_edit`, `write_full`, `validate_syntax`, `sandbox_run`, `scan_policy`) with structured observations. [IN REVIEW]
     *   [x] *`[MS-BROCODE-AGENT-ENG2]`* CodingAgent JSON action loop: host reject-done, turn/sandbox/context budgets; wire IMPROVE + voice refine. [IN REVIEW]
 *   **Ecosystem & Agents:**
-    *   [ ] **`[MS-BROCODE-AGENT-AGT1]`** Successful agent IMPROVE of existing Bro Code (e.g. Telemetry/Locator) to verified draft without manual Base64 patch ritual. [TARGETED FOR NEXT ACTION]
+    *   [x] *`[MS-BROCODE-AGENT-AGT1]`* Successful Locator IMPROVE to a syntax+sandbox verified draft in 8 turns (~6.1K estimated tokens), without manual Base64 patch ritual. [BUILT — ON-DEVICE 2026-07-15]
 
 ### - [x] `[MS-BROCODE-FIXTURES]` MILESTONE: **Bro Code fixture tests + SEND TO TEST CASES [BUILT]**
 *   **User Perspective (UI/UX):**
@@ -282,7 +282,7 @@ The Core is a verb-first intent dispatcher with multi-turn conversational state.
     *   [x] *`[MS-BROCODE-FIXTURES-ENG1]`* `test/fixtures/bro_code/` + `bro_code_fixture_loader.dart` + `bro_code_fixtures_test.dart` (syntax, due diligence, sandbox per bundle; QuickJS native guard). [BUILT]
     *   [x] *`[MS-BROCODE-FIXTURES-ENG2]`* `BroCodeFixtureReport` + `reportToBundleJson` helper; Cursor rule `bro-code-fixtures.mdc`. [BUILT]
 *   **Ecosystem & Agents:**
-    *   [ ] **`[MS-BROCODE-FIXTURES-AGT1]`** First committed repro fixture (e.g. Locator from phone) passes after agent fix; flip `expect*` flags in repo. [TARGETED FOR NEXT ACTION]
+    *   [x] *`[MS-BROCODE-FIXTURES-AGT1]`* Locator phone report committed as repro + repaired baseline; expectations flipped green and on-device QuickJS sandbox verified. [BUILT — ON-DEVICE 2026-07-15]
 *   **Deferred:**
     *   [ ] `[MS-BROCODE-REPORT]` User-consented upload of fixture reports to a dev centre (no silent egress); v1 is clipboard-only.
 

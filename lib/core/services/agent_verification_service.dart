@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -71,14 +69,6 @@ class AgentVerificationService extends ChangeNotifier {
     final sandboxOnly = _stripEmbeddedHtmlTemplates(script);
     final lower = sandboxOnly.toLowerCase();
 
-    // #region agent log
-    try {
-      File('debug-c55aa3.log').writeAsStringSync(
-          '{"sessionId":"c55aa3","id":"log_\${DateTime.now().millisecondsSinceEpoch}_5","timestamp":\${DateTime.now().millisecondsSinceEpoch},"location":"agent_verification_service.dart:71","message":"Due diligence check","data":{"scriptLength":\${script.length},"sandboxOnlyLength":\${sandboxOnly.length},"findings":\${jsonEncode(findings)},"snippet":\${jsonEncode(script.length > 500 ? script.substring(0, 500) : script)}},"runId":"run1","hypothesisId":"H4"}\\n',
-          mode: FileMode.append);
-    } catch(e) {}
-    // #endregion
-
     if (RegExp(r'\b(delete|drop|truncate|alter)\s+(from|table|into)\b',
             caseSensitive: false)
         .hasMatch(sandboxOnly)) {
@@ -124,52 +114,66 @@ class AgentVerificationService extends ChangeNotifier {
   }
 
   /// Dashboard HTML embedded in agent scripts runs in the browser, not QuickJS.
-  /// Strip any backtick template that looks like an HTML document so DOM/fetch
-  /// APIs inside dashboards do not false-flag the sandbox script.
+  /// Strip complete backtick templates that look like HTML. The scanner must
+  /// respect escaped backticks (`\``) used by JavaScript embedded inside the
+  /// HTML; a non-greedy regex stops at the first escaped inner template and
+  /// leaks browser APIs into the sandbox scan.
   String _stripEmbeddedHtmlTemplates(String script) {
-    var stripped = script.replaceAllMapped(
+    // Prefer explicit HTML document boundaries. This also handles a malformed
+    // dashboard whose inner JavaScript backticks were not escaped: syntax
+    // validation will still reject it, but due diligence should not mislabel
+    // browser code between <!DOCTYPE ... </html> as QuickJS-scope DOM access.
+    final htmlDocuments = script.replaceAllMapped(
       RegExp(
-        r"(?:const|let|var)?\s*\w+\s*=\s*`[\s\S]*?`",
-        multiLine: true,
-      ),
-      (match) {
-        final block = match.group(0) ?? '';
-        final lower = block.toLowerCase();
-        if (lower.contains('<!doctype') ||
-            lower.contains('<html') ||
-            lower.contains('<head') ||
-            lower.contains('<body') ||
-            lower.contains('<script') ||
-            lower.contains('document.') ||
-            lower.contains('fetch(')) {
-          return 'const __strippedHtml = ``';
-        }
-        return block;
-      },
-    );
-    // return `...html...` or bare assignment without declaration keyword
-    stripped = stripped.replaceAllMapped(
-      RegExp(
-        r"return\s*`[\s\S]*?(?:<!DOCTYPE|<html|<script|document\.|fetch\()[\s\S]*?`",
-        multiLine: true,
+        r'`\s*<!doctype[\s\S]*?</html>\s*`',
         caseSensitive: false,
+        multiLine: true,
       ),
-      (_) => 'return ``',
-    );
-    // Also strip anonymous/returned template literals that embed HTML.
-    stripped = stripped.replaceAllMapped(
-      RegExp(r"`[\s\S]*?<!DOCTYPE[\s\S]*?`", multiLine: true, caseSensitive: false),
       (_) => '``',
     );
-    stripped = stripped.replaceAllMapped(
-      RegExp(r"`[\s\S]*?<html[\s\S]*?`", multiLine: true, caseSensitive: false),
-      (_) => '``',
-    );
-    stripped = stripped.replaceAllMapped(
-      RegExp(r"`[\s\S]*?<script[\s\S]*?`", multiLine: true, caseSensitive: false),
-      (_) => '``',
-    );
-    return stripped;
+
+    final out = StringBuffer();
+    var cursor = 0;
+    while (cursor < htmlDocuments.length) {
+      final start = htmlDocuments.indexOf('`', cursor);
+      if (start < 0) {
+        out.write(htmlDocuments.substring(cursor));
+        break;
+      }
+
+      var end = start + 1;
+      while (end < htmlDocuments.length) {
+        if (htmlDocuments.codeUnitAt(end) == 0x60 &&
+            !_isEscaped(htmlDocuments, end)) {
+          break;
+        }
+        end++;
+      }
+      if (end >= htmlDocuments.length) {
+        out.write(htmlDocuments.substring(cursor));
+        break;
+      }
+
+      out.write(htmlDocuments.substring(cursor, start));
+      final template = htmlDocuments.substring(start, end + 1);
+      final lower = template.toLowerCase();
+      final isHtml = lower.contains('<!doctype') ||
+          lower.contains('<html') ||
+          lower.contains('<head') ||
+          lower.contains('<body') ||
+          lower.contains('<script');
+      out.write(isHtml ? '``' : template);
+      cursor = end + 1;
+    }
+    return out.toString();
+  }
+
+  bool _isEscaped(String source, int index) {
+    var slashes = 0;
+    for (var i = index - 1; i >= 0 && source.codeUnitAt(i) == 0x5c; i--) {
+      slashes++;
+    }
+    return slashes.isOdd;
   }
 
   Future<void> _loadPassword() async {

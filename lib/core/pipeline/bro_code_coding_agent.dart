@@ -62,6 +62,7 @@ class BroCodeCodingAgent {
     final started = DateTime.now();
     var turns = 0;
     var estimatedTokens = 0;
+    var consecutiveReads = 0;
 
     progress('Coding agent started for ${workspace.name}');
     progress(
@@ -171,9 +172,13 @@ class BroCodeCodingAgent {
 
       Map<String, dynamic> decoded;
       try {
-        decoded = _parseActionJson(raw);
+        decoded = parseBroCodeActionJson(raw);
       } on FormatException catch (e) {
         progress('Could not parse action JSON: ${e.message}');
+        final rawPreview = raw.replaceAll(RegExp(r'\s+'), ' ').trim();
+        progress(
+          '  raw: ${rawPreview.length > 180 ? '${rawPreview.substring(0, 180)}…' : rawPreview}',
+        );
         final repair = LlmChatMessage(
           role: 'user',
           content:
@@ -196,6 +201,28 @@ class BroCodeCodingAgent {
           ? Map<String, dynamic>.from(decoded['args'] as Map)
           : <String, dynamic>{};
       args.putIfAbsent('changeRequest', () => changeRequest);
+
+      if (action == 'read_script' || action == 'read_asset') {
+        consecutiveReads++;
+        if (consecutiveReads > 2) {
+          progress('Rejected $action: repeated reads without an edit');
+          obs = const ToolObservation(
+            ok: false,
+            tool: 'read_script',
+            summary: 'Read budget exhausted before a mutation',
+            detail:
+                'The syntax observation already includes the failing line and excerpt.',
+            nextHint:
+                'Act now: apply_edit or write_full, then validate_syntax. Do not reread the same source.',
+          );
+          _appendObs(messages, obs);
+          estimatedTokens += estimateTokensFromString(obs.toAgentMessage());
+          onContextUpdate?.call(estimatedTokens, budget);
+          continue;
+        }
+      } else {
+        consecutiveReads = 0;
+      }
 
       if (action == 'done') {
         progress('Model requested done — checking host gates…');
@@ -338,6 +365,9 @@ ${AgentBridgeSpec.bridgeSpecForLlm}
 
 Rules:
 - Prefer small apply_edit changes; do not thrash write_full.
+- A failed validate_syntax observation already includes the error excerpt. Edit
+  that excerpt directly; do not repeatedly reread the script.
+- At most two consecutive read actions are allowed before a mutation.
 - After every mutate, validate_syntax then sandbox_run before done.
 - The host WILL reject done if gates are not green.
 - One action per turn.
@@ -379,25 +409,105 @@ Rules:
       buf.writeln(priorFailureContext);
     }
     buf.writeln();
-    buf.writeln('Start by reading what you need, then edit, validate_syntax, sandbox_run, done.');
+    buf.writeln(
+      'Use the baseline syntax observation first. Read only if its excerpt is '
+      'insufficient, then edit, validate_syntax, sandbox_run, done.',
+    );
     return buf.toString();
   }
+}
 
-  static Map<String, dynamic> _parseActionJson(String raw) {
-    var clean = raw.trim();
-    if (clean.startsWith('```')) {
-      clean = clean.replaceFirst(RegExp(r'^```(?:json)?'), '');
-      if (clean.endsWith('```')) {
-        clean = clean.substring(0, clean.length - 3);
-      }
-      clean = clean.trim();
-    }
-    final decoded = jsonDecode(clean);
-    if (decoded is! Map) {
-      throw const FormatException('Action JSON must be an object');
-    }
-    return Map<String, dynamic>.from(decoded);
+/// Parses one model tool action. Providers sometimes wrap otherwise-valid JSON
+/// in prose or markdown despite JSON mode, so recover the first balanced object
+/// instead of spending an entire coding-agent turn on a formatting mistake.
+Map<String, dynamic> parseBroCodeActionJson(String raw) {
+  var clean = raw.trim();
+  if (clean.startsWith('```')) {
+    clean = clean.replaceFirst(RegExp(r'^```(?:json)?\s*'), '');
+    clean = clean.replaceFirst(RegExp(r'\s*```$'), '');
   }
+
+  Object? decoded;
+  try {
+    decoded = jsonDecode(clean);
+  } on FormatException {
+    final candidate = _firstBalancedJsonObject(clean);
+    if (candidate != null) {
+      try {
+        decoded = jsonDecode(candidate);
+      } on FormatException {
+        decoded = null;
+      }
+    }
+    decoded ??= _fallbackActionFromText(clean);
+    if (decoded == null) rethrow;
+  }
+  if (decoded is! Map) {
+    throw const FormatException('Action JSON must be an object');
+  }
+  return Map<String, dynamic>.from(decoded);
+}
+
+Map<String, dynamic>? _fallbackActionFromText(String source) {
+  final match = RegExp(
+    r'\b(read_script|read_asset|apply_edit|write_full|validate_syntax|sandbox_run|scan_policy|done)\b',
+    caseSensitive: false,
+  ).firstMatch(source);
+  if (match == null) return null;
+
+  final action = match.group(1)!.toLowerCase();
+  final args = <String, dynamic>{};
+  for (final key in ['line', 'lineNumber', 'startLine', 'endLine']) {
+    final number = RegExp(
+      '$key\\s*["\']?\\s*[:=]\\s*(\\d+)',
+      caseSensitive: false,
+    ).firstMatch(source);
+    if (number != null) args[key] = int.parse(number.group(1)!);
+  }
+  final dashboard = RegExp(
+    r'''expectDashboard\s*["']?\s*[:=]\s*(true|false)''',
+    caseSensitive: false,
+  ).firstMatch(source);
+  if (dashboard != null) {
+    args['expectDashboard'] = dashboard.group(1)!.toLowerCase() == 'true';
+  }
+
+  return {
+    'thought': 'Recovered action from non-JSON model response.',
+    'action': action,
+    'args': args,
+  };
+}
+
+String? _firstBalancedJsonObject(String source) {
+  for (var start = 0; start < source.length; start++) {
+    if (source.codeUnitAt(start) != 0x7b) continue;
+    var depth = 0;
+    var inString = false;
+    var escaped = false;
+    for (var i = start; i < source.length; i++) {
+      final code = source.codeUnitAt(i);
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (code == 0x5c) {
+          escaped = true;
+        } else if (code == 0x22) {
+          inString = false;
+        }
+        continue;
+      }
+      if (code == 0x22) {
+        inString = true;
+      } else if (code == 0x7b) {
+        depth++;
+      } else if (code == 0x7d) {
+        depth--;
+        if (depth == 0) return source.substring(start, i + 1);
+      }
+    }
+  }
+  return null;
 }
 
 final broCodeCodingAgentProvider =
