@@ -153,6 +153,29 @@ Future-scope ecosystem loop so User A can publish Bro Code to a shared place, Us
 
 ## 5. MILESTONES & ROADMAP
 
+### Coverage review — 2026-07-18 (commit `35665fe`)
+
+Evidence states (independent of parent `[x]`): **impl** (code exists) · **auto** (automation green, no critical skips) · **device** (physical acceptance logged).
+
+| Band | Count | Notes |
+|------|------:|-------|
+| Strong auto | 4 | `MS-VAULT-SERVER` (feature), `MS-BROCODE-AGENT`, `MS-BROCODE-FIXTURES`, `MS-BROCODE-DEV-LOOP` |
+| Partial auto | ~14 | Legacy UX + most In Review bridges |
+| None | ~11 | `MS-CORE-INTENT` has zero tests; deferred ecosystem empty |
+| Suite baseline | — | `flutter test`: **200 passed · 34 skipped · 1 failed** (`widget_test` dispose); no `integration_test/` |
+
+**Overstated claim corrected:** `MS-VAULT-SERVER` feature surface is validated, but sovereignty hardening is **open** (unauthenticated LAN `/api/query`, plaintext BYOK in SharedPreferences, unencrypted SQLite). Parent tag below reflects that.
+
+**Canvas:** open [milestone-coverage-roadmap.canvas.tsx](file:///C:/Users/tomar/.cursor/projects/c-Users-tomar-Documents-Vidyaman-project-aur-bhai-workspace-project-aur-bhai/canvases/milestone-coverage-roadmap.canvas.tsx) beside chat for the full evidence map.
+
+**Sprint targets (evidence-gated):**
+1. **S1 — Edge + telemetry reliability:** SQL allowlist/row caps; LAN pairing/auth; single-flight GPS + backoff.
+2. **S2 — Secrets at rest:** encrypted vault migration; keystore-backed BYOK.
+3. **S3 — Green suite + device acceptance:** fix `widget_test`; CI + non-skipping QuickJS; accept Bridge → Core JS → LLM → Intent → Author → Refine → Dashboard.
+4. **S4 — Trust lifecycle then expand:** real C4→C3→C2; structured due diligence; capability judge; only then Agent Feed + marketplace shell.
+
+**Deferred until trust + edge gates green:** Model Studio, Bro Code Commons, data market, chaining, Xter, offline wake/TTS. Marketplace UX3/AGT2 demoted from next-action.
+
 > **🤖 FUTURE LLM INSTRUCTION (CRITICAL MAINTENANCE, SPRINT LOOPS & STYLE PROTOCOLS):**
 > 1. You MUST review and update these checklists at the end of EVERY session or task execution.
 > 2. Mark completed aspects with `[x]` and incomplete ones with `[ ]`.
@@ -225,10 +248,10 @@ Future-scope ecosystem loop so User A can publish Bro Code to a shared place, Us
     *   [x] `[MS-AUDIO-DIRECT-AGT1]` Migrate full codebase terminology from "Plugins" to "Agents".
     *   [x] `[MS-AUDIO-DIRECT-AGT2]` Update CalculatorAgent and DrivingCoachAgent implementations.
 
-### - [x] `[MS-VAULT-SERVER]` MILESTONE: The Sovereign Data Vault & Local Edge Server [COMPLETE — validated by automated tests + repeated runs]
+### - [x] `[MS-VAULT-SERVER]` MILESTONE: The Sovereign Data Vault & Local Edge Server [FEATURE COMPLETE — hardening open; see ENG3–ENG5]
 *   **User Perspective (UI/UX):**
-    *   [x] <u>`[MS-VAULT-SERVER-UX1]` Active server IP and port configurations visible on the Settings page.</u>
-    *   [x] <u>`[MS-VAULT-SERVER-UX2]` Live edge server status indicator (IP / active port / offline status) in the Command Center status bar.</u>
+    *   [x] `[MS-VAULT-SERVER-UX1]` Active server IP and port configurations visible on the Settings page.
+    *   [x] `[MS-VAULT-SERVER-UX2]` Live edge server status indicator (IP / active port / offline status) in the Command Center status bar.
 *   **Engineering & Architecture:**
     *   [x] `[MS-VAULT-SERVER-ENG1]` Initialize background SQLite database with a `sovereign_vault` dynamic asset table to log and save sensor historical tables locally.
     *   [x] `[MS-VAULT-SERVER-ENG2]` Integrate Shelf background HTTP server bound to `http://localhost:8080` (with port fallback), supporting dynamic routing handlers.
@@ -236,8 +259,11 @@ Future-scope ecosystem loop so User A can publish Bro Code to a shared place, Us
     *   [x] `[MS-VAULT-DASHBOARD-URL]` Open dashboard must use `/vault/<key>` (never bare host root). Guarded by `isVaultDashboardUrl` / `launchVaultDashboard`; `GET /` returns an index page with vault HTML links — not a blank page.
     *   [x] `[MS-VAULT-DASHBOARD-RENDER]` Host rejects empty vault HTML (502); IMPROVE `checkRenderableDashboardHtml` fails unguarded Leaflet CDN init and `serviceWorker.register` without a published SW; no `Service-Worker-Allowed: /` (prevents SW blanking the origin).
     *   [x] `[MS-VAULT-DASHBOARD-PERF]` Dashboards must LIMIT/paginate telemetry queries (AgentBridgeSpec + `checkUnboundedTelemetryQueries`). Missing `/sw.js` / `/vault/*.sw.js` serve a killer SW that unregisters stuck workers; vault HTML sends `Clear-Site-Data: "executionContexts"`.
+    *   [ ] **`[MS-VAULT-SERVER-ENG3]` Shared read-only SQL validator + table allowlist + row/payload caps on `/api/query` and `System.querySQL` (reject mutation, multi-statement, pragma/attach, unbounded dumps). [TARGETED FOR NEXT ACTION — S1]**
+    *   [ ] **`[MS-VAULT-SERVER-ENG4]` Explicit LAN exposure control + pairing/session auth; unpaired LAN callers get 401/403; localhost remains usable. [TARGETED FOR NEXT ACTION — S1]**
+    *   [ ] **`[MS-VAULT-SERVER-ENG5]` Encrypted sovereign SQLite (keystore-backed key) + migrate existing rows; move BYOK/platform secrets out of plaintext SharedPreferences. [TARGETED FOR NEXT ACTION — S2]**
 *   **Ecosystem & Agents:**
-    *   [x] <u>`[MS-VAULT-SERVER-AGT1]` Register first system endpoints (`/api/status`, `/api/query`, `/vault/<key>`) to read/write JSON data locally.</u>
+    *   [x] `[MS-VAULT-SERVER-AGT1]` Register first system endpoints (`/api/status`, `/api/query`, `/vault/<key>`) to read/write JSON data locally.
 
 ### - [ ] `[MS-JS-BRIDGE]` MILESTONE: Headless Javascript Agent Sandbox [IN REVIEW — awaiting on-device physical test]
 *   **User Perspective (UI/UX):**
@@ -252,7 +278,7 @@ Future-scope ecosystem loop so User A can publish Bro Code to a shared place, Us
 *   **User Perspective (UI/UX):**
     *   [x] *`[MS-USER-ECOSYSTEM-UX1]` "Import Agent" / "Introduce to Ecosystem" UI — paste or upload JS source + JSON schema; assign 4-tier security class. [IN REVIEW]*
     *   [ ] ~~`[MS-USER-ECOSYSTEM-UX2]` Voice-driven fast authoring from Command Center — SUPERSEDED by `[MS-CONV-AUTHOR-UX1]`, which specifies the same voice-authoring behavior in fuller (one-shot + Socratic) detail. Tracked there.~~
-    *   [ ] **`[MS-USER-ECOSYSTEM-UX3]` Agent Marketplace view — browse and pick up Not Verified (C4) Bro Code from the community pool (near-term local shell; publish/license/re-share commons later via §2.10 / `[MS-BROCODE-COMMONS]`). [TARGETED FOR NEXT ACTION]**
+    *   [ ] ~~`[MS-USER-ECOSYSTEM-UX3]` Agent Marketplace view — browse and pick up Not Verified (C4) Bro Code from the community pool (near-term local shell; publish/license/re-share commons later via §2.10 / `[MS-BROCODE-COMMONS]`). [DEFERRED — blocked until S1 edge auth + S4 C4→C3→C2 trust gates]~~
 *   **Engineering & Architecture:**
     *   [x] *`[MS-USER-ECOSYSTEM-ENG1]` LLM agent authoring flow — user prompt "Create an agent that..." → BYOK generates JS + metadata → vault → register (distinct from agent execution). [IN REVIEW]*
     *   [x] *`[MS-USER-ECOSYSTEM-ENG2]` Agent lifecycle — list, delete, run, and export vault-stored agent bundles. [IN REVIEW]*
@@ -260,19 +286,20 @@ Future-scope ecosystem loop so User A can publish Bro Code to a shared place, Us
     *   [ ] *`[MS-USER-ECOSYSTEM-ENG4]` Reconsideration warning + device-auth force-promotion (`FlutterFragmentActivity` + local_auth) for self-authored agents flagged as harmful. [IN REVIEW]*
 *   **Ecosystem & Agents:**
     *   [x] *`[MS-USER-ECOSYSTEM-AGT1]` Vault key convention (`agent:<Name>`, `agent:<Name>:schema`) and dynamic registration into AgentService + LLM router. [IN REVIEW]*
-    *   [ ] **`[MS-USER-ECOSYSTEM-AGT2]` Marketplace Bro Code pickup flow — install from C4 pool, run on simulated data, promote through due diligence (commons licenses / re-share later: `[MS-BROCODE-COMMONS]`). [TARGETED FOR NEXT ACTION]**
+    *   [ ] ~~`[MS-USER-ECOSYSTEM-AGT2]` Marketplace Bro Code pickup flow — install from C4 pool, run on simulated data, promote through due diligence (commons licenses / re-share later: `[MS-BROCODE-COMMONS]`). [DEFERRED — blocked until S1 edge auth + S4 trust gates]~~
 
 ### - [ ] `[MS-TELEMETRY-DASHBOARD]` MILESTONE: First User-Created App Validation — Telemetry Graphs [IN REVIEW — awaiting on-device physical test]
 *   **User Perspective (UI/UX):**
     *   [x] *`[MS-TELEMETRY-DASHBOARD-UX1]` Agents page shows user-created dashboard URL and "Open in Browser" action (VAULT DASHBOARDS panel). [IN REVIEW]*
     *   [x] *`[MS-TELEMETRY-DASHBOARD-UX2]` Voice/text re-run executes the vault-stored JS agent (registered agents are discoverable by the LLM router). [IN REVIEW]*
-    *   [ ] **`[MS-TELEMETRY-DASHBOARD-UX3]` Dashboard lifetime — when a dashboard is published / listed, let the user choose how long it stays live (e.g. 1 hour / 24 hours / 7 days / forever). Forever is allowed, but must be an explicit choice; keeping every dashboard live forever wastes device storage, edge-server memory, and attention. Default should be a finite TTL with easy renew/extend. [NOTED — not built yet]**
+    *   [ ] ~~`[MS-TELEMETRY-DASHBOARD-UX3]` Dashboard lifetime — when a dashboard is published / listed, let the user choose how long it stays live (e.g. 1 hour / 24 hours / 7 days / forever). Forever is allowed, but must be an explicit choice; keeping every dashboard live forever wastes device storage, edge-server memory, and attention. Default should be a finite TTL with easy renew/extend. [DEFERRED — S4 lifecycle]~~
 *   **Engineering & Architecture:**
     *   [x] *`[MS-TELEMETRY-DASHBOARD-ENG1]` Path A validation — user prompts LLM to author a telemetry graph dashboard agent; live charts from local SQLite only. [IN REVIEW]*
     *   [x] *`[MS-TELEMETRY-DASHBOARD-ENG2]` Path B validation — user imports hand-coded `TelemetryDashboard.js`; same dashboard URL works without LLM authoring. [IN REVIEW]*
-    *   [ ] **`[MS-TELEMETRY-DASHBOARD-ENG3]` Optional stretch — user-authored export on dashboard (CSV download / local dump) for Path C laptop training; no built-in OS export feature. Exercising user ownership right per §2.6 — egress is legitimate when user-built, not platform-provided. [TARGETED FOR NEXT ACTION]**
-    *   [ ] **`[MS-TELEMETRY-DASHBOARD-ENG4]` Enforce dashboard TTL from UX3: persist expiry on vault keys, purge/hide expired dashboards from the edge server listing, and surface renew/extend in VAULT DASHBOARDS. [NOTED — blocked on UX3]**
+    *   [ ] ~~`[MS-TELEMETRY-DASHBOARD-ENG3]` Optional stretch — user-authored export on dashboard (CSV download / local dump) for Path C laptop training; no built-in OS export feature. Exercising user ownership right per §2.6 — egress is legitimate when user-built, not platform-provided. [DEFERRED — after S1 edge hardening]~~
+    *   [ ] ~~`[MS-TELEMETRY-DASHBOARD-ENG4]` Enforce dashboard TTL from UX3: persist expiry on vault keys, purge/hide expired dashboards from the edge server listing, and surface renew/extend in VAULT DASHBOARDS. [DEFERRED — blocked on UX3 / S4]~~
     *   [x] `[MS-TELEMETRY-LIVE-VS-SANDBOX]` Live vault = real device GPS/accel via `TelemetryCollector` → `addRecord` (sovereign only). Sandbox / C4 / IMPROVE / marketplace Bro Code = synthetic seed rows in in-memory DB only — never copy sovereign telemetry into sandbox.
+    *   [ ] **`[MS-TELEMETRY-COLLECTOR-RELIABILITY]` Single-flight GPS sampling (no overlapping high-accuracy requests), exponential backoff after timeouts, visible collector health / last-success, battery-aware interval. [TARGETED FOR NEXT ACTION — S1]**
 *   **Ecosystem & Agents:**
     *   [x] *`[MS-TELEMETRY-DASHBOARD-AGT1]` Reference sample `examples/TelemetryDashboard.js` in repo (documentation only, not bundled in APK). [IN REVIEW]*
 
@@ -336,10 +363,10 @@ Future-scope ecosystem loop so User A can publish Bro Code to a shared place, Us
 *   **Deferred:**
     *   [ ] `[MS-BROCODE-REPORT]` User-consented upload of fixture reports to a dev centre (no silent egress); v1 is clipboard-only.
 
-### - [ ] `[MS-DEV-HYGIENE]` MILESTONE: **Dart format + analyze pre-commit / CI [DEFERRED]**
+### - [ ] `[MS-DEV-HYGIENE]` MILESTONE: **Dart format + analyze pre-commit / CI [TARGETED FOR NEXT ACTION — S3]**
 *   **Engineering & Architecture:**
-    *   [ ] *`[MS-DEV-HYGIENE-ENG1]`* Pre-commit hook: `dart format --set-exit-if-changed .` then `flutter analyze` (repo Dart only — does not replace on-device Bro Code format/style checks).
-    *   [ ] *`[MS-DEV-HYGIENE-ENG2]`* Optional CI workflow running the same checks on PR. Non-critical; ship when team wants merge gate discipline.
+    *   [ ] **`[MS-DEV-HYGIENE-ENG1]`** Pre-commit hook: `dart format --set-exit-if-changed .` then `flutter analyze` (repo Dart only — does not replace on-device Bro Code format/style checks). Also fix failing `widget_test` dispose. [TARGETED — S3]
+    *   [ ] **`[MS-DEV-HYGIENE-ENG2]`** CI workflow running analyze + tests on PR; at least one job with native QuickJS so JS bridge/fixture sandbox cases do not skip. [TARGETED — S3]
 
 ### - [x] `[MS-BROCODE-DEV-LOOP]` MILESTONE: **Bro Code Dev-Mode Test & Fixture Loop [BUILT]**
 *   **User Perspective (UI/UX):**
@@ -517,16 +544,16 @@ To guarantee extreme robustness of the native edge runtime before compiling furt
     4. Voice/text: *"Run telemetry dashboard"* re-executes the vault-stored JS agent (LLM router discovery).
     5. DELETE removes the agent from both the vault and the live ecosystem.
 
-### Test Case F: Verb-Intent Dispatch + Core JS Calculator (`[MS-CORE-INTENT]`, `[MS-CORE-JS-MIGRATION]`)
+### Test Case F: Verb-Intent Dispatch + Core JS Calculator (`[MS-CORE-INTENT]`, `[MS-CORE-JS-MIGRATION]`, `[MS-CONV-AUTHOR]`, `[MS-AGENT-REFINE]`)
 *   **SOP:** Launch the app on a physical device (use Git Bash: `flutter run`). In the Command Center text simulator (or by voice):
     1. Type/say: *"Ask Calculator to get me 2 to the power of 3"*.
     2. Type/say: *"Build me an agent that records my expenses"*.
-    3. Type/say: *"Fix the Calculator"*.
+    3. Type/say: *"Fix the Calculator"* (or open IMPROVE on Calculator).
 *   **Validation:**
-    1. For (1), the log shows an **Intent** entry reading `EXECUTE -> Calculator`, then JS Bridge steps, and the TTS speaks *"Calculator agent says, the answer is 8."* — confirming the `^` power operator fix over the legacy Dart parser.
-    2. For (2), the log shows `AUTHOR` and the app acknowledges authoring is coming soon (MS-CONV-AUTHOR hook).
-    3. For (3), the log shows `REFINE -> Calculator` and the app acknowledges refinement is coming soon (MS-AGENT-REFINE hook).
-    4. The Agents catalog lists **Calculator** and **DrivingCoach** with a **C2** badge (they are now vault-backed JS agents, not native modules).
+    1. For (1), the log shows an **Intent** entry reading `EXECUTE -> Calculator`, then JS Bridge steps, and the TTS speaks a result of **8** — confirming the `^` power operator on the vault-backed JS Calculator.
+    2. For (2), the log shows `AUTHOR` and the conversational authoring session / App Spec panel opens (not a "coming soon" stub) — `[MS-CONV-AUTHOR]` In Review.
+    3. For (3), the log shows `REFINE` / IMPROVE handoff (or the IMPROVE sheet) rather than a "coming soon" stub — `[MS-AGENT-REFINE]` In Review.
+    4. The Agents catalog lists **Calculator** and **DrivingCoach** with a **C2** badge (they are vault-backed JS agents, not native modules).
 
 ### Test Case C: Pure Audio Handshake Reliability (`[MS-AUDIO-DIRECT-UX5]`)
 *   **SOP:** Tap the central pulsing indicator. Make a distinct command vocalization, then tap once again immediately. Double-tap to cancel a second try.
@@ -538,11 +565,17 @@ To guarantee extreme robustness of the native edge runtime before compiling furt
 ---
 
 ## 7. ARCHITECTURE & ENGINEERING HISTORY (Changelog)
-* **Arch v3.10 / Eng v2.8 (Current):**
+* **Coverage review 2026-07-18 (Current planning freeze):**
+  * *Evidence:* Suite 200/34/1; strong auto on vault feature + Bro Code agent/fixtures/dev-loop; `MS-CORE-INTENT` has zero automation; marketplace demoted until edge auth + trust lifecycle.
+  * *Vault claim:* Feature surface complete; sovereignty hardening open (`ENG3` SQL caps, `ENG4` LAN auth, `ENG5` encryption/BYOK secure storage).
+  * *Next action (Bold):* `MS-VAULT-SERVER-ENG3`, `ENG4`, `MS-TELEMETRY-COLLECTOR-RELIABILITY` (S1); `ENG5` (S2).
+  * *Deferred (strike):* marketplace UX3/AGT2; dashboard TTL/export stretch until later sprints.
+
+* **Arch v3.10 / Eng v2.8 (Legacy freeze):**
   * *Paradigm:* **Bro Code Commons & simple licenses** (§2.10) — publish → pickup (C4) → modify → re-share under `remix_free` / `lineage_indexed` / `paid`; license conflict rules; commons registry as shared place.
   * *Marketplace (§2.7):* Listings are Bro Code units with `license` + `revisionId` (+ optional parent); paid acquire ≠ skip due diligence.
   * *Sovereignty (§2.6):* Commons publish is user-authorized egress of authored code (not auto models/labels); distinct from `[MS-DATA-MARKET]`.
-  * *Milestones:* `[MS-BROCODE-COMMONS]` designed (deferred); `[MS-USER-ECOSYSTEM-UX3]` / `AGT2` cross-linked as near-term shell. **No Eng bump.**
+  * *Milestones:* `[MS-BROCODE-COMMONS]` designed (deferred); marketplace shell deferred pending S1/S4 gates. **No Eng bump.**
 
 * **Arch v3.9 / Eng v2.8 (Legacy):**
   * *Paradigm:* Alternative 3 rewritten as **sovereign data + dual-locus ML** (§2.2): Path H heuristic ships first; Path L learned binding matures via ambient capture → labels → train (phone tiny and/or Path C laptop/GPU) → bind → test; inference always on-device.
