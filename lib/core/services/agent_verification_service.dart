@@ -114,56 +114,84 @@ class AgentVerificationService extends ChangeNotifier {
   }
 
   /// Dashboard HTML embedded in agent scripts runs in the browser, not QuickJS.
-  /// Strip complete backtick templates that look like HTML. The scanner must
-  /// respect escaped backticks (`\``) used by JavaScript embedded inside the
-  /// HTML; a non-greedy regex stops at the first escaped inner template and
-  /// leaks browser APIs into the sandbox scan.
+  /// Strip HTML document bodies even when inner client JS has unescaped backticks
+  /// (those break QuickJS syntax, but must not become false DOM policy findings).
   String _stripEmbeddedHtmlTemplates(String script) {
-    // Prefer explicit HTML document boundaries. This also handles a malformed
-    // dashboard whose inner JavaScript backticks were not escaped: syntax
-    // validation will still reject it, but due diligence should not mislabel
-    // browser code between <!DOCTYPE ... </html> as QuickJS-scope DOM access.
-    final htmlDocuments = script.replaceAllMapped(
-      RegExp(
-        r'`\s*<!doctype[\s\S]*?</html>\s*`',
-        caseSensitive: false,
-        multiLine: true,
-      ),
-      (_) => '``',
-    );
+    // 1) Strip by HTML document boundaries regardless of quoting/backticks.
+    //    Nested unescaped ` inside <script> used to close backtick templates early
+    //    and leak document./fetch( into the sandbox scan.
+    var cleaned = _stripHtmlDocumentBodies(script);
 
+    // 2) Strip remaining backticks templates that look like HTML fragments.
     final out = StringBuffer();
     var cursor = 0;
-    while (cursor < htmlDocuments.length) {
-      final start = htmlDocuments.indexOf('`', cursor);
+    while (cursor < cleaned.length) {
+      final start = cleaned.indexOf('`', cursor);
       if (start < 0) {
-        out.write(htmlDocuments.substring(cursor));
+        out.write(cleaned.substring(cursor));
         break;
       }
 
       var end = start + 1;
-      while (end < htmlDocuments.length) {
-        if (htmlDocuments.codeUnitAt(end) == 0x60 &&
-            !_isEscaped(htmlDocuments, end)) {
+      while (end < cleaned.length) {
+        if (cleaned.codeUnitAt(end) == 0x60 && !_isEscaped(cleaned, end)) {
           break;
         }
         end++;
       }
-      if (end >= htmlDocuments.length) {
-        out.write(htmlDocuments.substring(cursor));
+      if (end >= cleaned.length) {
+        out.write(cleaned.substring(cursor));
         break;
       }
 
-      out.write(htmlDocuments.substring(cursor, start));
-      final template = htmlDocuments.substring(start, end + 1);
+      out.write(cleaned.substring(cursor, start));
+      final template = cleaned.substring(start, end + 1);
       final lower = template.toLowerCase();
       final isHtml = lower.contains('<!doctype') ||
           lower.contains('<html') ||
           lower.contains('<head') ||
           lower.contains('<body') ||
-          lower.contains('<script');
-      out.write(isHtml ? '``' : template);
+          lower.contains('<script') ||
+          lower.contains('<div') ||
+          lower.contains('<meta');
+      // Service-worker source is also browser-bound (written to vault), not QuickJS.
+      final isServiceWorker = lower.contains('self.addeventlistener') ||
+          lower.contains('self.skipwaiting') ||
+          lower.contains('clients.claim');
+      out.write((isHtml || isServiceWorker) ? '``' : template);
       cursor = end + 1;
+    }
+    return out.toString();
+  }
+
+  /// Removes content from `<!DOCTYPE` / `<html` through matching `</html>`,
+  /// ignoring string/template delimiters so policy never scans browser JS.
+  String _stripHtmlDocumentBodies(String script) {
+    final out = StringBuffer();
+    var cursor = 0;
+    final lower = script.toLowerCase();
+    while (cursor < script.length) {
+      final doctype = lower.indexOf('<!doctype', cursor);
+      final htmlTag = lower.indexOf('<html', cursor);
+      int start = -1;
+      if (doctype >= 0 && (htmlTag < 0 || doctype <= htmlTag)) {
+        start = doctype;
+      } else if (htmlTag >= 0) {
+        start = htmlTag;
+      }
+      if (start < 0) {
+        out.write(script.substring(cursor));
+        break;
+      }
+      out.write(script.substring(cursor, start));
+      final close = lower.indexOf('</html>', start);
+      if (close < 0) {
+        // Unclosed document — drop the rest (browser-bound HTML fragment).
+        out.write(' ');
+        break;
+      }
+      out.write(' ');
+      cursor = close + '</html>'.length;
     }
     return out.toString();
   }

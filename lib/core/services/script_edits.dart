@@ -98,26 +98,114 @@ String applyScriptEdits(String source, List<ScriptEdit> edits) {
       );
     }
 
-    final matches = _countOccurrences(working, edit.oldString);
-    if (matches == 0) {
+    final applied = _applyOneEdit(working, edit, editIndex: i + 1);
+    working = applied;
+  }
+  return working;
+}
+
+/// Exact match first; if none, fuzzy match ignoring runs of whitespace.
+String _applyOneEdit(String source, ScriptEdit edit, {required int editIndex}) {
+  final exact = _countOccurrences(source, edit.oldString);
+  if (exact > 0) {
+    if (!edit.replaceAll && exact > 1) {
       throw FormatException(
-        'Edit ${i + 1}: oldString not found in the script. Tap Retry.',
-      );
-    }
-    if (!edit.replaceAll && matches > 1) {
-      throw FormatException(
-        'Edit ${i + 1}: oldString matched $matches times. '
+        'Edit $editIndex: oldString matched $exact times. '
         'Use a longer unique snippet or replaceAll.',
       );
     }
-
     if (edit.replaceAll) {
-      working = working.replaceAll(edit.oldString, edit.newString);
-    } else {
-      working = working.replaceFirst(edit.oldString, edit.newString);
+      return source.replaceAll(edit.oldString, edit.newString);
     }
+    return source.replaceFirst(edit.oldString, edit.newString);
   }
-  return working;
+
+  final fuzzy = findFuzzyWhitespaceMatch(source, edit.oldString);
+  if (fuzzy == null) {
+    throw FormatException(
+      'Edit $editIndex: oldString not found in the script. Tap Retry.',
+    );
+  }
+  if (!edit.replaceAll && fuzzy.matchCount > 1) {
+    throw FormatException(
+      'Edit $editIndex: fuzzy oldString matched ${fuzzy.matchCount} times. '
+      'Use a longer unique snippet or replaceAll.',
+    );
+  }
+  // Apply using the actual span from the source (preserves surrounding text).
+  if (edit.replaceAll) {
+    final pattern = _whitespaceFlexiblePattern(edit.oldString);
+    if (pattern == null) {
+      throw FormatException(
+        'Edit $editIndex: oldString not found in the script. Tap Retry.',
+      );
+    }
+    final matches = RegExp(pattern, multiLine: true).allMatches(source).toList();
+    var working = source;
+    for (final m in matches.reversed) {
+      working = working.replaceRange(m.start, m.end, edit.newString);
+    }
+    return working;
+  }
+  return source.replaceRange(fuzzy.start, fuzzy.end, edit.newString);
+}
+
+/// Span of a fuzzy whitespace-insensitive match inside [source].
+class FuzzyMatchSpan {
+  final int start;
+  final int end;
+  final int matchCount;
+
+  const FuzzyMatchSpan({
+    required this.start,
+    required this.end,
+    required this.matchCount,
+  });
+}
+
+/// Match [needle] in [source] allowing any whitespace run to match any other.
+///
+/// Returns the first span and total match count, or null if none.
+FuzzyMatchSpan? findFuzzyWhitespaceMatch(String source, String needle) {
+  if (needle.isEmpty) return null;
+  final pattern = _whitespaceFlexiblePattern(needle);
+  if (pattern == null) return null;
+  final re = RegExp(pattern, multiLine: true);
+  final all = re.allMatches(source).toList();
+  if (all.isEmpty) return null;
+  final first = all.first;
+  return FuzzyMatchSpan(
+    start: first.start,
+    end: first.end,
+    matchCount: all.length,
+  );
+}
+
+/// Build a RegExp source that treats each whitespace run in [needle] as `\s+`.
+String? _whitespaceFlexiblePattern(String needle) {
+  final buf = StringBuffer();
+  var i = 0;
+  var sawNonWs = false;
+  while (i < needle.length) {
+    final c = needle[i];
+    if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+      while (i < needle.length &&
+          (needle[i] == ' ' ||
+              needle[i] == '\t' ||
+              needle[i] == '\n' ||
+              needle[i] == '\r')) {
+        i++;
+      }
+      if (sawNonWs) buf.write(r'\s+');
+      continue;
+    }
+    sawNonWs = true;
+    buf.write(RegExp.escape(c));
+    i++;
+  }
+  final src = buf.toString();
+  if (src.isEmpty || src == r'\s+') return null;
+  return src;
 }
 
 int _countOccurrences(String source, String needle) {
@@ -240,9 +328,7 @@ List<LocalSyntaxFixResult> localSyntaxFixCandidates(
 
   final colIndex = (loc.column - 1).clamp(0, originalLine.length);
   lineCandidates.add(
-    originalLine.substring(0, colIndex) +
-        ';' +
-        originalLine.substring(colIndex),
+    '${originalLine.substring(0, colIndex)};${originalLine.substring(colIndex)}',
   );
 
   final trimmed = originalLine.trimRight();

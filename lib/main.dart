@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -39,21 +38,8 @@ void main() async {
   final jsAgentCount = await jsRegistry.loadAndRegisterAgents();
   debugPrint('[Main] JS Bridge: $jsAgentCount vault agent(s) registered.');
 
-  // Inject dummy telematic records into the SQLite Vault every 3 seconds
-  // This simulates the user carrying the device.
-  Timer.periodic(const Duration(seconds: 3), (timer) {
-    final lat = 28.6139 + (DateTime.now().millisecond / 10000.0);
-    final lon = 77.2090 + (DateTime.now().microsecond / 1000000.0);
-    // Simulating variance in accelerometer reading (simulating "Walking" noise)
-    final accZ = 9.8 + (DateTime.now().millisecond % 10) / 5.0;
-    
-    telemetryBus.addRecord(
-      latitude: lat,
-      longitude: lon,
-      accelerometerZ: accZ,
-      compassDirection: 180.0,
-    );
-  });
+  // Live GPS/accel → sovereign vault starts after first UI frame (AmbientHub).
+  // Sandbox / due-diligence Bro Code never receives that stream.
 
   runApp(
     UncontrolledProviderScope(

@@ -17,8 +17,8 @@ import 'js_bridge_service.dart';
 
 /// Extracts JS source from author/refine model JSON.
 ///
-/// Prefers `scriptBase64` (avoids truncation of HTML-in-JS inside JSON strings);
-/// falls back to legacy `script`.
+/// Prefers `scriptBase64` (avoids truncation of large sources inside JSON strings);
+/// falls back to legacy `script`. Prefer thin execute + assets over nested HTML.
 String scriptFromDraftJson(Map<String, dynamic> decoded) {
   final b64 = decoded['scriptBase64'] as String?;
   if (b64 != null && b64.trim().isNotEmpty) {
@@ -547,7 +547,8 @@ Respond ONLY in RAW JSON (no markdown fences):
   "name": "PascalCaseAgentName",
   "description": "one sentence describing what the agent does",
   "inputSchema": { "paramName": { "type": "string|number|boolean", "description": "...", "required": true|false } },
-  "scriptBase64": "BASE64 of the full javascript UTF-8 source",
+  "scriptBase64": "BASE64 of the thin execute() javascript UTF-8 source",
+  "assets": { "OptionalDashboard.html": "large HTML/PWA sources preferred as assets" },
   "notes": "one short sentence on how to invoke it"
 }
 ''';
@@ -647,12 +648,13 @@ Respond ONLY in RAW JSON: {"answer": "..."}
       contextBlocks.writeln();
     }
 
-    progress('Coder Agent: generating full Bro Code rewrite…');
+    progress('Coder Agent: refining Bro Code (prefer thin execute + assets)…');
 
     final prompt = '''
 You are the Coder Agent for Project Aur Bhai.
-Rewrite the existing Bro Code (Javascript) to satisfy the change request.
-Respond in English only. Prefer a complete, clean script — not surgical patches.
+Update the Bro Code (Javascript) to satisfy the change request.
+Respond in English only. Prefer thin execute() + System.assets for HTML/PWA;
+do NOT nest large dashboard HTML inside the JS template string.
 
 Bro Code name: $broCodeName
 Current description: ${currentDescription ?? 'n/a'}
@@ -669,7 +671,7 @@ $currentScript
 USER CHANGE REQUEST:
 "$changeRequest"
 
-Respond ONLY in RAW JSON with scriptBase64 containing the FULL updated source.
+Respond ONLY in RAW JSON: thin scriptBase64 and/or assets / edits — not HTML-in-JS monoliths.
 ''';
 
     Object? lastFailure;
@@ -710,7 +712,7 @@ Respond ONLY in RAW JSON with scriptBase64 containing the FULL updated source.
         messages.add(LlmChatMessage(
           role: 'user',
           content:
-              'Invalid JSON (${e.message}). Return ONLY valid JSON with scriptBase64 of the full Bro Code.',
+              'Invalid JSON (${e.message}). Return ONLY valid JSON with thin scriptBase64 and/or assets.',
         ));
         continue;
       }
@@ -725,7 +727,7 @@ Respond ONLY in RAW JSON with scriptBase64 containing the FULL updated source.
         messages.add(const LlmChatMessage(
           role: 'user',
           content:
-              'Missing scriptBase64. Return the complete Bro Code as scriptBase64.',
+              'Missing scriptBase64. Return thin execute() as scriptBase64; put large HTML in assets.',
         ));
         continue;
       }
@@ -902,8 +904,8 @@ $currentScript
 ''';
 
     final initialUserPrompt = '''
-You are applying a last-resort surgical patch to Bro Code for Project Aur Bhai.
-Prefer scriptBase64 full rewrite if edits are hard. Respond in English only.
+You are applying a surgical patch to Bro Code for Project Aur Bhai.
+Prefer edits on listed assets for HTML/PWA; thin scriptBase64 only when execute() must change. Respond in English only.
 Bro Code name: $agentName
 Current description: ${currentDescription ?? 'n/a'}
 Current input schema: $schemaJson

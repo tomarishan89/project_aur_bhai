@@ -3,8 +3,12 @@ description: Bro Code fixture tests — where exports live and when to run them
 globs:
   - test/fixtures/bro_code/**
   - test/bro_code_fixtures_test.dart
+  - test/bro_code_dev_loop_test.dart
+  - test/bro_code_improve_e2e_test.dart
   - test/support/bro_code_fixture_loader.dart
   - lib/core/pipeline/bro_code_fixture_report.dart
+  - lib/core/pipeline/bro_code_fixture_capture.dart
+  - lib/core/pipeline/bro_code_workspace_snapshot.dart
   - lib/core/pipeline/bro_code_coding_agent.dart
 alwaysApply: false
 ---
@@ -15,16 +19,28 @@ alwaysApply: false
 
 Committed Bro Code test inputs live in `test/fixtures/bro_code/*.bundle.json`.
 
-Ingest phone exports from **SEND TO TEST CASES** (IMPROVE sheet) or agent **EXPORT**:
-- Paste report JSON → normalize to `<name>.bundle.json` (see `test/fixtures/bro_code/README.md`).
-- Include `fixture.expectSyntaxOk`, `fixture.expectSandboxOk`, `fixture.improveGoal`, and `tags` when known.
+Ingest phone / desktop exports from:
+- **CAPTURE FIXTURE** (debug IMPROVE sheet) — on phone writes to app sandbox;
+  on PC run `dart run tool/pull_bro_code_fixture.dart` to drop into
+  `test/fixtures/bro_code/` (no clipboard). Desktop `flutter run` may write
+  straight into the repo when cwd is the project root.
+- **COPY DIAGNOSTIC JSON** — clipboard fallback only.
+- Agent **EXPORT** — add a `fixture` block manually.
+
+When the user says to pull the latest capture and diagnose, follow
+`.cursor/rules/bro-code-pull-diagnose.mdc` (always-on): run the dart pull tool,
+then diagnose the new `*.bundle.json`. Do not ask for paste.
+
+Include `fixture.expectSyntaxOk`, `fixture.expectSandboxOk`, `fixture.improveGoal`, and `tags` when known.
 
 ## When to run
 
-After changing Bro Code agent logic, sandbox, syntax validation, or due-diligence scan:
+After changing Bro Code agent logic, sandbox, syntax validation, due-diligence scan, or the dev-loop capture/snapshot path:
 
 ```bash
 flutter test test/bro_code_fixtures_test.dart
+flutter test test/bro_code_dev_loop_test.dart
+flutter test test/bro_code_improve_e2e_test.dart
 ```
 
 Run full `flutter test` before merge when fixtures or agent pipeline changed.
@@ -35,6 +51,11 @@ Run full `flutter test` before merge when fixtures or agent pipeline changed.
 2. Fix the coding agent, prompts, or Bro Code script.
 3. Flip `fixture.expect*` to `true` once the case passes — fixtures document the baseline.
 
+## E2E improve
+
+`dev_loop_broken.bundle.json` + `bro_code_improve_e2e_test.dart` prove:
+broken → scripted IMPROVE → verified. New failing Bro Codes: Capture Fixture, commit, keep or extend the E2E.
+
 ## Deferred
 
-`[MS-BROCODE-REPORT]`: user-consented upload of `BroCodeFixtureReport` to a dev centre (not v1). Clipboard-only for now.
+`[MS-BROCODE-REPORT]`: user-consented upload of `BroCodeFixtureReport` to a dev centre (not v1). Clipboard + local Capture Fixture for now.

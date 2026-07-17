@@ -49,6 +49,7 @@ class JsAgentAdapter extends BroCode {
   final String _description;
   final Map<String, BroCodeParameter> _inputSchema;
   final String _script;
+  final Map<String, String> _assets;
 
   /// Trust tier assigned at import/authoring time.
   final AgentSecurityClass securityClass;
@@ -62,6 +63,9 @@ class JsAgentAdapter extends BroCode {
   /// Raw JS source (exposed for lifecycle / export).
   String get script => _script;
 
+  /// Sidecar assets injected as `System.assets` at run time.
+  Map<String, String> get assets => Map.unmodifiable(_assets);
+
   /// Optional sink for bridge step logs (wired by [VoiceHandshakeEngine]).
   void Function(String step)? bridgeLogSink;
 
@@ -69,19 +73,17 @@ class JsAgentAdapter extends BroCode {
   AgentExecutionResult? lastExecutionResult;
 
   JsAgentAdapter({
-    required Ref ref,
+    required this._ref,
     required String name,
-    required String description,
-    required Map<String, BroCodeParameter> inputSchema,
-    required String script,
+    required this._description,
+    required this._inputSchema,
+    required this._script,
+    Map<String, String> assets = const {},
     this.securityClass = AgentSecurityClass.c4Unverified,
     this.createdAt,
     this.updatedAt,
-  })  : _ref = ref,
-        _name = name,
-        _description = description,
-        _inputSchema = inputSchema,
-        _script = script;
+  })  : _name = name,
+        _assets = Map<String, String>.from(assets);
 
   /// Production RUN allowed only for Core (C1) or Verified (C2).
   bool get canExecute =>
@@ -130,6 +132,7 @@ class JsAgentAdapter extends BroCode {
       parameters: parameters,
       onStepLog: bridgeLogSink,
       sandboxMode: sandboxMode,
+      assets: _assets,
     );
     lastExecutionResult = result;
     return result.message;

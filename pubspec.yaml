@@ -51,6 +51,10 @@ dependencies:
   shelf_router: ^1.1.4
   quickjs_engine: ^0.1.1
   local_auth: ^3.0.1
+  url_launcher: ^6.3.1
+  geolocator: ^14.0.3
+  sensors_plus: ^7.1.0
+  crypto: ^3.0.7
 
 # Windows desktop: upstream quickjs_engine 0.1.1 exports
 # QuickjsEnginePluginCApiRegisterWithRegistrar, but Flutter codegen expects

@@ -1,0 +1,37 @@
+---
+description: >-
+  When the user asks to pull the latest Bro Code capture / fixture and diagnose
+  the IMPROVE failure — run adb pull tool, find the new *.bundle.json, diagnose.
+alwaysApply: true
+---
+
+# Pull latest Bro Code capture → diagnose
+
+Trigger phrases (examples): "pull the latest capture", "pull fixture and check",
+"what failed on device", "diagnose the last IMPROVE failure".
+
+## Mandatory steps (do not ask the user to paste JSON)
+
+1. From the Flutter project root, run:
+   ```bash
+   dart run tool/pull_bro_code_fixture.dart
+   ```
+2. Read the command stdout for the written path, e.g.
+   `test/fixtures/bro_code/locator.<stamp>.bundle.json`.
+3. If pull fails: check phone USB + debug build, that the user tapped
+   **CAPTURE FIXTURE**, and that `adb devices` shows the phone. Fix and retry.
+   Do **not** fall back to asking for clipboard paste unless pull is impossible.
+4. Open/inspect that `*.bundle.json` (or its nested `session` / `improve` /
+   `capture` fields). Prefer a small Python/Dart script or targeted reads —
+   files can be large.
+5. Diagnose root cause in the coding-agent / host gates / Bro Code script
+   (not only the model’s bad edit). Cite concrete evidence from the fixture
+   (failure message, repeated tool errors, gate findings).
+6. If the user wants a fix: patch the app/agent, add or keep the fixture, and
+   run `flutter test test/bro_code_fixtures_test.dart` (and related tests).
+
+## Do not
+
+- Ask the user to COPY DIAGNOSTIC JSON and paste it when the device is available.
+- Invent a fixture path — use the path printed by the pull tool.
+- Claim diagnosis complete without reading the pulled file.

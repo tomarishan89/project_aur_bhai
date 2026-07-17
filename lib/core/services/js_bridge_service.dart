@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:quickjs_engine/quickjs_engine.dart';
 
+import '../pipeline/bro_code_capability_judge.dart';
 import 'telemetry_bus.dart';
 
 /// Outcome of a single JS agent sandbox run.
@@ -13,10 +14,14 @@ class AgentExecutionResult {
   final bool isError;
   final List<String> vaultHtmlKeysWritten;
 
+  /// Side effects for capability judging (writeVault, sendHTTP, …).
+  final BroCodeExecutionTrace trace;
+
   const AgentExecutionResult({
     required this.message,
     this.isError = false,
     this.vaultHtmlKeysWritten = const [],
+    this.trace = const BroCodeExecutionTrace(),
   });
 }
 
@@ -70,25 +75,35 @@ $script
   /// human-readable string for TTS.
   ///
   /// When [sandboxMode] is true, System.querySQL / writeVault hit an in-memory
-  /// DB — never the sovereign vault (safe for C4 / Tester Agent runs).
+  /// DB seeded with **synthetic** telemetry only — never the sovereign vault
+  /// and never a copy of real GPS/accel (safe for C4 / IMPROVE / marketplace).
+  ///
+  /// [assets] are injected as read-only `System.assets[id]` so thin orchestrators
+  /// can `System.writeVault(key, System.assets[id], mime)` without embedding
+  /// large HTML/PWA blobs inside the execute script.
   Future<AgentExecutionResult> executeAgentScript({
     required String agentName,
     required String script,
     required Map<String, dynamic> parameters,
     void Function(String step)? onStepLog,
     bool sandboxMode = false,
+    Map<String, String> assets = const {},
   }) async {
     final runtime = getJavascriptRuntime(xhr: false);
     final htmlKeys = <String>[];
+    final events = <BroCodeExecutionEvent>[];
     if (sandboxMode) {
       await _telemetry.openSandbox(reset: true);
       onStepLog?.call('Sandbox vault opened (in-memory, isolated)');
     }
     try {
-      _registerBridges(runtime, agentName, onStepLog, htmlKeys);
+      _registerBridges(runtime, agentName, onStepLog, htmlKeys, events);
+      if (assets.isNotEmpty) {
+        onStepLog?.call('Injected ${assets.length} System.assets key(s)');
+      }
 
       final wrapped = '''
-${_systemBootstrap()}
+${_systemBootstrap(assets: assets)}
 
 $script
 
@@ -116,6 +131,11 @@ $script
         message: message,
         isError: looksLikeError,
         vaultHtmlKeysWritten: List.unmodifiable(htmlKeys),
+        trace: BroCodeExecutionTrace(
+          events: List.unmodifiable(events),
+          returnMessage: message,
+          ranOk: !looksLikeError,
+        ),
       );
     } catch (e, st) {
       debugPrint('[JsBridge] Execution error ($agentName): $e\n$st');
@@ -124,6 +144,11 @@ $script
         message: '$agentName Bro Code encountered an error: $e',
         isError: true,
         vaultHtmlKeysWritten: List.unmodifiable(htmlKeys),
+        trace: BroCodeExecutionTrace(
+          events: List.unmodifiable(events),
+          returnMessage: '$e',
+          ranOk: false,
+        ),
       );
     } finally {
       if (sandboxMode) {
@@ -139,10 +164,16 @@ $script
     String agentName,
     void Function(String step)? onStepLog,
     List<String> htmlKeysOut,
+    List<BroCodeExecutionEvent> eventsOut,
   ) {
     runtime.onMessage('AurBhai_BridgeLog', (dynamic args) {
       final message = args is Map ? args['message']?.toString() ?? '$args' : '$args';
       onStepLog?.call(message);
+      eventsOut.add(BroCodeExecutionEvent(
+        kind: 'log',
+        data: {'message': message},
+        summary: message.length > 120 ? '${message.substring(0, 120)}…' : message,
+      ));
     });
 
     runtime.onMessage('AurBhai_querySQL', (dynamic args) async {
@@ -153,6 +184,11 @@ $script
       }
       final rows = await _telemetry.executeQuery(query);
       onStepLog?.call('System.querySQL ← ${rows.length} row(s)');
+      eventsOut.add(BroCodeExecutionEvent(
+        kind: 'querySQL',
+        data: {'query': query, 'rowCount': rows.length},
+        summary: 'querySQL → ${rows.length} row(s)',
+      ));
       return rows;
     });
 
@@ -166,6 +202,15 @@ $script
           key.toLowerCase().endsWith('.html')) {
         htmlKeysOut.add(key);
       }
+      eventsOut.add(BroCodeExecutionEvent(
+        kind: 'writeVault',
+        data: {
+          'key': key,
+          'mimeType': mimeType,
+          'byteLength': value.length,
+        },
+        summary: 'writeVault $key ($mimeType)',
+      ));
       onStepLog?.call('System.writeVault ← ok');
       return {'success': true, 'key': key};
     });
@@ -196,6 +241,16 @@ $script
           ? '${response.body.substring(0, 4096)}…'
           : response.body;
       onStepLog?.call('System.sendHTTP ← HTTP ${response.statusCode}');
+      eventsOut.add(BroCodeExecutionEvent(
+        kind: 'sendHTTP',
+        data: {
+          'url': url,
+          'method': payload == null ? 'GET' : 'POST',
+          'statusCode': response.statusCode,
+          'bodyPreview': body.length > 500 ? '${body.substring(0, 500)}…' : body,
+        },
+        summary: 'sendHTTP ${payload == null ? 'GET' : 'POST'} $url → ${response.statusCode}',
+      ));
       return {
         'statusCode': response.statusCode,
         'body': body,
@@ -203,7 +258,7 @@ $script
     });
   }
 
-  String _systemBootstrap() => '''
+  String _systemBootstrap({Map<String, String> assets = const {}}) => '''
 const System = {
   log: function(message) {
     sendMessage('AurBhai_BridgeLog', JSON.stringify({ message: String(message) }));
@@ -223,7 +278,9 @@ const System = {
       url: String(url),
       payload: payload === undefined ? null : payload
     }));
-  }
+  },
+  // Read-only sidecars (HTML / manifest / SW). Do not mutate.
+  assets: Object.freeze(${jsonEncode(assets)})
 };
 ''';
 

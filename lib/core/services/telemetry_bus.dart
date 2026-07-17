@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
+import 'vault_build_stamp.dart';
+
 class TelemetryRecord {
   final String id;
   final DateTime timestamp;
@@ -50,19 +52,23 @@ class TelemetryBusService extends ChangeNotifier {
   Database? _sandboxDb;
   Timer? _purgeTimer;
   final Duration ttlDuration;
+  final String databaseFileName;
 
-  TelemetryBusService({this.ttlDuration = const Duration(hours: 24)});
+  TelemetryBusService({
+    this.ttlDuration = const Duration(hours: 24),
+    this.databaseFileName = 'aur_bhai_telemetry_vault.db',
+  });
 
   /// True while Bro Code is executing against the in-memory sandbox vault.
   bool get isSandboxActive => _sandboxDb != null;
 
   Future<void> initialize() async {
     final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'aur_bhai_telemetry_vault.db');
+    final path = join(dbPath, databaseFileName);
 
     _db = await openDatabase(
       path,
-      version: 2, // Bump to support dynamic vault tables
+      version: 3,
       onCreate: (db, version) async {
         await _createVaultSchema(db);
       },
@@ -76,10 +82,36 @@ class TelemetryBusService extends ChangeNotifier {
             )
           ''');
         }
+        if (oldVersion < 3) {
+          await _ensureVaultBuildColumns(db);
+        }
       },
     );
+    // Always repair: hot reload / stuck user_version can leave v3 without columns.
+    await _ensureVaultBuildColumns(_db!);
     debugPrint('[TelemetryBus] SQLite Sovereign Vault Initialized at $path');
     _startPurgeFirewall();
+  }
+
+  /// Idempotent: adds build-stamp columns if missing (safe on every boot).
+  Future<void> _ensureVaultBuildColumns(Database db) async {
+    final tables = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='sovereign_vault'",
+    );
+    if (tables.isEmpty) return;
+
+    final info = await db.rawQuery('PRAGMA table_info(sovereign_vault)');
+    final cols = info.map((r) => r['name'] as String).toSet();
+    if (!cols.contains('updated_at')) {
+      await db.execute('ALTER TABLE sovereign_vault ADD COLUMN updated_at TEXT');
+      debugPrint('[TelemetryBus] Added sovereign_vault.updated_at');
+    }
+    if (!cols.contains('content_hash')) {
+      await db.execute(
+        'ALTER TABLE sovereign_vault ADD COLUMN content_hash TEXT',
+      );
+      debugPrint('[TelemetryBus] Added sovereign_vault.content_hash');
+    }
   }
 
   Future<void> _createVaultSchema(Database db) async {
@@ -97,14 +129,18 @@ class TelemetryBusService extends ChangeNotifier {
       CREATE TABLE sovereign_vault (
         key TEXT PRIMARY KEY,
         value TEXT,
-        mime_type TEXT
+        mime_type TEXT,
+        updated_at TEXT,
+        content_hash TEXT
       )
     ''');
   }
 
   /// Opens (or resets) an isolated in-memory DB for unverified Bro Code tests.
   ///
-  /// Seeded with empty `telemetry` + `sovereign_vault` — never the real vault.
+  /// **Invariant:** sandbox telemetry is synthetic fixture-only. Never copy
+  /// sovereign GPS/accel rows into sandbox — marketplace / C4 / IMPROVE Bro
+  /// Code must not see real device location history.
   Future<void> openSandbox({bool reset = true}) async {
     if (_sandboxDb != null && reset) {
       await _sandboxDb!.close();
@@ -119,16 +155,27 @@ class TelemetryBusService extends ChangeNotifier {
         await _createVaultSchema(db);
       },
     );
-    // Fixture rows so SQL-backed Bro Code can exercise SELECT paths.
-    await _sandboxDb!.insert('telemetry', {
-      'id': 'sandbox-seed-1',
-      'timestamp': DateTime.now().toIso8601String(),
-      'latitude': 0.0,
-      'longitude': 0.0,
-      'accelerometerZ': 9.8,
-      'compassDirection': 0.0,
-    });
-    debugPrint('[TelemetryBus] Sandbox vault opened (in-memory)');
+    await _seedSandboxTelemetry(_sandboxDb!);
+    debugPrint(
+      '[TelemetryBus] Sandbox vault opened (in-memory, synthetic telemetry only)',
+    );
+  }
+
+  /// Fictional cluster near 41.0°N, 74.0°W — not the user's location.
+  Future<void> _seedSandboxTelemetry(Database db) async {
+    const baseLat = 41.0;
+    const baseLng = -74.0;
+    final now = DateTime.now();
+    for (var i = 0; i < 8; i++) {
+      await db.insert('telemetry', {
+        'id': 'sandbox-seed-$i',
+        'timestamp': now.subtract(Duration(seconds: i * 12)).toIso8601String(),
+        'latitude': baseLat + (i * 0.0008),
+        'longitude': baseLng + (i * 0.0006),
+        'accelerometerZ': 9.5 + (i % 4) * 0.15,
+        'compassDirection': (i * 45.0) % 360.0,
+      });
+    }
   }
 
   Future<void> closeSandbox() async {
@@ -140,6 +187,11 @@ class TelemetryBusService extends ChangeNotifier {
 
   Database? get _activeDb => _sandboxDb ?? _db;
 
+  /// Live / test injector path — **sovereign `_db` only**.
+  ///
+  /// Even while [isSandboxActive], never writes into `_sandboxDb`. Sandbox Bro
+  /// Code must not call this; collectors and unit tests write real/fixture rows
+  /// to the on-disk vault for dashboards only.
   Future<void> addRecord({
     required double latitude,
     required double longitude,
@@ -147,7 +199,12 @@ class TelemetryBusService extends ChangeNotifier {
     required double compassDirection,
   }) async {
     if (_db == null) return;
-    
+
+    assert(
+      !identical(_db, _sandboxDb),
+      'addRecord must never target the sandbox DB',
+    );
+
     final record = TelemetryRecord(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       timestamp: DateTime.now(),
@@ -162,15 +219,13 @@ class TelemetryBusService extends ChangeNotifier {
       record.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    
-    // Notify listeners only occasionally to avoid flooding UI
+
     if (DateTime.now().second % 10 == 0) notifyListeners();
   }
 
-  /// Query the last N records from the database
   Future<List<TelemetryRecord>> getRecentRecords(int limit) async {
     if (_db == null) return [];
-    
+
     final List<Map<String, dynamic>> maps = await _db!.query(
       'telemetry',
       orderBy: 'timestamp DESC',
@@ -179,15 +234,10 @@ class TelemetryBusService extends ChangeNotifier {
     return maps.map((e) => TelemetryRecord.fromMap(e)).toList();
   }
 
-  /// Sovereign (on-disk) DB only — never the sandbox.
   Database? get database => _db;
 
-  /// Active target for JS Bridge: sandbox when open, else sovereign vault.
   Database? get bridgeDatabase => _activeDb;
 
-  /// Generic SQLite query for Bro Code / JS Bridge.
-  ///
-  /// When [openSandbox] is active, reads hit the in-memory DB only.
   Future<List<Map<String, dynamic>>> executeQuery(
     String sql, [
     List<dynamic>? arguments,
@@ -202,6 +252,27 @@ class TelemetryBusService extends ChangeNotifier {
     }
   }
 
+  Map<String, String> _rowToVaultMap(Map<String, dynamic> row) {
+    final value = row['value'] as String? ?? '';
+    final mime = (row['mime_type'] as String?) ?? 'text/plain';
+    final hash = row['content_hash'] as String?;
+    final updatedAt = row['updated_at'] as String?;
+    final resolvedHash =
+        (hash != null && hash.isNotEmpty) ? hash : vaultContentHash(value);
+    return {
+      'key': row['key'] as String? ?? '',
+      'value': value,
+      'mime_type': mime,
+      'updated_at': updatedAt ?? '',
+      'content_hash': resolvedHash,
+      'build_id': resolveVaultBuildId(
+        value: value,
+        contentHash: hash,
+        updatedAtIso: updatedAt,
+      ),
+    };
+  }
+
   /// Write a string asset. Sandbox-active writes never touch the sovereign vault.
   Future<void> writeVaultData(
     String key,
@@ -210,16 +281,25 @@ class TelemetryBusService extends ChangeNotifier {
   }) async {
     final db = _activeDb;
     if (db == null) return;
+    final hash = vaultContentHash(value);
+    final updatedAt = DateTime.now().toUtc().toIso8601String();
     await db.insert(
       'sovereign_vault',
-      {'key': key, 'value': value, 'mime_type': mimeType},
+      {
+        'key': key,
+        'value': value,
+        'mime_type': mimeType,
+        'updated_at': updatedAt,
+        'content_hash': hash,
+      },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
     final target = _sandboxDb != null ? 'sandbox' : 'sovereign';
-    debugPrint('[TelemetryBus] Wrote $target vault asset: $key ($mimeType)');
+    debugPrint(
+      '[TelemetryBus] Wrote $target vault asset: $key ($mimeType) build=$hash',
+    );
   }
 
-  /// List vault keys, optionally filtered by prefix (e.g. `agent:`).
   Future<List<String>> listVaultKeys({String? prefix}) async {
     if (_db == null) return [];
 
@@ -233,33 +313,35 @@ class TelemetryBusService extends ChangeNotifier {
     return results.map((row) => row['key'] as String).toList();
   }
 
-  /// List vault entries (key + mime_type), optionally filtered by mime type.
+  /// List vault entries (key + mime + build stamp), optionally filtered by mime.
   Future<List<Map<String, String>>> listVaultEntries({String? mimeType}) async {
     if (_db == null) return [];
 
     final List<Map<String, dynamic>> results = await _db!.query(
       'sovereign_vault',
-      columns: ['key', 'mime_type'],
+      columns: ['key', 'value', 'mime_type', 'updated_at', 'content_hash'],
       where: mimeType != null ? 'mime_type = ?' : null,
       whereArgs: mimeType != null ? [mimeType] : null,
       orderBy: 'key ASC',
     );
-    return results
-        .map((row) => {
-              'key': row['key'] as String,
-              'mime_type': (row['mime_type'] as String?) ?? 'text/plain',
-            })
-        .toList();
+    return results.map(_rowToVaultMap).map((m) {
+      return {
+        'key': m['key']!,
+        'mime_type': m['mime_type']!,
+        'updated_at': m['updated_at']!,
+        'content_hash': m['content_hash']!,
+        'build_id': m['build_id']!,
+      };
+    }).toList();
   }
 
-  /// Delete a dynamic asset from the sovereign vault.
   Future<void> deleteVaultData(String key) async {
     if (_db == null) return;
     await _db!.delete('sovereign_vault', where: 'key = ?', whereArgs: [key]);
     debugPrint('[TelemetryBus] Deleted vault asset: $key');
   }
 
-  /// Read dynamic string asset from the sovereign vault
+  /// Read dynamic string asset from the sovereign vault (includes build stamp).
   Future<Map<String, String>?> readVaultData(String key) async {
     if (_db == null) return null;
     final List<Map<String, dynamic>> results = await _db!.query(
@@ -268,10 +350,10 @@ class TelemetryBusService extends ChangeNotifier {
       whereArgs: [key],
     );
     if (results.isEmpty) return null;
-    return {
-      'value': results.first['value'] as String,
-      'mime_type': results.first['mime_type'] as String,
-    };
+    return _rowToVaultMap({
+      ...results.first,
+      'key': key,
+    });
   }
 
   void _startPurgeFirewall() {
@@ -283,15 +365,18 @@ class TelemetryBusService extends ChangeNotifier {
 
   Future<void> purgeExpiredRecords() async {
     if (_db == null) return;
-    final expirationThreshold = DateTime.now().subtract(ttlDuration).toIso8601String();
-    
+    final expirationThreshold =
+        DateTime.now().subtract(ttlDuration).toIso8601String();
+
     final count = await _db!.delete(
       'telemetry',
       where: 'timestamp < ?',
       whereArgs: [expirationThreshold],
     );
     if (count > 0) {
-      debugPrint('[TelemetryPurgeFirewall] Purged $count expired records from SQLite.');
+      debugPrint(
+        '[TelemetryPurgeFirewall] Purged $count expired records from SQLite.',
+      );
     }
   }
 

@@ -72,6 +72,7 @@ class JsAgentRegistry {
             'Bro Code loaded from vault ($key)';
         final createdAt = _parseDate(schema['createdAt'] as String?);
         final updatedAt = _parseDate(schema['updatedAt'] as String?);
+        final assets = await readAgentAssets(displayName);
 
         agentService.registerAgent(
           JsAgentAdapter(
@@ -80,6 +81,7 @@ class JsAgentRegistry {
             description: description,
             inputSchema: _parseInputSchema(schema['inputSchema']),
             script: vaultEntry['value']!,
+            assets: assets,
             securityClass:
                 AgentSecurityClassX.fromId(schema['securityClass'] as String?),
             createdAt: createdAt,
@@ -152,12 +154,14 @@ class JsAgentRegistry {
       mimeType: 'application/json',
     );
 
+    final assets = await readAgentAssets(name);
     final adapter = JsAgentAdapter(
       ref: _ref,
       name: name,
       description: description,
       inputSchema: inputSchema,
       script: script,
+      assets: assets,
       securityClass: securityClass,
       createdAt: DateTime.tryParse(created),
       updatedAt: DateTime.tryParse(updated),
@@ -210,6 +214,7 @@ class JsAgentRegistry {
           description: existing.description,
           inputSchema: existing.inputSchema,
           script: existing.script,
+          assets: existing.assets,
           securityClass: securityClass,
           createdAt: existing.createdAt,
           updatedAt: existing.updatedAt,
@@ -258,9 +263,14 @@ class JsAgentRegistry {
     }
 
     for (final entry in assetUpdates.entries) {
-      final mime = entry.key.toLowerCase().endsWith('.html')
+      final lower = entry.key.toLowerCase();
+      final mime = lower.endsWith('.html') || lower.endsWith('.htm')
           ? 'text/html'
-          : 'text/plain';
+          : lower.endsWith('.webmanifest') || lower.endsWith('manifest.json')
+              ? 'application/manifest+json'
+              : lower.endsWith('.js')
+                  ? 'application/javascript'
+                  : 'text/plain';
       await telemetry.writeVaultData(
         assetKeyFor(name, entry.key),
         entry.value,

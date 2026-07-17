@@ -18,6 +18,10 @@ void main() {
     await bus.openSandbox(reset: true);
     expect(bus.isSandboxActive, isTrue);
 
+    final seedRows = await bus.executeQuery('SELECT COUNT(*) AS c FROM telemetry');
+    expect(seedRows.first['c'], 8,
+        reason: 'sandbox must seed a synthetic telemetry cluster');
+
     await bus.writeVaultData('sandbox-key', 'mock-only', mimeType: 'text/plain');
     final sandboxRead = await bus.readVaultData('sandbox-key');
     // readVaultData always hits sovereign DB (registry/admin path).

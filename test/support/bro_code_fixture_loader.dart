@@ -25,8 +25,41 @@ class BroCodeFixture {
   bool? get expectSandboxOk =>
       fixtureExpectations['expectSandboxOk'] as bool?;
 
+  bool? get expectFormatOk =>
+      fixtureExpectations['expectFormatOk'] as bool?;
+
+  bool? get expectStyleOk =>
+      fixtureExpectations['expectStyleOk'] as bool?;
+
+  List<String> get expectHtmlKeys {
+    final raw = fixtureExpectations['expectHtmlKeys'];
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
+  bool? get expectNoCanvas =>
+      fixtureExpectations['expectNoCanvas'] as bool?;
+
+  bool? get expectLeafletMap =>
+      fixtureExpectations['expectLeafletMap'] as bool?;
+
+  bool? get expectPwa => fixtureExpectations['expectPwa'] as bool?;
+
+  bool? get expectNoDanglingDom =>
+      fixtureExpectations['expectNoDanglingDom'] as bool?;
+
   String? get improveGoal =>
       fixtureExpectations['improveGoal'] as String?;
+
+  /// Optional multi-attempt session payload from reportVersion 2 exports.
+  Map<String, dynamic>? get session {
+    final raw = fixtureExpectations['session'];
+    // Prefer top-level session when present (see fromJsonFile).
+    return raw is Map ? Map<String, dynamic>.from(raw) : null;
+  }
 
   factory BroCodeFixture.fromJsonFile(File file) {
     final raw = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
@@ -35,6 +68,20 @@ class BroCodeFixture {
     if (raw.containsKey('broCode') && raw['broCode'] is Map) {
       final normalized = _reportToBundle(raw);
       return BroCodeFixture._fromBundleMap(file.path, normalized);
+    }
+
+    // Clipboard wrap: { "content": "<report JSON string>", "slug": "...", ... }
+    if (raw['content'] is String) {
+      try {
+        final inner = jsonDecode(raw['content'] as String);
+        if (inner is Map && inner['broCode'] is Map) {
+          final normalized =
+              _reportToBundle(Map<String, dynamic>.from(inner));
+          return BroCodeFixture._fromBundleMap(file.path, normalized);
+        }
+      } on FormatException {
+        // fall through
+      }
     }
 
     return BroCodeFixture._fromBundleMap(file.path, raw);
@@ -49,6 +96,10 @@ class BroCodeFixture {
     final fixture = raw['fixture'] is Map
         ? Map<String, dynamic>.from(raw['fixture'] as Map)
         : <String, dynamic>{};
+    // Carry top-level session into fixtureExpectations for tests.
+    if (raw['session'] is Map && !fixture.containsKey('session')) {
+      fixture['session'] = raw['session'];
+    }
     final assetsRaw = raw['assets'];
     final assets = <String, String>{};
     if (assetsRaw is Map) {
@@ -75,6 +126,7 @@ class BroCodeFixture {
       'schema': bro['schema'],
       if (bro['assets'] != null) 'assets': bro['assets'],
       'fixture': fixture,
+      if (report['session'] != null) 'session': report['session'],
     };
   }
 

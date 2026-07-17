@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,14 +22,18 @@ import '../../core/services/conversational_session_service.dart';
 import '../../core/services/agent_verification_service.dart';
 import '../../core/services/device_auth_service.dart';
 import '../../core/services/telemetry_bus.dart';
+import '../../core/services/telemetry_collector.dart';
+import '../../core/services/vault_dashboard_url.dart';
 import '../../core/services/app_spec.dart';
 import '../../core/services/author_prompts.dart';
 import '../../core/pipeline/bro_code_coding_agent.dart';
+import '../../core/pipeline/bro_code_fixture_capture.dart';
 import '../../core/pipeline/bro_code_fixture_report.dart';
 import '../../core/pipeline/bro_code_workspace.dart';
 import '../../core/pipeline/context_estimate.dart';
 import '../widgets/context_usage_gauge.dart';
 import 'package:flutter_riverpod/legacy.dart' show ChangeNotifierProvider;
+import 'package:url_launcher/url_launcher.dart';
 
 /// Bumped after agent RUN so the Vault Dashboards banner reloads.
 class VaultDashboardRefresh extends ChangeNotifier {
@@ -45,8 +50,22 @@ final vaultDashboardRefreshProvider =
   return VaultDashboardRefresh();
 });
 
-/// Opens [url] in the host's default browser (desktop) or copies it (mobile).
+/// Opens [url] with the platform default handler (Chrome/browser on Android).
+/// Falls back to copying the URL only if no handler can launch it.
 Future<void> launchInBrowser(BuildContext context, String url) async {
+  final uri = Uri.tryParse(url);
+  if (uri != null && (uri.hasScheme)) {
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (launched) return;
+    } catch (_) {
+      // try desktop process / clipboard below
+    }
+  }
+
   try {
     if (Platform.isWindows) {
       await Process.run('cmd', ['/c', 'start', '', url], runInShell: true);
@@ -61,12 +80,31 @@ Future<void> launchInBrowser(BuildContext context, String url) async {
   } catch (_) {
     // fall through to clipboard fallback
   }
+
   await Clipboard.setData(ClipboardData(text: url));
   if (context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('URL copied: $url')),
+      SnackBar(
+        content: Text(
+          'Could not open in an app — URL copied: $url',
+        ),
+      ),
     );
   }
+}
+
+/// Opens a vault dashboard URL only — refuses server root /api/* (blank-page trap).
+Future<void> launchVaultDashboard(BuildContext context, String url) async {
+  final err = vaultDashboardUrlError(url);
+  if (err != null) {
+    debugPrint('[launchVaultDashboard] refused: $url — $err');
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+    }
+    return;
+  }
+  debugPrint('[launchVaultDashboard] $url');
+  await launchInBrowser(context, url);
 }
 
 /// Promotion dialog shared by post-author listener and agent detail sheet.
@@ -264,17 +302,28 @@ class _ForcePromoteDialogState extends State<_ForcePromoteDialog> {
   }
 }
 
-class AmbientHubScreen extends StatefulWidget {
+class AmbientHubScreen extends ConsumerStatefulWidget {
   const AmbientHubScreen({super.key});
   @override
-  State<AmbientHubScreen> createState() => _AmbientHubScreenState();
+  ConsumerState<AmbientHubScreen> createState() => _AmbientHubScreenState();
 }
 
-class _AmbientHubScreenState extends State<AmbientHubScreen> {
+class _AmbientHubScreenState extends ConsumerState<AmbientHubScreen> {
   final PageController _pageController = PageController(initialPage: 1);
 
   @override
+  void initState() {
+    super.initState();
+    // Request location + start real sensors after first frame (not cold boot).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(telemetryCollectorProvider).start();
+    });
+  }
+
+  @override
   void dispose() {
+    ref.read(telemetryCollectorProvider).stop();
     _pageController.dispose();
     super.dispose();
   }
@@ -1138,12 +1187,12 @@ class _PluginsPage extends ConsumerWidget {
       return const Center(child: Text("No agents in this trust tier.", style: TextStyle(color: Colors.white30)));
     }
     return GridView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 0.8,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.1,
       ),
       itemCount: agents.length,
       itemBuilder: (context, index) {
@@ -1162,17 +1211,14 @@ class _PluginsPage extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(isJs ? Icons.javascript : Icons.extension,
-                    color: isJs ? Colors.amberAccent : Colors.greenAccent, size: 32),
-                const SizedBox(height: 8),
+                    color: isJs ? Colors.amberAccent : Colors.greenAccent, size: 28),
+                const SizedBox(height: 6),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Text(a.name,
                       style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
                 ),
-                const SizedBox(height: 4),
-                Text(isJs ? "JS AGENT" : "NATIVE",
-                    style: const TextStyle(color: Colors.white38, fontSize: 8, letterSpacing: 1)),
                 if (builtAt != null) ...[
                   const SizedBox(height: 2),
                   Text(
@@ -1213,11 +1259,13 @@ class _PluginsPage extends ConsumerWidget {
 }
 
 /// Surfaces user-created HTML dashboards stored in the sovereign vault
-/// (MS-TELEMETRY-DASHBOARD-UX1). Shows a same-origin URL + Open in Browser.
+/// (MS-TELEMETRY-DASHBOARD-UX1). Compact rows + kebab; Open prefers localhost
+/// on device. Future: [MS-TELEMETRY-DASHBOARD-UX3] dashboard TTL.
 class _VaultDashboardsBanner extends ConsumerStatefulWidget {
   const _VaultDashboardsBanner();
   @override
-  ConsumerState<_VaultDashboardsBanner> createState() => _VaultDashboardsBannerState();
+  ConsumerState<_VaultDashboardsBanner> createState() =>
+      _VaultDashboardsBannerState();
 }
 
 class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> {
@@ -1236,6 +1284,95 @@ class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> 
 
   void _refresh() => setState(() => _future = _load());
 
+  /// On phone, localhost reaches this device's edge server; LAN is for peers.
+  String? _openUrl(LocalServerService server, String key) {
+    if (!server.isRunning) return null;
+    final k = normalizeVaultKeyForUrl(key);
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      return '${server.localhostAddress}/vault/$k';
+    }
+    return server.vaultUrl(k);
+  }
+
+  String? _copyUrl(LocalServerService server, String key) {
+    if (!server.isRunning) return null;
+    return server.vaultUrl(key);
+  }
+
+  Future<void> _openDashboard(LocalServerService server, String key) async {
+    final url = _openUrl(server, key);
+    if (url == null) return;
+    await launchVaultDashboard(context, url);
+  }
+
+  Future<void> _copyLink(LocalServerService server, String key) async {
+    final url = _copyUrl(server, key);
+    if (url == null) return;
+    await Clipboard.setData(ClipboardData(text: url));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Dashboard URL copied')),
+    );
+  }
+
+  Future<void> _locateBroCode(String key) async {
+    final agents = ref.read(agentServiceProvider).agents;
+    final match = findAgentForDashboardKey(agents, key);
+    if (match == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No Bro Code matched "$key" (may be orphaned).'),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: const Color(0xFF141414),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => _AgentDetailSheet(agent: match),
+    );
+  }
+
+  Future<void> _stopRemove(String key) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text('Stop dashboard?', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Remove "$key" from the vault? /vault/$key will stop serving.',
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('CANCEL'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('STOP / REMOVE',
+                style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await ref.read(telemetryBusProvider).deleteVaultData(key);
+    ref.read(vaultDashboardRefreshProvider).bump();
+    _refresh();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Removed $key')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final server = ref.watch(localServerProvider);
@@ -1246,13 +1383,15 @@ class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> 
         if (mounted) _refresh();
       });
     }
+    final maxListH = (MediaQuery.sizeOf(context).height * 0.28).clamp(96.0, 180.0);
+
     return FutureBuilder<List<Map<String, String>>>(
       future: _future,
       builder: (context, snapshot) {
         final dashboards = snapshot.data ?? const [];
         return Container(
-          margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+          padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
           decoration: BoxDecoration(
             color: const Color(0xFF161616),
             borderRadius: BorderRadius.circular(12),
@@ -1260,78 +1399,211 @@ class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> 
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("VAULT DASHBOARDS",
-                      style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  const Expanded(
+                    child: Text(
+                      'VAULT DASHBOARDS',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
                   IconButton(
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                     icon: const Icon(Icons.refresh, color: Colors.white38, size: 16),
                     onPressed: _refresh,
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
               if (dashboards.isEmpty)
-                const Text("No dashboards yet. Create an agent that builds one, then run it.",
-                    style: TextStyle(color: Colors.white30, fontSize: 11, fontStyle: FontStyle.italic))
-              else
-                ...dashboards.map((d) {
-                  final key = d['key']!;
-                  final url = server.isRunning ? server.vaultUrl(key) : 'Server offline';
-                  final localUrl = server.isRunning ? '${server.localhostAddress}/vault/$key' : null;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(key, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                              Text(
-                                server.lanIp != null ? 'LAN: $url' : url,
-                                style: const TextStyle(color: Colors.greenAccent, fontSize: 9, fontFamily: 'Courier'),
-                              ),
-                              if (localUrl != null && server.lanIp != null)
-                                Text('On phone: $localUrl',
-                                    style: const TextStyle(color: Colors.white38, fontSize: 8, fontFamily: 'Courier')),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          icon: const Icon(Icons.copy, color: Colors.white38, size: 16),
-                          onPressed: server.isRunning
-                              ? () async {
-                                  await Clipboard.setData(ClipboardData(text: url));
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dashboard URL copied')));
-                                  }
-                                }
-                              : null,
-                        ),
-                        const SizedBox(width: 4),
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          icon: const Icon(Icons.open_in_browser, color: Colors.greenAccent, size: 18),
-                          onPressed: server.isRunning ? () => launchInBrowser(context, url) : null,
-                        ),
-                      ],
+                const Padding(
+                  padding: EdgeInsets.only(top: 2, bottom: 2),
+                  child: Text(
+                    'No dashboards yet. Create an agent that builds one, then run it.',
+                    style: TextStyle(
+                      color: Colors.white30,
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
                     ),
-                  );
-                }),
+                  ),
+                )
+              else
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: maxListH),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    padding: EdgeInsets.zero,
+                    itemCount: dashboards.length,
+                    itemBuilder: (context, index) {
+                      final d = dashboards[index];
+                      final key = d['key']!;
+                      final buildId = d['build_id'];
+                      final canOpen = server.isRunning;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    key,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (buildId != null && buildId.isNotEmpty)
+                                    Text(
+                                      'build $buildId',
+                                      style: const TextStyle(
+                                        color: Color(0xFFB8F5C0),
+                                        fontSize: 8,
+                                        fontFamily: 'Courier',
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                              tooltip: 'Open',
+                              icon: Icon(
+                                Icons.open_in_browser,
+                                color: canOpen
+                                    ? Colors.greenAccent
+                                    : Colors.white24,
+                                size: 18,
+                              ),
+                              onPressed: canOpen
+                                  ? () => _openDashboard(server, key)
+                                  : null,
+                            ),
+                            PopupMenuButton<String>(
+                              padding: EdgeInsets.zero,
+                              icon: const Icon(
+                                Icons.more_vert,
+                                color: Colors.white38,
+                                size: 18,
+                              ),
+                              color: const Color(0xFF1E1E1E),
+                              onSelected: (value) async {
+                                switch (value) {
+                                  case 'open':
+                                    await _openDashboard(server, key);
+                                  case 'copy':
+                                    await _copyLink(server, key);
+                                  case 'locate':
+                                    await _locateBroCode(key);
+                                  case 'stop':
+                                    await _stopRemove(key);
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  enabled: canOpen,
+                                  value: 'open',
+                                  child: const Text('Open',
+                                      style: TextStyle(color: Colors.white)),
+                                ),
+                                PopupMenuItem(
+                                  enabled: canOpen,
+                                  value: 'copy',
+                                  child: const Text('Copy link',
+                                      style: TextStyle(color: Colors.white)),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'locate',
+                                  child: Text('Locate Bro Code',
+                                      style: TextStyle(color: Colors.white)),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'stop',
+                                  child: Text('Stop / remove',
+                                      style: TextStyle(color: Colors.redAccent)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
             ],
           ),
         );
       },
     );
   }
+}
+
+/// Stem used to match vault HTML keys to Bro Code names (e.g. Locator.html).
+@visibleForTesting
+String normalizeDashboardKeyStem(String key) {
+  var s = key.trim();
+  final slash = s.lastIndexOf('/');
+  if (slash >= 0) s = s.substring(slash + 1);
+  s = s.replaceAll(RegExp(r'\.html?$', caseSensitive: false), '');
+  s = s.replaceAll(RegExp(r'[_\-]+'), ' ');
+  s = s.replaceAll(RegExp(r'\s*[Dd]ashboard\s*$'), '');
+  return s.trim();
+}
+
+@visibleForTesting
+AurBhaiAgent? findAgentForDashboardKey(
+  List<AurBhaiAgent> agents,
+  String vaultKey,
+) {
+  final stem = normalizeDashboardKeyStem(vaultKey).toLowerCase();
+  if (stem.isEmpty) return null;
+  final stemNs = stem.replaceAll(RegExp(r'\s+'), '');
+
+  for (final a in agents) {
+    if (a.name.toLowerCase() == stem) return a;
+  }
+  for (final a in agents) {
+    if (a.name.toLowerCase().replaceAll(RegExp(r'\s+'), '') == stemNs) {
+      return a;
+    }
+  }
+
+  AurBhaiAgent? best;
+  var bestScore = 0;
+  for (final a in agents) {
+    final n = a.name.toLowerCase();
+    final nNs = n.replaceAll(RegExp(r'\s+'), '');
+    var score = 0;
+    if (n == stem || nNs == stemNs) {
+      score = 100;
+    } else if (n.contains(stem) || stem.contains(n)) {
+      score = 50;
+    } else if (nNs.contains(stemNs) || stemNs.contains(nNs)) {
+      score = 40;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = a;
+    }
+  }
+  return best;
 }
 
 /// MS-USER-ECOSYSTEM-UX1: Create-with-AI (Path A) + Manual Import (Path B).
@@ -1885,7 +2157,7 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
                     side: const BorderSide(color: Colors.greenAccent),
                   ),
                   onPressed: () =>
-                      launchInBrowser(context, _dashboardUrl!),
+                      launchVaultDashboard(context, _dashboardUrl!),
                   icon: const Icon(Icons.open_in_browser, size: 16),
                   label: Text(
                     'OPEN DASHBOARD (${_dashboardKey ?? ''})',
@@ -2394,15 +2666,139 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
   int _contextUsed = 0;
   int _contextBudget = kDefaultContextBudgetTokens;
   int _lastTurnsUsed = 0;
+  BroCodeAgentResult? _lastResult;
   final _progressScroll = ScrollController();
+  late BroCodeImproveSession _session;
+  /// Script to continue from on Retry (last unverified / verified draft).
+  String? _workingScript;
 
   @override
   void initState() {
     super.initState();
+    _session = BroCodeImproveSession(
+      agentName: widget.agent.name,
+      startedAt: DateTime.now(),
+    );
     final chips = _suggestedChips();
     if (chips.isNotEmpty) {
       _changeCtrl.text = chips.first;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSessionFromVault();
+    });
+  }
+
+  Future<void> _loadSessionFromVault() async {
+    try {
+      final bus = ref.read(telemetryBusProvider);
+      final key = BroCodeImproveSession.vaultKeyFor(widget.agent.name);
+      final asset = await bus.readVaultData(key);
+      if (asset == null || !mounted) return;
+      final decoded = jsonDecode(asset['value']!) as Map<String, dynamic>;
+      final loaded = BroCodeImproveSession.fromJson(decoded);
+      setState(() {
+        _session = loaded;
+        _workingScript = loaded.lastWorkingScript;
+        _attempt = loaded.attempts.length;
+        if (_changeCtrl.text.trim().isEmpty &&
+            loaded.distinctChangeRequests().isNotEmpty) {
+          _changeCtrl.text = loaded.distinctChangeRequests().last;
+        }
+      });
+      _appendProgress(
+        'Restored ${loaded.attempts.length} prior IMPROVE attempt(s) '
+        '(${loaded.distinctChangeRequests().length} distinct request(s))',
+      );
+    } catch (e) {
+      debugPrint('[IMPROVE] Failed to load session history: $e');
+    }
+  }
+
+  Future<void> _persistSession() async {
+    try {
+      final dropped = _session.trimToMaxAttempts();
+      if (dropped > 0) {
+        _appendProgress(
+          'Trimmed $dropped oldest IMPROVE attempt(s) '
+          '(cap ${BroCodeImproveSession.maxPersistedAttempts})',
+        );
+      }
+      final bus = ref.read(telemetryBusProvider);
+      await bus.writeVaultData(
+        BroCodeImproveSession.vaultKeyFor(widget.agent.name),
+        _session.toJsonString(pretty: false),
+        mimeType: BroCodeImproveSession.vaultMime,
+      );
+    } catch (e) {
+      debugPrint('[IMPROVE] Failed to persist session history: $e');
+    }
+  }
+
+  Future<void> _startFreshSession() async {
+    if (_busy) return;
+    try {
+      final bus = ref.read(telemetryBusProvider);
+      await bus.deleteVaultData(
+        BroCodeImproveSession.vaultKeyFor(widget.agent.name),
+      );
+    } catch (e) {
+      debugPrint('[IMPROVE] Failed to delete session vault: $e');
+    }
+    if (!mounted) return;
+    setState(() {
+      _session = BroCodeImproveSession(
+        agentName: widget.agent.name,
+        startedAt: DateTime.now(),
+      );
+      _attempt = 0;
+      _workingScript = null;
+      _progressLog.clear();
+      _error = null;
+      _draft = null;
+      _verified = false;
+      _lastFailureForRetry = null;
+      _lastResult = null;
+      _lastTurnsUsed = 0;
+      _contextUsed = 0;
+    });
+    _appendProgress(
+      'Started fresh IMPROVE session — seeding from vault Bro Code on next Run.',
+    );
+  }
+
+  BroCodeImproveAttempt _buildAttempt({
+    required String scriptBefore,
+    required String changeRequest,
+    required List<String> activitySlice,
+    required bool verified,
+    required String outcomeMessage,
+    required String scriptAfter,
+    Map<String, String> assetsAfter = const {},
+    BroCodeAgentResult? diagnostics,
+  }) {
+    return BroCodeImproveAttempt(
+      attemptNumber: _session.attempts.length + 1,
+      completedAt: DateTime.now(),
+      changeRequest: changeRequest,
+      verified: verified,
+      outcomeMessage: outcomeMessage,
+      turnsUsed: diagnostics?.turnsUsed ?? _lastTurnsUsed,
+      estimatedTokensUsed:
+          diagnostics?.estimatedTokensUsed ?? _contextUsed,
+      agentActivity: activitySlice,
+      scriptBefore: scriptBefore,
+      scriptAfter: scriptAfter,
+      assetsAfter: assetsAfter,
+      lastRunError: widget.lastRunError,
+      dueDiligenceFindings: widget.dueDiligenceFindings,
+      baselineSyntax: diagnostics?.baselineSyntax,
+      lastSyntaxError: diagnostics?.lastSyntaxError,
+      lastSandboxError: diagnostics?.lastSandboxError,
+      lastFormatError: diagnostics?.lastFormatError,
+      lastStyleError: diagnostics?.lastStyleError,
+      lastPolicyError: diagnostics?.lastPolicyError,
+      failingObservations: diagnostics?.failingObservations ?? const [],
+    );
   }
 
   @override
@@ -2470,14 +2866,19 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
 
   Future<void> _generatePatch({bool isRetry = false}) async {
     if (_changeCtrl.text.trim().isEmpty) return;
+    final changeRequest = _changeCtrl.text.trim();
+    final activityStart = _progressLog.length;
+    final scriptBefore =
+        _workingScript ?? _draft?.script ?? widget.agent.script;
+
     setState(() {
       _busy = true;
       _error = null;
       _draft = null;
       _verified = false;
       if (!isRetry) {
+        // Keep durable session; only clear live log for a fresh RUN.
         _progressLog.clear();
-        _attempt = 0;
         _lastFailureForRetry = null;
         _contextUsed = 0;
       } else {
@@ -2492,21 +2893,31 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
         _appendProgress('Loaded ${assets.length} related vault asset(s)');
       }
 
+      // Retries continue from last working draft, not vault baseline.
+      final seedScript = isRetry
+          ? (_workingScript ?? _session.lastWorkingScript ?? widget.agent.script)
+          : (_workingScript ?? widget.agent.script);
+
       final workspace = BroCodeWorkspace(
         name: widget.agent.name,
         description: widget.agent.description,
         inputSchema: widget.agent.inputSchema.map(
           (k, v) => MapEntry(k, v.toJson()),
         ),
-        script: widget.agent.script,
+        script: seedScript,
         assets: assets,
       );
 
       _appendProgress('Handing off to coding agent (tools + observe + retry)…');
+      if (isRetry && seedScript != widget.agent.script) {
+        _appendProgress(
+          'Continuing from prior working draft (${seedScript.length} chars)',
+        );
+      }
 
       final result = await ref.read(broCodeCodingAgentProvider).improve(
             workspace: workspace,
-            changeRequest: _changeCtrl.text.trim(),
+            changeRequest: changeRequest,
             lastRunError: widget.lastRunError,
             dueDiligenceFindings: widget.dueDiligenceFindings,
             priorFailureContext: isRetry ? _lastFailureForRetry : null,
@@ -2514,13 +2925,42 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
             onContextUpdate: _onContextUpdate,
           );
 
+      final scriptAfter = result.draft?.script ?? workspace.script;
+      final assetsAfter = result.draft?.assetUpdates ??
+          Map<String, String>.from(workspace.assets);
+
       setState(() {
         _draft = result.draft;
         _verified = result.verified;
         _contextUsed = result.estimatedTokensUsed;
         _contextBudget = result.contextBudgetTokens;
         _lastTurnsUsed = result.turnsUsed;
+        _lastResult = result;
+        _workingScript = scriptAfter;
       });
+
+      final activitySlice = _progressLog.length > activityStart
+          ? _progressLog.sublist(activityStart)
+          : List<String>.from(_progressLog);
+
+      final attempt = _buildAttempt(
+        scriptBefore: scriptBefore,
+        changeRequest: changeRequest,
+        activitySlice: activitySlice,
+        verified: result.verified,
+        outcomeMessage: result.message,
+        scriptAfter: scriptAfter,
+        assetsAfter: assetsAfter,
+        diagnostics: result,
+      );
+      final dropped = _session.addAttempt(attempt);
+      if (dropped > 0) {
+        _appendProgress(
+          'Trimmed $dropped oldest IMPROVE attempt(s) '
+          '(cap ${BroCodeImproveSession.maxPersistedAttempts})',
+        );
+      }
+      await _persistSession();
 
       if (result.verified) {
         _appendProgress(
@@ -2537,26 +2977,47 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
           e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
       _lastFailureForRetry = friendly;
       _appendProgress('Failed: $friendly');
+
+      final activitySlice = _progressLog.length > activityStart
+          ? _progressLog.sublist(activityStart)
+          : List<String>.from(_progressLog);
+      final attempt = _buildAttempt(
+        scriptBefore: scriptBefore,
+        changeRequest: changeRequest,
+        activitySlice: activitySlice,
+        verified: false,
+        outcomeMessage: friendly,
+        scriptAfter: _workingScript ?? scriptBefore,
+      );
+      final dropped = _session.addAttempt(attempt);
+      if (dropped > 0) {
+        _appendProgress(
+          'Trimmed $dropped oldest IMPROVE attempt(s) '
+          '(cap ${BroCodeImproveSession.maxPersistedAttempts})',
+        );
+      }
+      await _persistSession();
+
       setState(() => _error = friendly);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _sendToTestCases() async {
-    final registry = ref.read(jsAgentRegistryProvider);
-    final assets = await registry.readAgentAssets(widget.agent.name);
+  BroCodeFixtureReport _buildDiagnosticReport() {
     final workspace = BroCodeWorkspace(
       name: widget.agent.name,
       description: widget.agent.description,
       inputSchema: widget.agent.inputSchema.map(
         (k, v) => MapEntry(k, v.toJson()),
       ),
-      script: _draft?.script ?? widget.agent.script,
-      assets: assets,
+      script: _draft?.script ?? _workingScript ?? widget.agent.script,
+      // Assets filled asynchronously by callers that need vault assets.
+      assets: const {},
     );
 
-    final report = BroCodeFixtureReport(
+    final diagnostics = _lastResult;
+    return BroCodeFixtureReport(
       exportedAt: DateTime.now(),
       appVersion: '1.0.0+1',
       workspace: workspace,
@@ -2569,18 +3030,137 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
       estimatedTokensUsed: _contextUsed,
       expectSyntaxOk: false,
       expectSandboxOk: false,
+      baselineSyntax: diagnostics?.baselineSyntax,
+      lastSyntaxError: diagnostics?.lastSyntaxError,
+      lastSandboxError: diagnostics?.lastSandboxError,
+      lastFormatError: diagnostics?.lastFormatError,
+      lastStyleError: diagnostics?.lastStyleError,
+      lastPolicyError: diagnostics?.lastPolicyError,
+      failingObservations: diagnostics?.failingObservations ?? const [],
+      session: _session,
+      attemptNumber: _session.attempts.isEmpty
+          ? null
+          : _session.attempts.last.attemptNumber,
+      verified: _verified,
     );
+  }
+
+  Future<BroCodeFixtureReport> _buildDiagnosticReportWithAssets() async {
+    final registry = ref.read(jsAgentRegistryProvider);
+    final assets = await registry.readAgentAssets(widget.agent.name);
+    final draftAssets = _draft?.assetUpdates;
+    final merged = <String, String>{
+      ...assets,
+      if (draftAssets != null) ...draftAssets,
+    };
+    final base = _buildDiagnosticReport();
+    return BroCodeFixtureReport(
+      exportedAt: base.exportedAt,
+      appVersion: base.appVersion,
+      workspace: BroCodeWorkspace(
+        name: base.workspace.name,
+        description: base.workspace.description,
+        inputSchema: base.workspace.inputSchema,
+        script: base.workspace.script,
+        assets: merged,
+      ),
+      changeRequest: base.changeRequest,
+      lastRunError: base.lastRunError,
+      dueDiligenceFindings: base.dueDiligenceFindings,
+      agentActivity: base.agentActivity,
+      failureMessage: base.failureMessage,
+      turnsUsed: base.turnsUsed,
+      estimatedTokensUsed: base.estimatedTokensUsed,
+      expectSyntaxOk: base.expectSyntaxOk,
+      expectSandboxOk: base.expectSandboxOk,
+      baselineSyntax: base.baselineSyntax,
+      lastSyntaxError: base.lastSyntaxError,
+      lastSandboxError: base.lastSandboxError,
+      lastFormatError: base.lastFormatError,
+      lastStyleError: base.lastStyleError,
+      lastPolicyError: base.lastPolicyError,
+      failingObservations: base.failingObservations,
+      session: base.session,
+      attemptNumber: base.attemptNumber,
+      verified: base.verified,
+    );
+  }
+
+  Future<void> _copyDiagnosticJson() async {
+    final report = await _buildDiagnosticReportWithAssets();
 
     await Clipboard.setData(ClipboardData(text: report.toJsonString()));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Fixture report copied. Save as test/fixtures/bro_code/<name>.bundle.json on your dev machine, then run flutter test.',
+            'Diagnostic JSON copied (${_session.attempts.length} attempt(s), '
+            '${_session.distinctChangeRequests().length} request(s)). '
+            'Paste into test/fixtures/bro_code/ on your dev machine.',
           ),
-          duration: Duration(seconds: 5),
+          duration: const Duration(seconds: 5),
         ),
       );
+    }
+  }
+
+  Future<void> _captureFixtureToDisk() async {
+    setState(() => _busy = true);
+    try {
+      final report = await _buildDiagnosticReportWithAssets();
+      final result = await BroCodeFixtureCapture.writeBundle(report);
+      if (!mounted) return;
+
+      // Always leave the pull command on the clipboard for the PC workflow.
+      final clipboardText = result.wroteToRepoFixtures
+          ? 'Fixture already in repo: test/fixtures/bro_code/${result.bundleFileName}'
+          : 'dart run tool/pull_bro_code_fixture.dart';
+      await Clipboard.setData(ClipboardData(text: clipboardText));
+
+      _appendProgress(
+        'CAPTURE FIXTURE → ${result.bundleFileName}',
+      );
+      if (result.wroteToRepoFixtures) {
+        _appendProgress(
+          'Saved into repo fixtures (desktop). Run fixture / E2E tests next.',
+        );
+      } else {
+        _appendProgress(
+          'Saved on device (phone cannot write your Windows repo).',
+        );
+        _appendProgress(
+          'On PC: dart run tool/pull_bro_code_fixture.dart  (command copied)',
+        );
+        _appendProgress(
+          'Then tell Cursor to investigate that *.bundle.json — no paste needed.',
+        );
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.wroteToRepoFixtures
+                ? 'Fixture in repo: ${result.bundleFileName}'
+                : 'Fixture on phone: ${result.bundleFileName}\n'
+                    'Pull command copied. On PC run:\n'
+                    'dart run tool/pull_bro_code_fixture.dart',
+          ),
+          duration: const Duration(seconds: 10),
+          backgroundColor: Colors.teal.shade900,
+        ),
+      );
+    } catch (e) {
+      _appendProgress('CAPTURE FIXTURE failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Capture Fixture failed: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -2763,6 +3343,25 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
                     fontWeight: FontWeight.bold, fontSize: 12),
               ),
             ),
+            if (_session.isLarge && !_busy) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Session has ${_session.attempts.length} attempt(s) — '
+                'Start fresh to discard prior drafts and history.',
+                style: const TextStyle(color: Colors.orangeAccent, fontSize: 10),
+              ),
+              TextButton(
+                onPressed: _startFreshSession,
+                child: const Text(
+                  'START FRESH',
+                  style: TextStyle(
+                    color: Colors.orangeAccent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
             if (_busy) ...[
               const SizedBox(height: 8),
               const Text(
@@ -2888,9 +3487,17 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
                 Text(_error!,
                     style:
                         const TextStyle(color: Colors.redAccent, fontSize: 11)),
+              if (_session.isLarge) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Session is large — Start fresh to discard prior drafts and history.',
+                  style: TextStyle(color: Colors.orangeAccent, fontSize: 10),
+                ),
+              ],
               const SizedBox(height: 8),
               const Text(
-                'Improvement did not succeed yet. Retry, or send this Bro Code to test cases so we can fix the agent in a future update.',
+                'Improvement did not succeed yet. Retry continues from the last draft. '
+                'Start fresh reseeds from the vault Bro Code. Or copy a diagnostic JSON.',
                 style: TextStyle(color: Colors.white38, fontSize: 10),
               ),
               const SizedBox(height: 4),
@@ -2900,17 +3507,32 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                onPressed: _busy ? null : _sendToTestCases,
+                onPressed: _busy ? null : _copyDiagnosticJson,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.amberAccent,
                   side: const BorderSide(color: Colors.amberAccent),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                icon: const Icon(Icons.science_outlined, size: 18),
-                label: const Text('SEND TO TEST CASES',
+                icon: const Icon(Icons.content_copy_outlined, size: 18),
+                label: const Text('COPY DIAGNOSTIC JSON',
                     style: TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 11)),
               ),
+              if (kDebugMode) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _captureFixtureToDisk,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.tealAccent,
+                    side: const BorderSide(color: Colors.tealAccent),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  icon: const Icon(Icons.save_alt_outlined, size: 18),
+                  label: const Text('CAPTURE FIXTURE',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 11)),
+                ),
+              ],
               const SizedBox(height: 8),
               OutlinedButton(
                 onPressed:
@@ -2920,6 +3542,20 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
                   side: const BorderSide(color: Colors.lightBlueAccent),
                 ),
                 child: const Text('RETRY AGENT',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 11)),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: (_busy ||
+                        (_session.attempts.isEmpty && _workingScript == null))
+                    ? null
+                    : _startFreshSession,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orangeAccent,
+                  side: const BorderSide(color: Colors.orangeAccent),
+                ),
+                child: const Text('START FRESH',
                     style: TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 11)),
               ),

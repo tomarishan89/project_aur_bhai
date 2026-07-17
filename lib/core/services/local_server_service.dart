@@ -7,6 +7,8 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
 import 'telemetry_bus.dart';
+import 'vault_build_stamp.dart';
+import 'vault_dashboard_url.dart';
 
 class LocalServerService extends ChangeNotifier {
   static const int defaultPort = 8080;
@@ -43,13 +45,49 @@ class LocalServerService extends ChangeNotifier {
 
   String get statusUrl => '$serverAddress/api/status';
 
-  String vaultUrl(String key) => '$serverAddress/vault/$key';
+  /// Full URL for a vault asset. [key] must be non-empty (never bare server root).
+  String vaultUrl(String key) {
+    final k = normalizeVaultKeyForUrl(key);
+    final url = '$serverAddress/vault/$k';
+    assert(isVaultDashboardUrl(url), 'vaultUrl produced non-dashboard URL: $url');
+    return url;
+  }
 
   static const List<String> coreEndpoints = [
+    'GET /',
     'GET /api/status',
     'POST /api/query',
     'GET /vault/<key>',
+    'GET /sw.js',
   ];
+
+  /// Returned when a browser requests a missing SW — unregisters stuck workers.
+  static const String killerServiceWorkerJs = '''
+/* Aur Bhai killer SW — missing vault SW; uninstall and clear caches */
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    } catch (_) {}
+    try {
+      await self.registration.unregister();
+    } catch (_) {}
+    try {
+      const clients = await self.clients.matchAll({ type: 'window' });
+      for (const c of clients) {
+        if (c.navigate) c.navigate(c.url);
+      }
+    } catch (_) {}
+  })());
+});
+self.addEventListener('fetch', (event) => {
+  event.respondWith(fetch(event.request));
+});
+''';
 
   LocalServerService(this._ref) {
     _setupCoreRoutes();
@@ -76,6 +114,52 @@ class LocalServerService extends ChangeNotifier {
   }
 
   void _setupCoreRoutes() {
+    // Bare host:8080/ is not a dashboard — explain and link vault HTML keys.
+    _router.get('/', (Request request) async {
+      try {
+        final bus = _ref.read(telemetryBusProvider);
+        final dashboards =
+            await bus.listVaultEntries(mimeType: 'text/html');
+        final links = dashboards.map((d) {
+          final key = d['key'] ?? '';
+          final build = d['build_id'] ?? '';
+          final href = '/vault/${key.split('/').map(Uri.encodeComponent).join('/')}';
+          final buildNote = build.isEmpty
+              ? ''
+              : ' <span style="color:#888">build ${_htmlEscape(build)}</span>';
+          return '<li><a href="$href">${_htmlEscape(key)}</a>$buildNote</li>';
+        }).join('\n');
+        final body = '''
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aur Bhai Edge Server</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#111;color:#eee;padding:24px;line-height:1.45}
+a{color:#7CFFB2} .muted{color:#888;font-size:14px}
+</style></head><body>
+<h1>Aur Bhai edge server</h1>
+<p class="muted">This is the server root — not a Bro Code dashboard.
+Open a vault HTML URL (<code>/vault/&lt;name.html&gt;</code>) from the app’s
+<strong>Vault Dashboards</strong> panel.</p>
+<p><a href="/api/status">/api/status</a></p>
+<h2>Dashboards in vault</h2>
+${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes HTML.</p>' : '<ul>$links</ul>'}
+</body></html>
+''';
+        return Response.ok(
+          body,
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store',
+          },
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: 'Edge index error: $e',
+        );
+      }
+    });
+
     _router.get('/api/status', (Request request) {
       return Response.ok(
         jsonEncode({
@@ -111,18 +195,65 @@ class LocalServerService extends ChangeNotifier {
       }
     });
 
+    // Root /sw.js — common bad register path; kill stuck workers.
+    _router.get('/sw.js', (Request request) {
+      return _killerServiceWorkerResponse();
+    });
+
     _router.get('/vault/<key>', (Request request, String key) async {
       try {
         final telemetryBus = _ref.read(telemetryBusProvider);
         final asset = await telemetryBus.readVaultData(key);
 
         if (asset == null) {
+          if (_isServiceWorkerKey(key)) {
+            return _killerServiceWorkerResponse();
+          }
           return Response.notFound('Asset "$key" not found in Sovereign Vault.');
         }
 
+        final mime = _vaultMime(key, asset['mime_type']);
+        final hash = asset['content_hash'] ?? vaultContentHash(asset['value']!);
+        final buildId = asset['build_id'] ??
+            resolveVaultBuildId(
+              value: asset['value']!,
+              contentHash: asset['content_hash'],
+              updatedAtIso: asset['updated_at'],
+            );
+        final isHtml = mime.contains('html') ||
+            key.toLowerCase().endsWith('.html');
+        final raw = asset['value'] ?? '';
+        if (isHtml && raw.trim().length < 40) {
+          return Response(
+            502,
+            body: 'Vault HTML "$key" is empty or unusable '
+                '(${raw.trim().length} chars). Re-run the Bro Code / APPLY so '
+                'System.writeVault publishes a full dashboard document. '
+                'build=$buildId',
+            headers: {
+              'Content-Type': 'text/plain; charset=utf-8',
+              'Cache-Control': 'no-store',
+              'X-Aur-Build': _httpHeaderSafe(buildId),
+            },
+          );
+        }
+        final body =
+            isHtml ? injectHtmlBuildStamp(raw, buildId) : raw;
+
         return Response.ok(
-          asset['value'],
-          headers: {'Content-Type': asset['mime_type'] ?? 'text/plain'},
+          body,
+          headers: {
+            'Content-Type': mime,
+            'ETag': '"$hash"',
+            // HTTP headers must be ASCII — pretty build id uses '·'.
+            'X-Aur-Build': _httpHeaderSafe(buildId),
+            if (isHtml) 'Cache-Control': 'no-store',
+            // Helps browsers drop stuck execution contexts / rogue SWs.
+            if (isHtml) 'Clear-Site-Data': '"executionContexts"',
+            // Do NOT allow '/' — a bad SW would blank the whole origin.
+            // Default scope stays under /vault/ next to the script.
+            if (_isManifestKey(key) && !isHtml) 'Cache-Control': 'no-cache',
+          },
         );
       } catch (e) {
         return Response.internalServerError(body: 'Vault asset retrieval error: $e');
@@ -192,6 +323,53 @@ class LocalServerService extends ChangeNotifier {
   void unregisterDynamicRoute(String path) {
     _dynamicRoutes.remove(path);
   }
+
+  static bool _isManifestKey(String key) {
+    final k = key.toLowerCase();
+    return k.endsWith('.webmanifest') ||
+        k.endsWith('manifest.json') ||
+        k.contains('manifest');
+  }
+
+  static bool _isServiceWorkerKey(String key) {
+    final k = key.toLowerCase();
+    return k.endsWith('.sw.js') ||
+        k.contains('service-worker') ||
+        k.contains('serviceworker') ||
+        (k.endsWith('sw.js'));
+  }
+
+  static Response _killerServiceWorkerResponse() {
+    return Response.ok(
+      killerServiceWorkerJs,
+      headers: {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'Service-Worker-Allowed': '/vault/',
+      },
+    );
+  }
+
+  /// Latin-1 safe token for response headers (build ids may contain '·').
+  static String _httpHeaderSafe(String value) =>
+      value.replaceAll('·', '-').replaceAll(RegExp(r'[^\x20-\x7E]'), '-');
+
+  static String _vaultMime(String key, String? stored) {
+    if (stored != null &&
+        stored.isNotEmpty &&
+        stored != 'text/plain' &&
+        stored != 'application/octet-stream') {
+      return stored;
+    }
+    if (_isManifestKey(key)) return 'application/manifest+json';
+    if (_isServiceWorkerKey(key)) return 'application/javascript';
+    if (key.toLowerCase().endsWith('.html')) return 'text/html';
+    if (key.toLowerCase().endsWith('.json')) return 'application/json';
+    if (key.toLowerCase().endsWith('.js')) return 'application/javascript';
+    return stored ?? 'text/plain';
+  }
+
+  static String _htmlEscape(String s) => const HtmlEscape().convert(s);
 
   @override
   void dispose() {

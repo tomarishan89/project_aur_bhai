@@ -75,6 +75,7 @@ class TesterAgent {
     required String broCodeName,
     required String script,
     Map<String, dynamic> parameters = const {},
+    Map<String, String> assets = const {},
     void Function(String step)? onStepLog,
   }) async {
     final bridge = _ref.read(jsBridgeServiceProvider);
@@ -92,6 +93,7 @@ class TesterAgent {
       parameters: parameters,
       onStepLog: onStepLog,
       sandboxMode: true,
+      assets: assets,
     );
 
     return TesterAgentResult(

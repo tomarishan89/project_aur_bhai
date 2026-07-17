@@ -118,5 +118,45 @@ void main() {
       expect((json['data'] as List).first['count'], greaterThanOrEqualTo(1));
       client.close();
     });
+
+    test('missing SW paths return killer unregister script', () async {
+      final client = HttpClient();
+      final base = server.localhostAddress;
+      for (final path in ['/sw.js', '/vault/locator.sw.js', '/vault/sw.js']) {
+        final request = await client.getUrl(Uri.parse('$base$path'));
+        final response = await request.close();
+        expect(response.statusCode, 200, reason: path);
+        final body = await response.transform(utf8.decoder).join();
+        expect(body, contains('unregister'), reason: path);
+        expect(
+          response.headers.value('content-type'),
+          contains('javascript'),
+          reason: path,
+        );
+      }
+      client.close();
+    });
+
+    test('vault HTML responses include Clear-Site-Data', () async {
+      final bus = container.read(telemetryBusProvider);
+      await bus.writeVaultData(
+        'light.html',
+        '<!DOCTYPE html><html><body><button>Hi</button></body></html>',
+        mimeType: 'text/html',
+      );
+
+      final client = HttpClient();
+      final base = server.localhostAddress;
+      final request =
+          await client.getUrl(Uri.parse('$base/vault/light.html'));
+      final response = await request.close();
+      expect(response.statusCode, 200);
+      expect(
+        response.headers.value('clear-site-data'),
+        contains('executionContexts'),
+      );
+      await response.drain<void>();
+      client.close();
+    });
   });
 }

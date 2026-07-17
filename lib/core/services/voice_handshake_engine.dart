@@ -633,9 +633,7 @@ class VoiceHandshakeEngine extends ChangeNotifier {
         name: target,
         script: cachedScript,
         description: _session.pendingPatchAgentDescription,
-        inputSchema: inputSchema == null
-            ? null
-            : inputSchema.map((key, value) {
+        inputSchema: inputSchema?.map((key, value) {
                 final field = value is Map ? value : <String, dynamic>{};
                 return MapEntry(
                   key,

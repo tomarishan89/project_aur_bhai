@@ -177,6 +177,36 @@ async function execute(params) {
       expect(entry?['value'], 'hello-from-js');
     }, skip: quickJsAvailable ? false : 'QuickJS native library not built (cmake required on Windows)');
 
+    test('System.assets injects sidecars for thin orchestrators', () async {
+      final bridge = container.read(jsBridgeServiceProvider);
+      final bus = container.read(telemetryBusProvider);
+
+      final result = await bridge.executeAgentScript(
+        agentName: 'AssetProbe',
+        script: '''
+async function execute(params) {
+  const html = System.assets['dash.html'];
+  if (!html) throw new Error('missing asset');
+  await System.writeVault('dash.html', html, 'text/html');
+  return 'asset-ok:' + html.length;
+}
+''',
+        parameters: const {},
+        sandboxMode: true,
+        assets: const {
+          'dash.html':
+              '<!DOCTYPE html><html><body><div id="c">hi</div></body></html>',
+        },
+      );
+
+      expect(result.isError, isFalse, reason: result.message);
+      expect(result.message, contains('asset-ok:'));
+      expect(result.vaultHtmlKeysWritten, contains('dash.html'));
+      final entry = await bus.readVaultData('dash.html');
+      // Sandbox vault is closed after execute; still assert keys from result.
+      expect(entry, isNull);
+    }, skip: quickJsAvailable ? false : 'QuickJS native library not built (cmake required on Windows)');
+
     test('vault agent executes TelemetryCounter script', () async {
       final registry = container.read(jsAgentRegistryProvider);
       await registry.seedDemoAgentIfMissing();

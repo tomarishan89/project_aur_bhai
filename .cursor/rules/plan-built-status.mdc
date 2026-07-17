@@ -5,12 +5,16 @@ alwaysApply: true
 
 # Plan status after implementation
 
-When you finish implementing an agreed plan (all todos done, or the user confirms the work is complete):
+When you finish implementing an agreed plan (all todos done, or the user confirms the work is complete), this is a mandatory completion gate:
 
-1. Open the corresponding `*.plan.md` file (under `.cursor/plans/` or the workspace plans directory).
-2. Set the plan's status language to **built**, not "build" or "building".
-3. Mark frontmatter todos as `status: completed` (or `status: built` if that field exists).
-4. In the plan body, replace any CTA or heading that says **Build** / "Ready to build" with **Built** / "Built" so the file clearly shows the plan was realized.
+1. Locate every plan used for the implementation. Check both the workspace plan directory and the user-level `~/.cursor/plans/` directory; do not assume the plan is inside the repository.
+2. **Deduplicate before marking built.** Search `~/.cursor/plans/` for other `*.plan.md` files with the same frontmatter `name` (or clearly the same topic/continuation). Keep **one** canonical file — the plan you actually used in this session. Either amend that file in place, or merge any unique notes from duplicates into it, then **delete** the extra copies. Never leave two built plans for the same work.
+3. Open the canonical `*.plan.md` and verify its todos against the work actually completed.
+4. Set frontmatter `status: built`.
+5. Mark every implemented frontmatter todo as `status: completed` (or `status: built` if that field exists). Do not mark unfinished work completed.
+6. In the plan body, replace any CTA or heading that says **Build** / "Ready to build" with **Built** so the file clearly shows the plan was realized.
+7. Re-read the updated plan and confirm that `status: built`, todo statuses, and body wording agree.
+8. Do not tell the user the implementation is complete until this gate succeeds. If a plan cannot be found or updated, report that as a blocker instead of claiming completion.
 
 Example frontmatter after completion:
 
