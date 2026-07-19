@@ -10,9 +10,13 @@ allprojects {
 // Register before any subproject is evaluated (afterEvaluate in subprojects{} runs too late).
 gradle.beforeProject {
     afterEvaluate {
-        extensions.findByType<com.android.build.gradle.BaseExtension>()?.compileOptions?.apply {
-            sourceCompatibility = JavaVersion.VERSION_17
-            targetCompatibility = JavaVersion.VERSION_17
+        extensions.findByType<com.android.build.gradle.BaseExtension>()?.apply {
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
+            // Align plugin modules with app compileSdk (androidx / FGS APIs).
+            compileSdkVersion(36)
         }
         if (name == "quickjs_engine") {
             extensions.findByType<com.android.build.gradle.LibraryExtension>()?.apply {

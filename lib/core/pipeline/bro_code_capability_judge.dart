@@ -1,4 +1,4 @@
-/// Generic Bro Code capability verification (design + stubs).
+/// Generic Bro Code capability verification.
 ///
 /// PLATFORM NOTE — applies to EVERY Bro Code, not Locator alone:
 /// Users may ask for dashboards, tweets, smart-device commands, notifications,
@@ -11,6 +11,8 @@
 /// inside [BroCodeDashboardGoalChecker] only. New capabilities must go through
 /// this judge path, not new per-app regex gates.
 library;
+
+import 'dart:convert';
 
 /// One side-effect captured during sandbox / dry-run execution.
 class BroCodeExecutionEvent {
@@ -68,12 +70,7 @@ class BroCodeCapabilityJudgement {
   });
 }
 
-/// Pluggable judge: today a stub; tomorrow a fast LLM / heuristic matcher.
-///
-/// Contract for implementers:
-/// - Input: raw [changeRequest] + [BroCodeExecutionTrace] (+ optional published HTML)
-/// - Output: pass/fail with concrete unmet expectations the agent can fix
-/// - Must NOT assume Locator, maps, or PWA — those are just possible intents
+/// Pluggable judge: heuristic + optional LLM (BYOK judge slot).
 abstract class BroCodeCapabilityJudge {
   Future<BroCodeCapabilityJudgement> judge({
     required String changeRequest,
@@ -82,11 +79,7 @@ abstract class BroCodeCapabilityJudge {
   });
 }
 
-/// Heuristic placeholder until the LLM judge is wired to BYOK.
-///
-/// Does NOT claim feature fidelity. Passes when sandbox ran and produced at
-/// least one vault HTML write for UI-ish requests, or any side effect for
-/// non-UI requests. Real judging belongs in [LlmBroCodeCapabilityJudge].
+/// Fail-closed structural heuristic.
 class HeuristicBroCodeCapabilityJudge implements BroCodeCapabilityJudge {
   @override
   Future<BroCodeCapabilityJudgement> judge({
@@ -126,11 +119,19 @@ class HeuristicBroCodeCapabilityJudge implements BroCodeCapabilityJudge {
       );
     }
 
+    if (trace.events.isEmpty && publishedAssets.isEmpty) {
+      return const BroCodeCapabilityJudgement(
+        ok: false,
+        summary: 'No sandbox side effects observed (fail-closed)',
+        unmetExpectations: [
+          'Produce at least one System bridge side effect (writeVault, sendHTTP, …)',
+        ],
+      );
+    }
+
     return BroCodeCapabilityJudgement(
       ok: true,
-      summary:
-          'Heuristic pass (structural only) — LLM judge not yet wired for '
-          'full intent fidelity',
+      summary: 'Heuristic pass (structural)',
       evidence: [
         'events=${trace.events.length}',
         'vaultHtmlWrites=${vaultHtml.length}',
@@ -139,18 +140,8 @@ class HeuristicBroCodeCapabilityJudge implements BroCodeCapabilityJudge {
   }
 }
 
-/// Future: call a small BYOK model with a fixed judge prompt.
-///
-/// Prompt sketch (do not hardcode product features):
-/// ```
-/// USER ASKED: …
-/// EXECUTION TRACE (JSON): …
-/// PUBLISHED ASSETS (keys + truncated bodies): …
-/// Question: Does the trace fulfill the ask? Reply JSON
-/// {"ok":bool,"unmetExpectations":[…],"evidence":[…]}
-/// ```
+/// BYOK LLM judge — fixed JSON rubric; falls back to heuristic on parse failure.
 class LlmBroCodeCapabilityJudge implements BroCodeCapabilityJudge {
-  // ignore: unused_field — reserved for BYOK wiring
   final Future<String> Function(String prompt)? _complete;
 
   LlmBroCodeCapabilityJudge({Future<String> Function(String prompt)? complete})
@@ -162,18 +153,80 @@ class LlmBroCodeCapabilityJudge implements BroCodeCapabilityJudge {
     required BroCodeExecutionTrace trace,
     Map<String, String> publishedAssets = const {},
   }) async {
+    final heuristic = HeuristicBroCodeCapabilityJudge();
     if (_complete == null) {
-      return HeuristicBroCodeCapabilityJudge().judge(
+      return heuristic.judge(
         changeRequest: changeRequest,
         trace: trace,
         publishedAssets: publishedAssets,
       );
     }
-    // Full LLM path lands with MS-BROCODE-CAPABILITY-JUDGE.
-    return HeuristicBroCodeCapabilityJudge().judge(
-      changeRequest: changeRequest,
-      trace: trace,
-      publishedAssets: publishedAssets,
-    );
+
+    // Still fail-closed on empty traces before spending tokens.
+    if (!trace.ranOk || (trace.events.isEmpty && publishedAssets.isEmpty)) {
+      return heuristic.judge(
+        changeRequest: changeRequest,
+        trace: trace,
+        publishedAssets: publishedAssets,
+      );
+    }
+
+    final assetPreview = publishedAssets.entries
+        .take(4)
+        .map((e) {
+          final body = e.value.length > 400
+              ? '${e.value.substring(0, 400)}…'
+              : e.value;
+          return '${e.key}: $body';
+        })
+        .join('\n---\n');
+
+    final prompt = '''
+You are a Bro Code capability judge. Reply with ONLY JSON:
+{"ok":bool,"summary":string,"unmetExpectations":[string],"evidence":[string]}
+
+USER ASKED:
+$changeRequest
+
+EXECUTION TRACE (JSON):
+${jsonEncode(trace.toJson())}
+
+PUBLISHED ASSETS (truncated):
+$assetPreview
+
+Does the trace fulfill the ask? Be strict: no credit for unrelated side effects.
+''';
+
+    try {
+      final raw = await _complete!(prompt);
+      final start = raw.indexOf('{');
+      final end = raw.lastIndexOf('}');
+      if (start < 0 || end <= start) {
+        return heuristic.judge(
+          changeRequest: changeRequest,
+          trace: trace,
+          publishedAssets: publishedAssets,
+        );
+      }
+      final json = jsonDecode(raw.substring(start, end + 1)) as Map<String, dynamic>;
+      return BroCodeCapabilityJudgement(
+        ok: json['ok'] == true,
+        summary: json['summary']?.toString() ?? 'LLM judge',
+        unmetExpectations: (json['unmetExpectations'] as List?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const [],
+        evidence: (json['evidence'] as List?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const [],
+      );
+    } catch (_) {
+      return heuristic.judge(
+        changeRequest: changeRequest,
+        trace: trace,
+        publishedAssets: publishedAssets,
+      );
+    }
   }
 }

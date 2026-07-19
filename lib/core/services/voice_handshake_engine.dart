@@ -13,11 +13,17 @@ import '../agents/js_agent_adapter.dart';
 import 'llm_service.dart';
 import 'agent_service.dart';
 import 'byok_service.dart';
+import 'llm/llm_slot.dart';
 import 'author_prompts.dart';
 import 'app_spec.dart';
 import 'conversational_session_service.dart';
 import 'agent_verification_service.dart';
 import 'js_agent_registry.dart';
+import 'agent_feed_service.dart';
+import 'model_studio/bro_code_ml_meta.dart';
+import 'telemetry_bus.dart';
+import 'bro_call_service.dart';
+import '../pipeline/authoring_trace.dart';
 import '../pipeline/bro_code_coding_agent.dart';
 import '../pipeline/bro_code_workspace.dart';
 
@@ -179,13 +185,7 @@ class VoiceHandshakeEngine extends ChangeNotifier {
         );
         break;
       case AgentIntent.feed:
-        final name = target ?? 'that agent';
-        lastTranscribedWords = 'Data feed requested';
-        _addLog('Feed Intent',
-            'Agent data ingestion is not wired up yet. (MS-AGENT-FEED)');
-        notifyListeners();
-        await speak(
-            "I understood you want to give $name some data. That's coming soon.");
+        await _dispatchFeed(turn);
         break;
       case AgentIntent.direct:
         if (await _tryAnswerCapabilities(turn.transcription)) break;
@@ -195,6 +195,41 @@ class VoiceHandshakeEngine extends ChangeNotifier {
         notifyListeners();
         await speak(reply);
         break;
+    }
+  }
+
+  Future<void> _dispatchFeed(TurnParsedResponse turn) async {
+    final name = turn.targetAgent?.trim();
+    final payload = (turn.payload?.trim().isNotEmpty ?? false)
+        ? turn.payload!.trim()
+        : turn.transcription.trim();
+    if (name == null || name.isEmpty) {
+      _addLog('Feed Intent', 'FEED had no target agent.', isError: true);
+      await speak("I didn't catch which agent to tell.");
+      return;
+    }
+    if (payload.isEmpty) {
+      _addLog('Feed Intent', 'FEED had empty payload.', isError: true);
+      await speak('What should I tell $name?');
+      return;
+    }
+
+    try {
+      final entry = await _ref.read(agentFeedServiceProvider).push(
+            agentName: name,
+            text: payload,
+            source: 'voice',
+          );
+      lastTranscribedWords = 'Fed $name';
+      _addLog(
+        'Feed Intent',
+        'Stored inbox entry ${entry.id} for $name: $payload',
+      );
+      notifyListeners();
+      await speak('Got it. Told $name: $payload');
+    } catch (e) {
+      _addLog('Feed Intent', 'Failed: $e', isError: true);
+      await speak("I couldn't save that for $name.");
     }
   }
 
@@ -246,6 +281,15 @@ class VoiceHandshakeEngine extends ChangeNotifier {
 
     final initial = turn.spec ?? AppSpec();
     _session.startAuthor(initialSpec: initial);
+    final authorCfg = _ref.read(byokServiceProvider).configForSlot(LlmSlot.author);
+    _session.setAuthorModel(
+      provider: authorCfg.provider,
+      modelId: authorCfg.modelName,
+    );
+    final kickoff = turn.transcription.trim();
+    if (kickoff.isNotEmpty) {
+      _session.appendAuthoringTurn(role: 'user', text: kickoff, phase: 'eliciting');
+    }
     if (turn.spec != null) {
       _session.mergeAppSpec(turn.spec!);
       _addLog('Author Spec', _session.appSpec.toAuthorRequest());
@@ -263,6 +307,14 @@ class VoiceHandshakeEngine extends ChangeNotifier {
   Future<void> _handleAuthorTurn(TurnParsedResponse turn) async {
     final localIntent =
         ConversationalSessionService.classifyResponseLocal(turn.transcription);
+    final uttered = turn.transcription.trim();
+    if (uttered.isNotEmpty) {
+      _session.appendAuthoringTurn(
+        role: 'user',
+        text: uttered,
+        phase: _session.phase.name,
+      );
+    }
 
     if (localIntent == SessionResponseIntent.cancel) {
       _session.cancel();
@@ -440,7 +492,10 @@ class VoiceHandshakeEngine extends ChangeNotifier {
 
       final verification = _ref.read(agentVerificationProvider);
       final scan = verification.scanScript(draft.script);
-      _session.setLastScan(passed: scan.passed, findings: scan.findings);
+      _session.setLastScan(
+        passed: scan.passed,
+        findings: scan.findingMessages,
+      );
       final hasExternal = spec.externalIntegrations.isNotEmpty;
       _addLog(
         'Due Diligence',
@@ -448,10 +503,31 @@ class VoiceHandshakeEngine extends ChangeNotifier {
             ? hasExternal
                 ? 'Clean scan; external integrations require C2 promotion and platform keys in Settings.'
                 : 'Clean scan for $registryName.'
-            : 'Flagged: ${scan.findings.join(' ')}',
+            : 'Flagged: ${scan.findingMessages.join(' ')}',
         isError: !scan.passed,
       );
       notifyListeners();
+
+      // MS-MODEL-META-AGT1 — Path L slots when purpose implies classification.
+      final purposeText =
+          '${spec.purpose.value ?? ''} ${draft.description}'.toLowerCase();
+      final wantsPathL = RegExp(
+        r'classif|detect|pothole|label|sensor|accelerometer|ambient|train',
+      ).hasMatch(purposeText);
+      final mlMeta = wantsPathL
+          ? const BroCodeMlMeta(
+              usesModel: true,
+              maturity: 'collecting',
+              labelSchema: {
+                'labels': ['positive', 'negative'],
+              },
+              capturePolicy: {
+                'mode': 'ambient',
+                'fineWindowSeconds': 45,
+              },
+              fineWindow: Duration(seconds: 45),
+            )
+          : null;
 
       await registry.saveAndRegisterAgent(
         name: registryName,
@@ -459,7 +535,27 @@ class VoiceHandshakeEngine extends ChangeNotifier {
         inputSchema: schemaParams,
         script: draft.script,
         securityClass: AgentSecurityClass.c4Unverified,
+        mlMeta: mlMeta,
       );
+      if (mlMeta != null) {
+        _addLog(
+          'Model Studio',
+          'Path L collecting mode proposed (usesModel) for $registryName.',
+        );
+      }
+
+      // S15 — freeze authoring form interactions with this Bro Code.
+      final trace = _session.buildAuthoringTrace(
+        agentName: registryName,
+        buildOutcome: 'built',
+        appSpecAtBuild: spec.toJson(),
+      );
+      await _ref.read(telemetryBusProvider).writeVaultData(
+            AuthoringTrace.vaultKeyFor(registryName),
+            trace.toJsonString(),
+            mimeType: 'application/json',
+          );
+      _addLog('Authoring Trace', 'Frozen ${trace.turns.length} turn(s) for $registryName');
 
       _session.complete();
       lastTranscribedWords = 'Agent $displayName created';
@@ -577,7 +673,8 @@ class VoiceHandshakeEngine extends ChangeNotifier {
             lastRunError: (_session.lastScan?.findings.isNotEmpty ?? false)
                 ? _session.lastScan!.findings.join('; ')
                 : null,
-            dueDiligenceFindings: _session.lastScan?.findings ?? const [],
+            dueDiligenceFindings:
+                _session.lastScan?.findings ?? const <String>[],
             onProgress: (msg) {
               _addLog('Agent', msg);
               notifyListeners();
@@ -653,7 +750,7 @@ class VoiceHandshakeEngine extends ChangeNotifier {
         'Due Diligence',
         scan.passed
             ? 'Clean scan after refine.'
-            : 'Flagged after refine: ${scan.findings.join(' ')}',
+            : 'Flagged after refine: ${scan.findingMessages.join(' ')}',
         isError: !scan.passed,
       );
 
@@ -763,6 +860,13 @@ class VoiceHandshakeEngine extends ChangeNotifier {
   }
 
   Future<void> speak(String text) async {
+    if (_session.isActive && _session.kind == SessionKind.author) {
+      _session.appendAuthoringTurn(
+        role: 'assistant',
+        text: text,
+        phase: _session.phase.name,
+      );
+    }
     try {
       await _tts.speak(text);
     } catch (e) {
@@ -939,6 +1043,24 @@ class VoiceHandshakeEngine extends ChangeNotifier {
         ? turn.transcription
         : 'Processed command';
     _addLog('Transcription', lastTranscribedWords);
+
+    // S17 — pending Bro Call ack (Haan Bhai) takes priority.
+    final calls = _ref.read(broCallServiceProvider);
+    if (calls.nextPending != null &&
+        calls.looksLikeAck(turn.transcription)) {
+      final delivered = await calls.acknowledgeAndDeliver();
+      if (delivered != null) {
+        _addLog('Bro Call', 'Delivered ${delivered.id} from ${delivered.agentName}');
+        lastTranscribedWords = 'Bro Call: ${delivered.title}';
+        // Payload spoken via BroCallService.onDeliverPayload; ensure TTS if unset.
+        if (calls.onDeliverPayload == null) {
+          await speak(
+            delivered.speakText.isEmpty ? delivered.body : delivered.speakText,
+          );
+        }
+        return;
+      }
+    }
 
     if (_isSessionRecapQuery(turn.transcription) && _session.isActive) {
       final recap = _session.summarize();

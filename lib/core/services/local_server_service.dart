@@ -1,17 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
+import 'sql_query_guard.dart';
 import 'telemetry_bus.dart';
 import 'vault_build_stamp.dart';
 import 'vault_dashboard_url.dart';
 
 class LocalServerService extends ChangeNotifier {
   static const int defaultPort = 8080;
+  static const String pairHeader = 'x-aur-pair';
 
   final Ref _ref;
   HttpServer? _server;
@@ -20,9 +23,15 @@ class LocalServerService extends ChangeNotifier {
   String? _lanIp;
   bool _disposed = false;
 
+  /// When false (default), non-loopback clients get 403.
+  bool _lanExposureEnabled = false;
+  String _pairingToken = '';
+
   bool get isRunning => _server != null;
   int? get port => _server?.port;
   String? get lanIp => _lanIp;
+  bool get lanExposureEnabled => _lanExposureEnabled;
+  String get pairingToken => _pairingToken;
 
   String get host {
     if (!isRunning) return '—';
@@ -90,7 +99,90 @@ self.addEventListener('fetch', (event) => {
 ''';
 
   LocalServerService(this._ref) {
+    _pairingToken = _generatePairToken();
     _setupCoreRoutes();
+  }
+
+  void setLanExposureEnabled(bool enabled) {
+    if (_lanExposureEnabled == enabled) return;
+    _lanExposureEnabled = enabled;
+    if (enabled) {
+      _pairingToken = _generatePairToken();
+    }
+    if (!_disposed) notifyListeners();
+    debugPrint(
+      '[LocalServer] LAN exposure ${enabled ? "ON (pair=$_pairingToken)" : "OFF"}',
+    );
+  }
+
+  void rotatePairingToken() {
+    _pairingToken = _generatePairToken();
+    if (!_disposed) notifyListeners();
+  }
+
+  static String _generatePairToken() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    final rnd = Random.secure();
+    return List.generate(6, (_) => chars[rnd.nextInt(chars.length)]).join();
+  }
+
+  /// Loopback always allowed. LAN requires exposure + matching pair token.
+  Response? _authorizeLan(Request request) {
+    final info =
+        request.context['shelf.io.connection_info'] as HttpConnectionInfo?;
+    final remote = info?.remoteAddress;
+    final isLoopback = remote == null || remote.isLoopback;
+    if (isLoopback) return null;
+
+    if (!_lanExposureEnabled) {
+      return Response.forbidden(
+        jsonEncode({
+          'success': false,
+          'error': 'LAN access disabled. Enable in Settings → Local Edge Server.',
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    final presented = _presentedPairToken(request);
+    if (presented != _pairingToken) {
+      return Response(
+        401,
+        body: jsonEncode({
+          'success': false,
+          'error':
+              'Pairing required. Open vault URL with ?pair=CODE or send header $pairHeader',
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+    return null;
+  }
+
+  String _presentedPairToken(Request request) {
+    final header = request.headers[pairHeader] ??
+        request.headers['X-Aur-Pair'] ??
+        '';
+    if (header.isNotEmpty) return header.trim();
+    final query = request.url.queryParameters['pair'] ?? '';
+    if (query.isNotEmpty) return query.trim();
+    final cookie = request.headers['cookie'] ?? '';
+    for (final part in cookie.split(';')) {
+      final kv = part.trim().split('=');
+      if (kv.length == 2 && kv[0] == 'aur_pair') return kv[1].trim();
+    }
+    return '';
+  }
+
+  Map<String, String> _pairCookieHeaders(Request request) {
+    final q = request.url.queryParameters['pair'] ?? '';
+    if (q.isNotEmpty && q == _pairingToken) {
+      return {
+        'Set-Cookie':
+            'aur_pair=$_pairingToken; Path=/; SameSite=Lax; HttpOnly',
+      };
+    }
+    return const {};
   }
 
   static Future<String?> resolveLanIpv4() async {
@@ -174,6 +266,8 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
     });
 
     _router.post('/api/query', (Request request) async {
+      final denied = _authorizeLan(request);
+      if (denied != null) return denied;
       try {
         final body = await request.readAsString();
         final payload = jsonDecode(body);
@@ -185,6 +279,12 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
 
         return Response.ok(
           jsonEncode({'success': true, 'data': results}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      } on SqlQueryRejected catch (e) {
+        return Response(
+          400,
+          body: jsonEncode({'success': false, 'error': e.message}),
           headers: {'Content-Type': 'application/json'},
         );
       } catch (e) {
@@ -201,6 +301,8 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
     });
 
     _router.get('/vault/<key>', (Request request, String key) async {
+      final denied = _authorizeLan(request);
+      if (denied != null) return denied;
       try {
         final telemetryBus = _ref.read(telemetryBusProvider);
         final asset = await telemetryBus.readVaultData(key);
@@ -253,6 +355,7 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
             // Do NOT allow '/' — a bad SW would blank the whole origin.
             // Default scope stays under /vault/ next to the script.
             if (_isManifestKey(key) && !isHtml) 'Cache-Control': 'no-cache',
+            ..._pairCookieHeaders(request),
           },
         );
       } catch (e) {
@@ -281,9 +384,11 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
 
     for (final tryPort in portsToTry) {
       try {
-        final cascade = Cascade().add(_router.call);
+        final handler = const Pipeline()
+            .addMiddleware(_lanGateMiddleware())
+            .addHandler(_router.call);
         _server = await io.serve(
-          cascade.handler,
+          handler,
           InternetAddress.anyIPv4,
           tryPort,
         );
@@ -322,6 +427,23 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
 
   void unregisterDynamicRoute(String path) {
     _dynamicRoutes.remove(path);
+  }
+
+  Middleware _lanGateMiddleware() {
+    return (Handler inner) {
+      return (Request request) async {
+        final path = request.url.path;
+        // Status + killer SW + index stay reachable for discovery; data paths gated.
+        final public = path.isEmpty ||
+            path == 'api/status' ||
+            path == 'sw.js';
+        if (!public) {
+          final denied = _authorizeLan(request);
+          if (denied != null) return denied;
+        }
+        return inner(request);
+      };
+    };
   }
 
   static bool _isManifestKey(String key) {

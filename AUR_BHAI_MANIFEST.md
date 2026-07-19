@@ -161,28 +161,30 @@ Deferred design note for when (and only when) companies can be brought onto the 
 
 ## 5. MILESTONES & ROADMAP
 
-### Coverage review — 2026-07-18 (commit `35665fe`)
+### Coverage review — 2026-07-18 (refreshed 2026-07-19)
 
 Evidence states (independent of parent `[x]`): **impl** (code exists) · **auto** (automation green, no critical skips) · **device** (physical acceptance logged).
 
 | Band | Count | Notes |
 |------|------:|-------|
-| Strong auto | 4 | `MS-VAULT-SERVER` (feature), `MS-BROCODE-AGENT`, `MS-BROCODE-FIXTURES`, `MS-BROCODE-DEV-LOOP` |
-| Partial auto | ~14 | Legacy UX + most In Review bridges |
-| None | ~11 | `MS-CORE-INTENT` has zero tests; deferred ecosystem empty |
-| Suite baseline | — | `flutter test`: **200 passed · 34 skipped · 1 failed** (`widget_test` dispose); no `integration_test/` |
+| Strong auto | 4+ | `MS-VAULT-SERVER` (feature+hardening tests), `MS-BROCODE-AGENT`, `MS-BROCODE-FIXTURES`, `MS-BROCODE-DEV-LOOP` |
+| Partial auto | ~14 | Legacy UX + most In Review bridges; Feed/marketplace unit coverage |
+| None | ~11 | `MS-CORE-INTENT` still thin; deferred commercial empty |
+| Suite baseline | — | `flutter test` (2026-07-19): **~237 passed · 34 skipped · suite hygiene on widget/BroCall dispose**; no `integration_test/` |
 
 **Sovereignty hardening (S1–S2 code):** shared SQL guard + LAN pairing + sealed vault archive + BYOK in secure storage are implemented with unit/integration tests. Parent COMPLETE still requires §5.1 Accept of ENG3–ENG5 (device LAN + Locator browser still open).
 
+**Friend Showcase (S14–S18 code):** closed-circle Publish/CIRCLE/pickup, Issues fixture lock tooling, wake path, Bro Call, headset copy — agent-ready; friend green signal is ops (private repo + PAT + APK).
+
 **Canvas:** open [milestone-coverage-roadmap.canvas.tsx](file:///C:/Users/tomar/.cursor/projects/c-Users-tomar-Documents-Vidyaman-project-aur-bhai-workspace-project-aur-bhai/canvases/milestone-coverage-roadmap.canvas.tsx) beside chat for the full evidence map.
 
-**Sprint targets (evidence-gated):**
-1. **S1 — Edge + telemetry reliability:** SQL allowlist/row caps; LAN pairing/auth; single-flight GPS + backoff.
-2. **S2 — Secrets at rest:** encrypted vault migration; keystore-backed BYOK.
-3. **S3 — Green suite + device acceptance:** fix `widget_test`; CI + non-skipping QuickJS; accept Bridge → Core JS → LLM → Intent → Author → Refine → Dashboard.
-4. **S4 — Trust lifecycle then expand:** real C4→C3→C2; structured due diligence; capability judge; only then Agent Feed + marketplace shell.
+**Sprint targets (evidence-gated) — original S1–S4 sequence; code largely landed, Accept open:**
+1. **S1 — Edge + telemetry reliability:** SQL allowlist/row caps; LAN pairing/auth; single-flight GPS + backoff. → *code in review*
+2. **S2 — Secrets at rest:** encrypted vault migration; keystore-backed BYOK. → *code in review*
+3. **S3 — Green suite + device acceptance:** keep suite green; CI + non-skipping QuickJS; accept Bridge → Core JS → LLM → Intent → Author → Refine → Dashboard.
+4. **S4 — Trust lifecycle then expand:** C4→C3→C2; structured due diligence; capability judge; Feed + marketplace shell landed in later sprints — device Accept still open.
 
-**Deferred until trust + edge gates green:** Model Studio, Bro Code Commons, data market (§2.11 — overkill until companies on platform), chaining, Xter, offline wake/TTS. Marketplace UX3/AGT2 demoted from next-action.
+**Deferred unless you ask:** Model Studio Label/Train/Runtime, paid/public Commons, data market, chaining. Offline wake custom `.ppn` is ops (Picovoice file), not Eng.
 
 **Locator reconciliation (2026-07-18):** Accepted (underline) Bro Code agent/fixtures/dev-loop, platform ENG1–3, agent-refine IMPROVE path, vault dashboard BUILD/URL/RENDER/PERF, live-vs-sandbox. **Still In Review:** JS Bridge, User Ecosystem, Telemetry Dashboard (browser gate), Core Intent, Conv Author, Core JS Migration, LLM Agnostic. Run §5.1 post-sprint review tables after each sprint before flipping more italics → underlines.
 

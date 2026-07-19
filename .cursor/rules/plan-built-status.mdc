@@ -1,24 +1,48 @@
 ---
-description: When a plan is fully implemented, mark its plan.md as built (not build)
+description: Deduplicate plans early; mark plan.md built when implementation completes
 alwaysApply: true
 ---
 
-# Plan status after implementation
+# Plan dedupe + built status
 
-When you finish implementing an agreed plan (all todos done, or the user confirms the work is complete), this is a mandatory completion gate:
+## When this applies
 
-1. Locate every plan used for the implementation. Check both the workspace plan directory and the user-level `~/.cursor/plans/` directory; do not assume the plan is inside the repository.
-2. **Deduplicate before marking built.** Search `~/.cursor/plans/` for other `*.plan.md` files with the same frontmatter `name` (or clearly the same topic/continuation). Keep **one** canonical file — the plan you actually used in this session. Either amend that file in place, or merge any unique notes from duplicates into it, then **delete** the extra copies. Never leave two built plans for the same work.
-3. Open the canonical `*.plan.md` and verify its todos against the work actually completed.
-4. Set frontmatter `status: built`.
-5. Mark every implemented frontmatter todo as `status: completed` (or `status: built` if that field exists). Do not mark unfinished work completed.
-6. In the plan body, replace any CTA or heading that says **Build** / "Ready to build" with **Built** so the file clearly shows the plan was realized.
-7. Re-read the updated plan and confirm that `status: built`, todo statuses, and body wording agree.
-8. Do not tell the user the implementation is complete until this gate succeeds. If a plan cannot be found or updated, report that as a blocker instead of claiming completion.
+Run this gate in **both** of these moments (not only at the end):
+
+1. **Start of implement** — user says “implement the plan”, attaches a plan, or Build is confirmed.
+2. **End of implement** — all todos done, or user confirms the work is complete.
+
+A user line like “Do NOT edit the plan file itself” means: do not rewrite the plan body mid-implementation for fluff. It does **not** waive:
+
+- locating and **deduplicating** sibling plans with the same `name` / topic, or
+- the **completion gate** (`status: built`, todos completed, Built heading) when work is finished.
+
+If the user later says “deduplicate” / “mark built”, do that immediately.
+
+## Deduplicate (mandatory, before other plan edits)
+
+1. Search **both** the workspace plan directory and user-level `~/.cursor/plans/` for `*.plan.md`.
+2. Match duplicates by frontmatter `name` (exact) **or** clearly the same topic/continuation (e.g. two “Friend share readiness” files with different hashes).
+3. Keep **one** canonical file — prefer the copy that has unique sections the others lack (merge those sections in), or the one actively attached in the session.
+4. **Delete** the extra copies. Never leave two plans for the same work (built or not).
+5. Do not start (or re-start) implementation against a duplicate; work only against the canonical path after dedupe.
+
+## Completion gate (mandatory before claiming done)
+
+After dedupe, on the canonical `*.plan.md`:
+
+1. Verify frontmatter todos against work actually completed.
+2. Set frontmatter `status: built` **near the top** (immediately after `name` / `overview`) — not buried after a long `todos:` list, or the UI may still show **Build**.
+3. Mark every implemented todo `status: completed` (or `built` if that field exists). Do not mark unfinished work completed.
+4. Replace body CTA/heading **Build** / “Ready to build” with **Built** (e.g. `# Built — …`). Frontmatter alone is not enough if the body still reads like a pre-build plan.
+5. Re-read and confirm `status`, todos, and wording agree.
+6. Do not tell the user implementation is complete until this succeeds. If the plan cannot be found or updated, report that as a blocker.
 
 Example frontmatter after completion:
 
 ```yaml
+name: Example Plan
+overview: ...
 status: built
 todos:
   - id: rename-bhai
@@ -26,4 +50,4 @@ todos:
     status: completed
 ```
 
-Do this in the same session as the implementation, before claiming the work is done.
+Do this in the same session as the implementation (and again if a later session finishes residual work).

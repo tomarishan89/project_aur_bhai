@@ -716,11 +716,7 @@ class BroCodeAgentTools {
         .toList();
     final keysOk = missingKeys.isEmpty;
     final dashboardOk = !expectDashboard || htmlKeys.isNotEmpty;
-    final passed = !execution.isError && dashboardOk && keysOk;
-    sandboxOkAfterLastMutate = passed;
-
-    // Structural capability hint (LLM judge lands later). Non-blocking when
-    // dashboard HTML keys already satisfy sandbox expectations.
+    // Structural capability judge — fail-closed when changeRequest is set.
     BroCodeCapabilityJudgement? judgeHint;
     final change = (args['changeRequest'] as String? ?? lastChangeRequest ?? '')
         .trim();
@@ -734,6 +730,10 @@ class BroCodeAgentTools {
         },
       );
     }
+    final judgeOk = judgeHint == null || judgeHint.ok;
+    final passed =
+        !execution.isError && dashboardOk && keysOk && judgeOk;
+    sandboxOkAfterLastMutate = passed;
 
     if (!passed) {
       final goalDetail = <String>[
@@ -741,15 +741,19 @@ class BroCodeAgentTools {
           'Expected an HTML dashboard vault write for this change (e.g. System.writeVault("….html", …)).',
         if (missingKeys.isNotEmpty)
           'Missing expected HTML key(s): ${missingKeys.join(', ')}. Wrote: ${htmlKeys.isEmpty ? '(none)' : htmlKeys.join(', ')}.',
+        if (judgeHint != null && !judgeHint.ok)
+          'Capability judge failed: ${judgeHint.summary}',
       ];
       return ToolObservation(
         ok: false,
         tool: 'sandbox_run',
         summary: missingKeys.isNotEmpty
             ? 'Sandbox missing expected HTML key(s): ${missingKeys.join(', ')}'
-            : expectDashboard && htmlKeys.isEmpty && !execution.isError
-                ? 'Smoke ran but wrote no HTML dashboard (expected for this change)'
-                : 'Sandbox failed: ${execution.message}',
+            : judgeHint != null && !judgeHint.ok
+                ? 'Capability judge rejected: ${judgeHint.summary}'
+                : expectDashboard && htmlKeys.isEmpty && !execution.isError
+                    ? 'Smoke ran but wrote no HTML dashboard (expected for this change)'
+                    : 'Sandbox failed: ${execution.message}',
         detail: [
           execution.message,
           ...goalDetail,
@@ -848,7 +852,7 @@ class BroCodeAgentTools {
           ? null
           : 'Keep browser APIs inside HTML template strings only; fix with apply_edit. Host re-scans after edits.',
       data: {
-        'findings': scan.findings,
+        'findings': scan.findings.map((f) => f.toJson()).toList(),
       },
     );
   }

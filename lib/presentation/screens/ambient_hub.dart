@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -24,14 +25,27 @@ import '../../core/services/device_auth_service.dart';
 import '../../core/services/telemetry_bus.dart';
 import '../../core/services/telemetry_collector.dart';
 import '../../core/services/vault_dashboard_url.dart';
+import '../../core/services/marketplace_catalog.dart';
+import '../../core/services/llm/llm_slot.dart';
 import '../../core/services/app_spec.dart';
 import '../../core/services/author_prompts.dart';
 import '../../core/pipeline/bro_code_coding_agent.dart';
+import '../../core/pipeline/authoring_trace.dart';
 import '../../core/pipeline/bro_code_fixture_capture.dart';
 import '../../core/pipeline/bro_code_fixture_report.dart';
 import '../../core/pipeline/bro_code_workspace.dart';
 import '../../core/pipeline/context_estimate.dart';
 import '../widgets/context_usage_gauge.dart';
+import '../widgets/due_diligence_findings_list.dart';
+import '../widgets/ambient_capture_panel.dart';
+import '../widgets/llm_slot_editors.dart';
+import '../widgets/circle_marketplace_tab.dart';
+import '../../core/config/app_config.dart';
+import '../../core/services/wake_word_service.dart';
+import '../../core/services/bro_call_service.dart';
+import '../../core/services/circle_registry_service.dart';
+import '../../core/services/issue_report_service.dart';
+import '../../core/services/model_studio/bro_code_ml_meta.dart';
 import 'package:flutter_riverpod/legacy.dart' show ChangeNotifierProvider;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -125,7 +139,7 @@ Future<void> showAgentPromotionDialog(
         backgroundColor: const Color(0xFF1A1A1A),
         title: const Text('Promote Agent?', style: TextStyle(color: Colors.white)),
         content: Text(
-          '${pending.agentName} passed due diligence. Promote to Verified (C2)?',
+          '${pending.agentName} passed due diligence. Advance C4 → C3 → C2?',
           style: const TextStyle(color: Colors.white70),
         ),
         actions: [
@@ -138,16 +152,29 @@ Future<void> showAgentPromotionDialog(
       ),
     );
     if (promote == true) {
-      final ok = await verification.promoteToVerified(
-        registry: ref.read(jsAgentRegistryProvider),
+      final registry = ref.read(jsAgentRegistryProvider);
+      final toC3 = await verification.promoteToDueDiligence(
+        registry: registry,
         agentName: pending.agentName,
         priorScan: pending.scan,
       );
+      final ok = toC3 &&
+          await verification.promoteToVerified(
+            registry: registry,
+            agentName: pending.agentName,
+            priorScan: pending.scan,
+          );
       if (context.mounted) {
         if (ok) {
           onPromoted?.call();
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${pending.agentName} promoted to C2.')),
+            SnackBar(
+              content: Text('${pending.agentName} promoted C4→C3→C2.'),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Promotion failed (need C3 before C2).')),
           );
         }
       }
@@ -251,10 +278,7 @@ class _ForcePromoteDialogState extends State<_ForcePromoteDialog> {
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            ...pending.scan.findings.map((f) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text('• $f', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                )),
+            DueDiligenceFindingsList(scan: pending.scan),
             const SizedBox(height: 12),
             const Text(
               'Proceed only if you trust this agent. Force-promotion requires your device screen lock or fingerprint.',
@@ -308,22 +332,60 @@ class AmbientHubScreen extends ConsumerStatefulWidget {
   ConsumerState<AmbientHubScreen> createState() => _AmbientHubScreenState();
 }
 
-class _AmbientHubScreenState extends ConsumerState<AmbientHubScreen> {
+class _AmbientHubScreenState extends ConsumerState<AmbientHubScreen>
+    with WidgetsBindingObserver {
   final PageController _pageController = PageController(initialPage: 1);
+  TelemetryCollector? _collector;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Request location + start real sensors after first frame (not cold boot).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.read(telemetryCollectorProvider).start();
+      _collector = ref.read(telemetryCollectorProvider);
+      unawaited(_collector!.start());
+      final wake = ref.read(wakeWordServiceProvider);
+      wake.onWakeDetected = () {
+        final engine = ref.read(voiceHandshakeProvider);
+        unawaited(engine.onMicSingleTap());
+      };
+      final calls = ref.read(broCallServiceProvider);
+      calls.onDeliverPayload = (call) {
+        final engine = ref.read(voiceHandshakeProvider);
+        unawaited(engine.speak(
+          call.speakText.isEmpty ? call.body : call.speakText,
+        ));
+      };
+      calls.onCallQueued = (call) {
+        final engine = ref.read(voiceHandshakeProvider);
+        unawaited(engine.speak(AppConfig.broCallCuePhrase));
+      };
+      unawaited(ref.read(issueReportServiceProvider).load());
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final c = _collector;
+    if (c == null) return;
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      unawaited(c.pause());
+    } else if (state == AppLifecycleState.resumed) {
+      unawaited(c.resume());
+      unawaited(ref.read(issueReportServiceProvider).refreshStatuses());
+      final wake = ref.read(wakeWordServiceProvider);
+      if (wake.listenEnabled) unawaited(wake.startListening());
+    }
+  }
+
+  @override
   void dispose() {
-    ref.read(telemetryCollectorProvider).stop();
+    WidgetsBinding.instance.removeObserver(this);
+    // Do not ref.read after unmount — widget_test dispose crash.
+    unawaited(_collector?.stop() ?? Future<void>.value());
     _pageController.dispose();
     super.dispose();
   }
@@ -666,6 +728,11 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
   final _modCtrl = TextEditingController();
   final _urlCtrl = TextEditingController();
   final _respWordCtrl = TextEditingController(text: "Haan bhai");
+  final _picovoiceCtrl = TextEditingController();
+  final _circleOwnerCtrl = TextEditingController();
+  final _circleRepoCtrl = TextEditingController();
+  final _circleTokenCtrl = TextEditingController();
+  final _circleAuthorCtrl = TextEditingController();
   String _provider = "Google Gemini";
   bool _obscure = true;
   String _gender = "Male";
@@ -694,6 +761,15 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
       _externalKeyCtrls[platform.name]?.text =
           byok.externalKeyFor(platform);
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final circle = ref.read(circleRegistryProvider);
+      await circle.loadConfig();
+      if (!mounted) return;
+      _circleOwnerCtrl.text = circle.owner;
+      _circleRepoCtrl.text = circle.repo;
+      _circleAuthorCtrl.text = circle.authorDisplay;
+      setState(() {});
+    });
   }
 
   @override
@@ -702,6 +778,11 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
     _modCtrl.dispose();
     _urlCtrl.dispose();
     _respWordCtrl.dispose();
+    _picovoiceCtrl.dispose();
+    _circleOwnerCtrl.dispose();
+    _circleRepoCtrl.dispose();
+    _circleTokenCtrl.dispose();
+    _circleAuthorCtrl.dispose();
     for (final c in _externalKeyCtrls.values) {
       c.dispose();
     }
@@ -809,6 +890,215 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
               const SizedBox(height: 16),
               TextField(controller: _urlCtrl, style: const TextStyle(color: Colors.white, fontSize: 13), decoration: const InputDecoration(labelText: "Endpoint URL", labelStyle: TextStyle(color: Colors.white54, fontSize: 12))),
             ],
+            const SizedBox(height: 16),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: const Text(
+                'Per-function LLM slots',
+                style: TextStyle(color: Colors.white, fontSize: 13),
+              ),
+              subtitle: Text(
+                ref.watch(byokServiceProvider).multiSlotEnabled
+                    ? 'On — language/author/improve/judge can use different APIs (empty slot → default)'
+                    : 'Off — one provider for all functions',
+                style: const TextStyle(color: Colors.white54, fontSize: 11),
+              ),
+              value: ref.watch(byokServiceProvider).multiSlotEnabled,
+              activeThumbColor: Colors.greenAccent,
+              onChanged: (v) async {
+                await ref.read(byokServiceProvider).setMultiSlotEnabled(v);
+                if (v) {
+                  await ref.read(byokServiceProvider).updateSlot(
+                        LlmSlot.defaultSlot,
+                        ByokSlotConfig(
+                          provider: _provider,
+                          apiKey: _keyCtrl.text.trim(),
+                          modelName: _modCtrl.text.trim(),
+                          customUrl: _urlCtrl.text.trim(),
+                        ),
+                      );
+                }
+                setState(() {});
+              },
+            ),
+            if (ref.watch(byokServiceProvider).multiSlotEnabled) ...[
+              const SizedBox(height: 8),
+              const LlmSlotEditors(),
+            ],
+            const SizedBox(height: 24),
+            const Text(
+              'WAKE WORD (ON-DEVICE)',
+              style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              AppConfig.wakePrivacyBody,
+              style: const TextStyle(color: Colors.white38, fontSize: 11),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _picovoiceCtrl,
+              obscureText: true,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: const InputDecoration(
+                labelText: 'Picovoice AccessKey',
+                labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ),
+            Text(
+              'Interim wake phrase: ${AppConfig.wakeWordInterimBuiltIn} '
+              '(target: ${AppConfig.wakeWordPhraseLabel}). ${AppConfig.wakeCustomPpnHint}',
+              style: const TextStyle(color: Colors.white30, fontSize: 10),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              AppConfig.headsetRidingHint,
+              style: const TextStyle(color: Colors.white24, fontSize: 10),
+            ),
+            Builder(builder: (context) {
+              final wake = ref.watch(wakeWordServiceProvider);
+              return Column(
+                children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: Text(AppConfig.wakeListenEnabledLabel,
+                        style: const TextStyle(color: Colors.white, fontSize: 13)),
+                    subtitle: Text(
+                      wake.isListening
+                          ? AppConfig.wakeListeningIndicator
+                          : AppConfig.wakeListenSubtitle,
+                      style: const TextStyle(color: Colors.white54, fontSize: 11),
+                    ),
+                    value: wake.listenEnabled,
+                    activeThumbColor: Colors.greenAccent,
+                    onChanged: (v) async {
+                      if (v && !wake.privacyAcknowledged) {
+                        await wake.acknowledgePrivacy();
+                      }
+                      if (_picovoiceCtrl.text.trim().isNotEmpty) {
+                        await wake.setAccessKey(_picovoiceCtrl.text.trim());
+                      }
+                      await wake.setListenEnabled(v);
+                      setState(() {});
+                    },
+                  ),
+                  if (wake.lastError != null)
+                    Text(wake.lastError!,
+                        style: const TextStyle(color: Colors.redAccent, fontSize: 11)),
+                ],
+              );
+            }),
+            const SizedBox(height: 24),
+            const Text(
+              'CLOSED CIRCLE (GITHUB REGISTRY)',
+              style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              AppConfig.circlePublishConfirm,
+              style: const TextStyle(color: Colors.white38, fontSize: 11),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              AppConfig.circleFriendApkHint,
+              style: const TextStyle(color: Colors.white30, fontSize: 10),
+            ),
+            TextField(
+              controller: _circleOwnerCtrl,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: const InputDecoration(
+                labelText: 'GitHub owner',
+                labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ),
+            TextField(
+              controller: _circleRepoCtrl,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: InputDecoration(
+                labelText: 'Repo (default ${AppConfig.circleDefaultRepo})',
+                labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ),
+            TextField(
+              controller: _circleTokenCtrl,
+              obscureText: true,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: const InputDecoration(
+                labelText: 'Fine-grained PAT (contents + issues)',
+                labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ),
+            TextField(
+              controller: _circleAuthorCtrl,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: const InputDecoration(
+                labelText: 'Display name on publishes',
+                labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () async {
+                  await ref.read(circleRegistryProvider).saveConfig(
+                        owner: _circleOwnerCtrl.text,
+                        repo: _circleRepoCtrl.text,
+                        token: _circleTokenCtrl.text,
+                        authorDisplay: _circleAuthorCtrl.text,
+                      );
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Circle registry settings saved')),
+                  );
+                },
+                child: const Text('SAVE CIRCLE SETTINGS'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () async {
+                await ref.read(issueReportServiceProvider).refreshStatuses();
+                if (!mounted) return;
+                final reports = ref.read(issueReportServiceProvider).reports;
+                await showModalBottomSheet<void>(
+                  context: context,
+                  backgroundColor: const Color(0xFF1A1A1A),
+                  builder: (ctx) => Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(AppConfig.issueMyReportsTitle,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        if (reports.isEmpty)
+                          const Text('No reports yet.',
+                              style: TextStyle(color: Colors.white54))
+                        else
+                          ...reports.take(8).map(
+                                (r) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Text(
+                                    '#${r.githubIssueNumber ?? "-"} ${r.title}\n'
+                                    '${r.status.name}'
+                                    '${r.agentName != null ? " · ${r.agentName}" : ""}',
+                                    style: const TextStyle(
+                                        color: Colors.white70, fontSize: 12),
+                                  ),
+                                ),
+                              ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              child: const Text('MY ISSUE REPORTS'),
+            ),
             const SizedBox(height: 24),
             const Text(
               'EXTERNAL PLATFORM KEYS (user-authorized egress)',
@@ -941,6 +1231,80 @@ class _EdgeServerPanel extends ConsumerWidget {
               _edgeInfoRow('LAN (Wi-Fi)', server.lanServerAddress, valueColor: Colors.greenAccent),
             if (server.isRunning && server.lanIp == null)
               _edgeInfoRow('LAN (Wi-Fi)', 'Unavailable — use on-device localhost', valueColor: Colors.amber),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: const Text(
+                'Allow LAN access',
+                style: TextStyle(color: Colors.white, fontSize: 13),
+              ),
+              subtitle: Text(
+                server.lanExposureEnabled
+                    ? 'Peers need pair code ${server.pairingToken}'
+                    : 'Off — only localhost (this phone) can query/vault',
+                style: const TextStyle(color: Colors.white54, fontSize: 11),
+              ),
+              value: server.lanExposureEnabled,
+              activeThumbColor: Colors.greenAccent,
+              onChanged: (v) => server.setLanExposureEnabled(v),
+            ),
+            if (server.lanExposureEnabled) ...[
+              _edgeInfoRow('Pair code', server.pairingToken, valueColor: Colors.amber),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () {
+                    server.rotatePairingToken();
+                    _copyToClipboard(context, server.pairingToken, 'Pair code');
+                  },
+                  icon: const Icon(Icons.refresh, size: 16, color: Colors.white70),
+                  label: const Text(
+                    'ROTATE / COPY PAIR',
+                    style: TextStyle(fontSize: 10, color: Colors.white70),
+                  ),
+                ),
+              ),
+            ],
+            ListenableBuilder(
+              listenable: ref.watch(telemetryCollectorProvider),
+              builder: (context, _) {
+                final c = ref.read(telemetryCollectorProvider);
+                final last = c.lastSuccessAt;
+                final lastLabel = last == null
+                    ? 'never'
+                    : DateFormat('HH:mm:ss').format(last);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 8),
+                    const Text(
+                      'LIVE TELEMETRY',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    _edgeInfoRow('Collector', c.status.name),
+                    _edgeInfoRow('Last fix', lastLabel),
+                    if (c.currentBackoff > Duration.zero)
+                      _edgeInfoRow(
+                        'Backoff',
+                        '${c.currentBackoff.inSeconds}s',
+                        valueColor: Colors.amber,
+                      ),
+                    if (c.lastError != null)
+                      _edgeInfoRow(
+                        'Error',
+                        c.lastError!,
+                        valueColor: Colors.redAccent,
+                      ),
+                  ],
+                );
+              },
+            ),
             const SizedBox(height: 8),
             const Text('Registered endpoints', style: TextStyle(color: Colors.white54, fontSize: 11)),
             const SizedBox(height: 4),
@@ -1131,8 +1495,9 @@ class _PluginsPage extends ConsumerWidget {
       grouped[_classOf(a)]!.add(a);
     }
 
+    final wake = ref.watch(wakeWordServiceProvider);
     return DefaultTabController(
-      length: 4,
+      length: 6,
       child: SafeArea(
         child: Column(
           children: [
@@ -1156,7 +1521,18 @@ class _PluginsPage extends ConsumerWidget {
                 ],
               ),
             ),
+            if (wake.isListening)
+              Container(
+                width: double.infinity,
+                color: const Color(0xFF10261A),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Text(
+                  AppConfig.wakeListeningIndicator,
+                  style: const TextStyle(color: Colors.greenAccent, fontSize: 11),
+                ),
+              ),
             const _VaultDashboardsBanner(),
+            const AmbientCapturePanel(),
             const TabBar(
               isScrollable: true,
               indicatorColor: Colors.greenAccent,
@@ -1167,13 +1543,18 @@ class _PluginsPage extends ConsumerWidget {
                 Tab(text: "C2: VERIFIED"),
                 Tab(text: "C3: DUE DILIGENCE"),
                 Tab(text: "C4: UNVERIFIED"),
+                Tab(text: "MARKETPLACE"),
+                Tab(text: "CIRCLE"),
               ],
             ),
             Expanded(
               child: TabBarView(
-                children: AgentSecurityClass.values
-                    .map((c) => _buildAgentGrid(context, ref, grouped[c]!))
-                    .toList(),
+                children: [
+                  ...AgentSecurityClass.values
+                      .map((c) => _buildAgentGrid(context, ref, grouped[c]!)),
+                  const _MarketplacePoolTab(),
+                  const CircleMarketplaceTab(),
+                ],
               ),
             ),
           ],
@@ -1258,9 +1639,83 @@ class _PluginsPage extends ConsumerWidget {
   }
 }
 
+/// Local C4 pool browse + pickup (MS-USER-ECOSYSTEM-UX3 / AGT2).
+class _MarketplacePoolTab extends ConsumerWidget {
+  const _MarketplacePoolTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final catalog = ref.watch(marketplaceCatalogProvider);
+    final listings = catalog.listings();
+    if (listings.isEmpty) {
+      return const Center(
+        child: Text('Marketplace pool is empty.',
+            style: TextStyle(color: Colors.white30)),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      itemCount: listings.length + 1,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return const Text(
+            'Local C4 pool — pickup installs at Unverified. Run Test in Sandbox, then promote.',
+            style: TextStyle(color: Colors.white54, fontSize: 11),
+          );
+        }
+        final listing = listings[index - 1];
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF161616),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(listing.name,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14)),
+              const SizedBox(height: 4),
+              Text(listing.description,
+                  style: const TextStyle(color: Colors.white60, fontSize: 11)),
+              const SizedBox(height: 4),
+              Text('license: ${listing.license}',
+                  style: const TextStyle(color: Colors.white38, fontSize: 10)),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    final ok = await catalog.pickup(listing);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(ok
+                            ? '${listing.name} installed at C4.'
+                            : '${listing.name} already exists — rename or delete first.'),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.download, size: 16, color: Colors.greenAccent),
+                  label: const Text('PICK UP',
+                      style: TextStyle(color: Colors.greenAccent, fontSize: 11)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Surfaces user-created HTML dashboards stored in the sovereign vault
-/// (MS-TELEMETRY-DASHBOARD-UX1). Compact rows + kebab; Open prefers localhost
-/// on device. Future: [MS-TELEMETRY-DASHBOARD-UX3] dashboard TTL.
+/// (MS-TELEMETRY-DASHBOARD-UX1). Compact rows + kebab; TTL renew/extend (UX3).
 class _VaultDashboardsBanner extends ConsumerStatefulWidget {
   const _VaultDashboardsBanner();
   @override
@@ -1283,6 +1738,16 @@ class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> 
   }
 
   void _refresh() => setState(() => _future = _load());
+
+  String _ttlLabel(String expiresAt) {
+    if (expiresAt.isEmpty) return 'forever';
+    final at = DateTime.tryParse(expiresAt)?.toLocal();
+    if (at == null) return 'forever';
+    final left = at.difference(DateTime.now());
+    if (left.isNegative) return 'expired';
+    if (left.inHours < 48) return '~${left.inHours}h left';
+    return '~${left.inDays}d left';
+  }
 
   /// On phone, localhost reaches this device's edge server; LAN is for peers.
   String? _openUrl(LocalServerService server, String key) {
@@ -1445,7 +1910,9 @@ class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> 
                       final d = dashboards[index];
                       final key = d['key']!;
                       final buildId = d['build_id'];
+                      final expiresAt = d['expires_at'] ?? '';
                       final canOpen = server.isRunning;
+                      final ttlLabel = _ttlLabel(expiresAt);
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 2),
                         child: Row(
@@ -1464,17 +1931,20 @@ class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> 
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  if (buildId != null && buildId.isNotEmpty)
-                                    Text(
-                                      'build $buildId',
-                                      style: const TextStyle(
-                                        color: Color(0xFFB8F5C0),
-                                        fontSize: 8,
-                                        fontFamily: 'Courier',
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                  Text(
+                                    [
+                                      if (buildId != null && buildId.isNotEmpty)
+                                        'build $buildId',
+                                      'TTL $ttlLabel',
+                                    ].join(' · '),
+                                    style: const TextStyle(
+                                      color: Color(0xFFB8F5C0),
+                                      fontSize: 8,
+                                      fontFamily: 'Courier',
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ],
                               ),
                             ),
@@ -1505,6 +1975,7 @@ class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> 
                               ),
                               color: const Color(0xFF1E1E1E),
                               onSelected: (value) async {
+                                final bus = ref.read(telemetryBusProvider);
                                 switch (value) {
                                   case 'open':
                                     await _openDashboard(server, key);
@@ -1512,6 +1983,37 @@ class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> 
                                     await _copyLink(server, key);
                                   case 'locate':
                                     await _locateBroCode(key);
+                                  case 'ttl1h':
+                                    await bus.setVaultTtl(
+                                        key, const Duration(hours: 1));
+                                    _refresh();
+                                  case 'ttl24h':
+                                    await bus.setVaultTtl(
+                                        key, const Duration(hours: 24));
+                                    _refresh();
+                                  case 'ttl7d':
+                                    await bus.setVaultTtl(
+                                        key, const Duration(days: 7));
+                                    _refresh();
+                                  case 'ttlForever':
+                                    await bus.setVaultTtl(key, null);
+                                    _refresh();
+                                  case 'exportCsv':
+                                    final csv = await bus.exportTelemetryCsv();
+                                    await bus.writeVaultData(
+                                      'telemetry_export.csv',
+                                      csv,
+                                      mimeType: 'text/csv',
+                                      ttl: const Duration(hours: 24),
+                                    );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(const SnackBar(
+                                        content: Text(
+                                          'Wrote telemetry_export.csv (24h TTL)',
+                                        ),
+                                      ));
+                                    }
                                   case 'stop':
                                     await _stopRemove(key);
                                 }
@@ -1532,6 +2034,31 @@ class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> 
                                 const PopupMenuItem(
                                   value: 'locate',
                                   child: Text('Locate Bro Code',
+                                      style: TextStyle(color: Colors.white)),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'ttl1h',
+                                  child: Text('TTL: 1 hour',
+                                      style: TextStyle(color: Colors.white)),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'ttl24h',
+                                  child: Text('TTL: 24 hours',
+                                      style: TextStyle(color: Colors.white)),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'ttl7d',
+                                  child: Text('TTL: 7 days',
+                                      style: TextStyle(color: Colors.white)),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'ttlForever',
+                                  child: Text('TTL: forever',
+                                      style: TextStyle(color: Colors.white)),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'exportCsv',
+                                  child: Text('Export telemetry CSV',
                                       style: TextStyle(color: Colors.white)),
                                 ),
                                 const PopupMenuItem(
@@ -1858,6 +2385,7 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
   String? _dashboardUrl;
   DueDiligenceResult? _scan;
   bool _scanLoaded = false;
+  BroCodeMlMeta? _mlMeta;
 
   @override
   void didChangeDependencies() {
@@ -1865,6 +2393,7 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
     if (!_scanLoaded) {
       _scanLoaded = true;
       _refreshScan();
+      unawaited(_loadMlMeta());
     }
   }
 
@@ -1874,6 +2403,36 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
           .read(agentVerificationProvider)
           .scanScript((widget.agent as JsAgentAdapter).script);
     }
+  }
+
+  Future<void> _loadMlMeta() async {
+    if (widget.agent is! JsAgentAdapter) return;
+    final meta = await ref
+        .read(jsAgentRegistryProvider)
+        .readMlMeta(widget.agent.name);
+    if (mounted) setState(() => _mlMeta = meta);
+  }
+
+  Future<void> _toggleUsesModel(bool enabled) async {
+    if (widget.agent is! JsAgentAdapter) return;
+    final next = BroCodeMlMeta(
+      usesModel: enabled,
+      maturity: enabled ? 'collecting' : 'heuristic_only',
+      labelSchema: _mlMeta?.labelSchema ??
+          const {
+            'labels': ['positive', 'negative'],
+          },
+      capturePolicy: _mlMeta?.capturePolicy ??
+          const {
+            'mode': 'ambient',
+            'fineWindowSeconds': 45,
+          },
+      fineWindow: _mlMeta?.fineWindow ?? const Duration(seconds: 45),
+    );
+    final ok = await ref
+        .read(jsAgentRegistryProvider)
+        .updateMlMeta(widget.agent.name, next);
+    if (ok && mounted) setState(() => _mlMeta = next);
   }
 
   Future<void> _promote() async {
@@ -2002,7 +2561,7 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
         agent: adapter,
         lastRunError: _runWasError ? _runResult : null,
         lastRunResult: _runResult,
-        dueDiligenceFindings: _scan?.findings ?? const [],
+        dueDiligenceFindings: _scan?.findingMessages ?? const [],
       ),
     ).then((_) {
       if (mounted) setState(_refreshScan);
@@ -2068,6 +2627,103 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
             if (isJs) ...[
               const SizedBox(height: 10),
               _buildVerificationBanner(agent, scan),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.greenAccent,
+                  side: const BorderSide(color: Colors.greenAccent),
+                ),
+                onPressed: () async {
+                  final license = await showDialog<String>(
+                    context: context,
+                    builder: (ctx) => SimpleDialog(
+                      backgroundColor: const Color(0xFF1A1A1A),
+                      title: const Text('Publish to circle',
+                          style: TextStyle(color: Colors.white)),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(AppConfig.circlePublishConfirm,
+                              style: const TextStyle(
+                                  color: Colors.white54, fontSize: 12)),
+                        ),
+                        SimpleDialogOption(
+                          onPressed: () => Navigator.pop(ctx, 'remix_free'),
+                          child: const Text('remix_free',
+                              style: TextStyle(color: Colors.greenAccent)),
+                        ),
+                        SimpleDialogOption(
+                          onPressed: () =>
+                              Navigator.pop(ctx, 'lineage_indexed'),
+                          child: const Text('lineage_indexed',
+                              style: TextStyle(color: Colors.greenAccent)),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (license == null || !mounted) return;
+                  try {
+                    await ref.read(circleRegistryProvider).publishAgent(
+                          agent.name,
+                          license: license,
+                        );
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text(
+                              '${agent.name} published to circle ($license)')),
+                    );
+                  } catch (e) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Publish failed: $e')),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.cloud_upload_outlined, size: 16),
+                label: const Text('PUBLISH TO CIRCLE',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'MODEL STUDIO',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: const Text(
+                        'usesModel (Path L collecting)',
+                        style: TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                      subtitle: Text(
+                        'maturity: ${_mlMeta?.maturity ?? 'heuristic_only'}',
+                        style: const TextStyle(
+                            color: Colors.white38, fontSize: 10),
+                      ),
+                      value: _mlMeta?.usesModel ?? false,
+                      activeThumbColor: Colors.greenAccent,
+                      onChanged: _toggleUsesModel,
+                    ),
+                  ],
+                ),
+              ),
             ],
             const SizedBox(height: 12),
             if (agent.inputSchema.isNotEmpty) ...[
@@ -2326,13 +2982,10 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(text, style: TextStyle(color: color, fontSize: 11)),
-          if (flagged)
-            ...scan.findings.map((f) => Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text('• $f',
-                      style: const TextStyle(
-                          color: Colors.white54, fontSize: 10)),
-                )),
+          if (flagged) ...[
+            const SizedBox(height: 6),
+            DueDiligenceFindingsList(scan: scan),
+          ],
         ],
       ),
     );
@@ -3054,6 +3707,25 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
       if (draftAssets != null) ...draftAssets,
     };
     final base = _buildDiagnosticReport();
+
+    AuthoringTrace? authoringTrace;
+    String? authoringMissing;
+    try {
+      final entry = await ref.read(telemetryBusProvider).readVaultData(
+            AuthoringTrace.vaultKeyFor(widget.agent.name),
+          );
+      final raw = entry?['value'];
+      if (raw != null && raw.trim().isNotEmpty) {
+        authoringTrace = AuthoringTrace.fromJson(
+          jsonDecode(raw) as Map<String, dynamic>,
+        );
+      } else {
+        authoringMissing = 'No frozen authoringTrace in vault (imported Bro or pre-S15 build).';
+      }
+    } catch (e) {
+      authoringMissing = 'Failed to load authoringTrace: $e';
+    }
+
     return BroCodeFixtureReport(
       exportedAt: base.exportedAt,
       appVersion: base.appVersion,
@@ -3083,6 +3755,8 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
       session: base.session,
       attemptNumber: base.attemptNumber,
       verified: base.verified,
+      authoringTrace: authoringTrace,
+      authoringTraceMissingReason: authoringMissing,
     );
   }
 
@@ -3533,6 +4207,98 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
                           fontWeight: FontWeight.bold, fontSize: 11)),
                 ),
               ],
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _busy
+                    ? null
+                    : () async {
+                        final noteCtrl = TextEditingController();
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            backgroundColor: const Color(0xFF1A1A1A),
+                            title: const Text('Send report',
+                                style: TextStyle(color: Colors.white)),
+                            content: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(AppConfig.issueSendConsent,
+                                      style: const TextStyle(
+                                          color: Colors.white70, fontSize: 12)),
+                                  const SizedBox(height: 12),
+                                  TextField(
+                                    controller: noteCtrl,
+                                    maxLines: 4,
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 13),
+                                    decoration: InputDecoration(
+                                      labelText:
+                                          AppConfig.issueReporterNoteLabel,
+                                      hintText: AppConfig.issueReporterNoteHint,
+                                      labelStyle: const TextStyle(
+                                          color: Colors.white54, fontSize: 12),
+                                      hintStyle: const TextStyle(
+                                          color: Colors.white30, fontSize: 11),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('CANCEL')),
+                              TextButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('SEND')),
+                            ],
+                          ),
+                        );
+                        final reporterNote = noteCtrl.text;
+                        noteCtrl.dispose();
+                        if (ok != true || !mounted) return;
+                        setState(() => _busy = true);
+                        try {
+                          final report =
+                              await _buildDiagnosticReportWithAssets();
+                          final created = await ref
+                              .read(issueReportServiceProvider)
+                              .sendReport(
+                                report: report,
+                                title:
+                                    'Bro Code: ${widget.agent.name} — ${report.failureMessage}',
+                                reporterNote: reporterNote,
+                              );
+                          _appendProgress(
+                            'Report sent → GitHub #${created.githubIssueNumber}',
+                          );
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Report #${created.githubIssueNumber} created',
+                                ),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          _appendProgress('Send report failed: $e');
+                        } finally {
+                          if (mounted) setState(() => _busy = false);
+                        }
+                      },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orangeAccent,
+                  side: const BorderSide(color: Colors.orangeAccent),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                icon: const Icon(Icons.bug_report_outlined, size: 18),
+                label: const Text('SEND REPORT TO CIRCLE',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 11)),
+              ),
               const SizedBox(height: 8),
               OutlinedButton(
                 onPressed:

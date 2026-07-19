@@ -1,12 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../agents/agent_base.dart';
 import '../agents/js_agent_adapter.dart';
+import '../pipeline/authoring_trace.dart';
 import 'agent_service.dart';
 import 'js_bridge_service.dart';
+import 'model_studio/bro_code_ml_meta.dart';
 import 'telemetry_bus.dart';
 
 /// Loads Javascript Bro Code from the sovereign vault and registers it.
@@ -96,6 +99,74 @@ class JsAgentRegistry {
     return registered;
   }
 
+  /// Consumes `tool/.friend_install_queue.json` written by
+  /// `dart run tool/install_issue_fixture.dart` (desktop / same machine).
+  Future<void> consumeFriendInstallQueueIfPresent() async {
+    if (kIsWeb) return;
+    final candidates = <File>[
+      File('tool/.friend_install_queue.json'),
+      File('${Directory.current.path}${Platform.pathSeparator}tool${Platform.pathSeparator}.friend_install_queue.json'),
+    ];
+    File? queue;
+    for (final f in candidates) {
+      if (f.existsSync()) {
+        queue = f;
+        break;
+      }
+    }
+    if (queue == null) return;
+
+    try {
+      final payload =
+          jsonDecode(queue.readAsStringSync()) as Map<String, dynamic>;
+      final name = payload['name'] as String? ?? '';
+      final script = payload['script'] as String? ?? '';
+      if (name.isEmpty || script.isEmpty) {
+        debugPrint('[JsAgentRegistry] Friend install queue invalid; skipping');
+        return;
+      }
+      final inputRaw =
+          Map<String, dynamic>.from(payload['inputSchema'] as Map? ?? {});
+      final inputSchema = <String, AgentParameter>{};
+      for (final e in inputRaw.entries) {
+        final field = e.value is Map
+            ? Map<String, dynamic>.from(e.value as Map)
+            : <String, dynamic>{};
+        inputSchema[e.key] = AgentParameter(
+          type: field['type']?.toString() ?? 'string',
+          description: field['description']?.toString() ?? '',
+          required: field['required'] as bool? ?? false,
+        );
+      }
+      await saveAndRegisterAgent(
+        name: name,
+        description: payload['description'] as String? ?? name,
+        inputSchema: inputSchema,
+        script: script,
+        securityClass: AgentSecurityClass.c4Unverified,
+      );
+      final traceRaw = payload['authoringTrace'];
+      if (traceRaw is Map) {
+        final trace = AuthoringTrace.fromJson(
+          Map<String, dynamic>.from(traceRaw),
+        );
+        await _ref.read(telemetryBusProvider).writeVaultData(
+              AuthoringTrace.vaultKeyFor(name),
+              trace.toJsonString(),
+              mimeType: 'application/json',
+            );
+      }
+      final bak = File('${queue.path}.installed');
+      queue.renameSync(bak.path);
+      debugPrint(
+        '[JsAgentRegistry] Installed friend fixture as $name (C4). '
+        'Do not Publish unless intentional.',
+      );
+    } catch (e) {
+      debugPrint('[JsAgentRegistry] Friend install failed: $e');
+    }
+  }
+
   /// Persists a JS agent + metadata to the vault and registers it live.
   ///
   /// This is the shared sink for both LLM authoring (Path A) and manual
@@ -108,6 +179,7 @@ class JsAgentRegistry {
     AgentSecurityClass securityClass = AgentSecurityClass.c4Unverified,
     DateTime? createdAt,
     DateTime? updatedAt,
+    BroCodeMlMeta? mlMeta,
   }) async {
     final syntax =
         _ref.read(jsBridgeServiceProvider).validateScriptSyntax(script);
@@ -123,11 +195,15 @@ class JsAgentRegistry {
 
     // Preserve existing createdAt when overwriting (e.g. refine).
     String? existingCreatedAt;
+    Map<String, dynamic>? priorMl;
     final priorSchema = await telemetry.readVaultData(schemaKeyFor(name));
     if (priorSchema != null) {
       try {
         final decoded = jsonDecode(priorSchema['value']!) as Map<String, dynamic>;
         existingCreatedAt = decoded['createdAt'] as String?;
+        if (decoded['ml'] is Map) {
+          priorMl = Map<String, dynamic>.from(decoded['ml'] as Map);
+        }
       } catch (_) {}
     }
 
@@ -139,18 +215,24 @@ class JsAgentRegistry {
       script,
       mimeType: 'application/javascript',
     );
+    var schemaMap = <String, dynamic>{
+      'name': name,
+      'description': description,
+      'securityClass': securityClass.id,
+      'createdAt': created,
+      'updatedAt': updated,
+      'inputSchema': inputSchema.map(
+        (key, param) => MapEntry(key, param.toJson()),
+      ),
+    };
+    if (mlMeta != null) {
+      schemaMap = BroCodeMlMeta.mergeIntoSchema(schemaMap, mlMeta);
+    } else if (priorMl != null) {
+      schemaMap['ml'] = priorMl;
+    }
     await telemetry.writeVaultData(
       schemaKeyFor(name),
-      jsonEncode({
-        'name': name,
-        'description': description,
-        'securityClass': securityClass.id,
-        'createdAt': created,
-        'updatedAt': updated,
-        'inputSchema': inputSchema.map(
-          (key, param) => MapEntry(key, param.toJson()),
-        ),
-      }),
+      jsonEncode(schemaMap),
       mimeType: 'application/json',
     );
 
@@ -169,6 +251,34 @@ class JsAgentRegistry {
     agentService.registerAgent(adapter);
     debugPrint('[JsAgentRegistry] Saved & registered agent: $name (${securityClass.id})');
     return adapter;
+  }
+
+  /// Persist / update Path L ML metadata on Bro Code schema (MS-MODEL-META).
+  Future<bool> updateMlMeta(String name, BroCodeMlMeta meta) async {
+    final telemetry = _ref.read(telemetryBusProvider);
+    final schemaEntry = await telemetry.readVaultData(schemaKeyFor(name));
+    if (schemaEntry == null) return false;
+    try {
+      final schema =
+          jsonDecode(schemaEntry['value']!) as Map<String, dynamic>;
+      final next = BroCodeMlMeta.mergeIntoSchema(schema, meta);
+      next['updatedAt'] = DateTime.now().toIso8601String();
+      await telemetry.writeVaultData(
+        schemaKeyFor(name),
+        jsonEncode(next),
+        mimeType: 'application/json',
+      );
+      return true;
+    } catch (e) {
+      debugPrint('[JsAgentRegistry] updateMlMeta failed: $e');
+      return false;
+    }
+  }
+
+  Future<BroCodeMlMeta?> readMlMeta(String name) async {
+    final telemetry = _ref.read(telemetryBusProvider);
+    final schemaEntry = await telemetry.readVaultData(schemaKeyFor(name));
+    return BroCodeMlMeta.fromSchemaJson(schemaEntry?['value']);
   }
 
   /// Removes an agent from the vault and the live registry.
@@ -338,6 +448,63 @@ class JsAgentRegistry {
           'type': 'number',
           'description':
               'The number of recent telemetry records to analyze (e.g. 10 or 50). Default is 20 if omitted.',
+          'required': false,
+        },
+      },
+    );
+
+    // MS-AGENT-FEED-AGT1 — consume voice-"tell" cash entries (C2 seed).
+    await _seedAgentIfMissing(
+      name: 'Accountant',
+      description:
+          'Records cash expenses from voice feed inbox (Tell Accountant I spent …).',
+      script: _accountantScript,
+      inputSchema: const {},
+    );
+
+    // MVP-S13 — selected social Bro Codes (BYOK platform keys + C2).
+    await _seedAgentIfMissing(
+      name: 'Xter',
+      description:
+          'Posts short text to X/Twitter via System.sendHTTP (needs C2 + Twitter key).',
+      script: _xterScript,
+      inputSchema: {
+        'text': {
+          'type': 'string',
+          'description': 'Status text to post (max ~280 chars)',
+          'required': true,
+        },
+      },
+    );
+    await _seedAgentIfMissing(
+      name: 'FacebookPoster',
+      description:
+          'Posts a message via Facebook Graph HTTP (needs C2 + Facebook key).',
+      script: _facebookPosterScript,
+      inputSchema: {
+        'text': {
+          'type': 'string',
+          'description': 'Message to post',
+          'required': true,
+        },
+        'pageId': {
+          'type': 'string',
+          'description': 'Page id or "me" (default me)',
+          'required': false,
+        },
+      },
+    );
+
+    // S17 — Bro Code Call demo (local notify; no external API).
+    await _seedAgentIfMissing(
+      name: 'CallDemo',
+      description:
+          'Demo Bro Call: queues a local Aur Bhai alert; say Haan Bhai to hear the message.',
+      script: _callDemoScript,
+      inputSchema: {
+        'message': {
+          'type': 'string',
+          'description': 'Message to speak after Haan Bhai',
           'required': false,
         },
       },
@@ -598,6 +765,76 @@ async function execute(params) {
   var v = Math.round(variance * 100) / 100;
   return 'Based on your last ' + rows.length + ' sensor readings, your accelerometer variance is ' +
     v + '. My model predicts you are currently ' + prediction + '.';
+}
+''';
+
+const _accountantScript = r'''
+async function execute(params) {
+  System.log('Accountant reading feed inbox…');
+  const items = await System.readInbox({ unreadOnly: true, limit: 50 });
+  if (!items || items.length === 0) {
+    return 'No new expenses. Tell Accountant that you spent an amount.';
+  }
+  let total = 0;
+  const ids = [];
+  for (const item of items) {
+    ids.push(item.id);
+    const m = String(item.text).match(/(\d+(?:\.\d+)?)/);
+    if (m) total += Number(m[1]);
+  }
+  await System.consumeInbox({ ids: ids });
+  return 'Recorded ' + items.length + ' expense entr' +
+    (items.length === 1 ? 'y' : 'ies') + '; total about ' + total + '.';
+}
+''';
+
+const _xterScript = r'''
+async function execute(params) {
+  const text = String((params && params.text) || '').trim();
+  if (!text) {
+    return 'Provide text to post (e.g. Run Xter with text="Hello from Aur Bhai").';
+  }
+  const url = 'https://api.twitter.com/2/tweets';
+  const payload = JSON.stringify({ text: text.slice(0, 280) });
+  try {
+    const res = await System.sendHTTP(url, payload);
+    System.log('Xter sendHTTP result: ' + JSON.stringify(res));
+    return 'Posted to X (or received API response). Check your X account.';
+  } catch (e) {
+    return 'Xter failed: ' + e + '. Ensure C2 + Twitter key in Settings.';
+  }
+}
+''';
+
+const _facebookPosterScript = r'''
+async function execute(params) {
+  const text = String((params && params.text) || '').trim();
+  const pageId = String((params && params.pageId) || 'me').trim();
+  if (!text) {
+    return 'Provide text (and optional pageId) to post.';
+  }
+  const url = 'https://graph.facebook.com/v19.0/' + encodeURIComponent(pageId) + '/feed';
+  const payload = JSON.stringify({ message: text });
+  try {
+    const res = await System.sendHTTP(url, payload);
+    System.log('FacebookPoster result: ' + JSON.stringify(res));
+    return 'Facebook post attempted. Verify on your page.';
+  } catch (e) {
+    return 'FacebookPoster failed: ' + e + '. Ensure C2 + Facebook key in Settings.';
+  }
+}
+''';
+
+const _callDemoScript = r'''
+async function execute(params) {
+  const message = String((params && params.message) ||
+    'Your pothole complaint was picked up. Demo only — no network.').trim();
+  await System.notifyUser({
+    title: 'Update',
+    body: message,
+    speakText: message
+  });
+  return 'Call queued. When you hear or see Aur Bhai, say Haan Bhai to hear the message.';
 }
 ''';
 

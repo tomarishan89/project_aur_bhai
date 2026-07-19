@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'core/services/telemetry_bus.dart';
@@ -10,6 +11,8 @@ import 'presentation/screens/ambient_hub.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Port for wake-listen FGS ↔ UI (MS-OFFLINE-WAKE).
+  FlutterForegroundTask.initCommunicationPort();
 
   // Initialize SQLite for Windows testing (FFI required for desktop)
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
@@ -35,6 +38,7 @@ void main() async {
   final jsRegistry = container.read(jsAgentRegistryProvider);
   await jsRegistry.seedCoreAgentsIfMissing(); // MS-CORE-JS-MIGRATION: Calculator + DrivingCoach as C2 JS agents
   await jsRegistry.seedDemoAgentIfMissing();
+  await jsRegistry.consumeFriendInstallQueueIfPresent(); // S15 friend fixture replay
   final jsAgentCount = await jsRegistry.loadAndRegisterAgents();
   debugPrint('[Main] JS Bridge: $jsAgentCount vault agent(s) registered.');
 

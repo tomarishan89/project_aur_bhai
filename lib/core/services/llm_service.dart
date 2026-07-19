@@ -9,6 +9,7 @@ import 'agent_service.dart';
 import '../agents/agent_base.dart';
 import 'llm/llm_provider.dart';
 import 'llm/llm_provider_factory.dart';
+import 'llm/llm_slot.dart';
 import 'author_prompts.dart';
 import 'agent_bridge_spec.dart';
 import 'app_spec.dart';
@@ -215,8 +216,11 @@ class LlmService {
   final Ref _ref;
   LlmService(this._ref);
 
-  LlmProvider _provider() =>
-      LlmProviderFactory.forConfig(_ref.read(byokServiceProvider));
+  LlmProvider _provider({LlmSlot slot = LlmSlot.defaultSlot}) =>
+      LlmProviderFactory.forConfig(
+        _ref.read(byokServiceProvider),
+        slot: slot,
+      );
 
   Future<bool> generateAndSaveResponseAudio(
     String responseWord,
@@ -225,12 +229,13 @@ class LlmService {
   ) async {
     final byok = _ref.read(byokServiceProvider);
 
-    if (!byok.hasApiKey) {
-      debugPrint('No API key for TTS.');
+    if (!byok.hasKeyForSlot(LlmSlot.tts)) {
+      debugPrint('No API key for TTS slot.');
       return false;
     }
 
-    final provider = _provider();
+    final provider = _provider(slot: LlmSlot.tts);
+    debugPrint('[LlmService] TTS slot=${LlmSlot.tts.id} provider=${provider.id}');
     if (!provider.supportsTts) {
       debugPrint('TTS not natively supported for ${provider.id}.');
       return false;
@@ -262,10 +267,12 @@ class LlmService {
     bool authorSessionActive = false,
   }) async {
     final byok = _ref.read(byokServiceProvider);
+    final slot =
+        audioFilePath != null ? LlmSlot.language : LlmSlot.intent;
 
-    if (!byok.hasApiKey) {
+    if (!byok.hasKeyForSlot(slot)) {
       return TurnParsedResponse.fallback(
-        'Please configure your API Key in the settings drawer to enable AI.',
+        'Please configure your API Key (${slot.label}) in Settings to enable AI.',
       );
     }
 
@@ -277,7 +284,10 @@ class LlmService {
     );
 
     try {
-      final provider = _provider();
+      final provider = _provider(slot: slot);
+      debugPrint(
+        '[LlmService parseTurn] slot=${slot.id} provider=${provider.id}',
+      );
       String responseBody;
 
       if (audioFilePath != null) {
@@ -527,8 +537,10 @@ ${_turnJsonContract()}
 
   Future<AuthoredAgentDraft> authorAgent(String userRequest) async {
     final byok = _ref.read(byokServiceProvider);
-    if (!byok.hasApiKey) {
-      throw Exception('Configure your API Key in Settings to author agents.');
+    if (!byok.hasKeyForSlot(LlmSlot.author)) {
+      throw Exception(
+        'Configure your API Key (author slot or default) in Settings to author agents.',
+      );
     }
 
     final systemPrompt = '''
@@ -553,7 +565,12 @@ Respond ONLY in RAW JSON (no markdown fences):
 }
 ''';
 
-    final raw = await _provider().complete(
+    final authorProvider = _provider(slot: LlmSlot.author);
+    debugPrint(
+      '[LlmService authorAgent] slot=${LlmSlot.author.id} '
+      'provider=${authorProvider.id}',
+    );
+    final raw = await authorProvider.complete(
       prompt: systemPrompt,
       jsonMode: true,
       timeout: const Duration(seconds: 40),
@@ -586,7 +603,7 @@ Respond ONLY in RAW JSON (no markdown fences):
 
   Future<String> describeCapabilities() async {
     final byok = _ref.read(byokServiceProvider);
-    if (!byok.hasApiKey) {
+    if (!byok.hasKeyForSlot(LlmSlot.intent)) {
       return AuthorPrompts.capabilitiesBlurb;
     }
 
@@ -600,7 +617,7 @@ Respond ONLY in RAW JSON: {"answer": "..."}
 ''';
 
     try {
-      final raw = await _provider().complete(
+      final raw = await _provider(slot: LlmSlot.intent).complete(
         prompt: prompt,
         jsonMode: true,
         timeout: const Duration(seconds: 10),
@@ -625,8 +642,10 @@ Respond ONLY in RAW JSON: {"answer": "..."}
     void Function(String message)? onProgress,
   }) async {
     final byok = _ref.read(byokServiceProvider);
-    if (!byok.hasApiKey) {
-      throw Exception('Configure your API Key in Settings.');
+    if (!byok.hasKeyForSlot(LlmSlot.improve)) {
+      throw Exception(
+        'Configure your API Key (improve slot or default) in Settings.',
+      );
     }
 
     void progress(String message) => onProgress?.call(message);
@@ -649,6 +668,10 @@ Respond ONLY in RAW JSON: {"answer": "..."}
     }
 
     progress('Coder Agent: refining Bro Code (prefer thin execute + assets)…');
+    final improveProvider = _provider(slot: LlmSlot.improve);
+    progress(
+      'IMPROVE slot=${LlmSlot.improve.id} provider=${improveProvider.id}',
+    );
 
     final prompt = '''
 You are the Coder Agent for Project Aur Bhai.
@@ -684,7 +707,7 @@ Respond ONLY in RAW JSON: thin scriptBase64 and/or assets / edits — not HTML-i
       progress('Coder Agent turn $turn/$kMaxRefineModelTurns…');
       String raw;
       try {
-        raw = await _provider().completeChat(
+        raw = await improveProvider.completeChat(
           messages: messages,
           jsonMode: true,
           timeout: const Duration(seconds: 60),
@@ -852,14 +875,20 @@ Respond ONLY in RAW JSON: thin scriptBase64 and/or assets / edits — not HTML-i
     List<LlmChatMessage>? chatSeed,
   }) async {
     final byok = _ref.read(byokServiceProvider);
-    if (!byok.hasApiKey) {
-      throw Exception('Configure your API Key in Settings.');
+    if (!byok.hasKeyForSlot(LlmSlot.improve)) {
+      throw Exception(
+        'Configure your API Key (improve slot or default) in Settings.',
+      );
     }
 
     void progress(String message) => onProgress?.call(message);
     final bridge = _ref.read(jsBridgeServiceProvider);
+    final improveProvider = _provider(slot: LlmSlot.improve);
 
     progress('Loaded vault script (${currentScript.length} chars)');
+    progress(
+      'IMPROVE slot=${LlmSlot.improve.id} provider=${improveProvider.id}',
+    );
 
     final schemaJson = currentInputSchema != null
         ? jsonEncode(currentInputSchema)
@@ -945,7 +974,7 @@ Respond ONLY in RAW JSON with either scriptBase64 OR edits[] (Base64 snippets).
 
       String raw;
       try {
-        raw = await _provider().completeChat(
+        raw = await improveProvider.completeChat(
           messages: messages,
           jsonMode: true,
           timeout: const Duration(seconds: 60),

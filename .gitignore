@@ -52,6 +52,13 @@ android/build/
 # Feedback Related:
 feedback/
 
+# Friend fixture install queue (local maintainer tooling)
+tool/.friend_install_queue.json
+tool/.friend_install_queue.json.installed
+
+# Local friend APK drops (do not commit binaries)
+friend_share/
+
 
 # Vendored plugin build caches (must never be committed)
 third_party/**/.cxx/

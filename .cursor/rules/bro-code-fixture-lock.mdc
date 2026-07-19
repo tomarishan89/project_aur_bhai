@@ -1,0 +1,16 @@
+---
+description: Fixture Lock Protocol when pulling friend GitHub Issue reports
+globs:
+alwaysApply: false
+---
+
+# Fixture Lock Protocol (S15)
+
+When the user asks to pull / diagnose a friend’s Bro Code report from GitHub Issues:
+
+1. Resolve target: explicit `#N` → else agent name + latest → else latest `aur-bhai-report`. If ambiguous, stop and ask.
+2. Run `dart run tool/fetch_issue_fixture.dart` with `--issue N` or `--agent Name --latest` (needs `CIRCLE_OWNER`, `gh` auth).
+3. Print the tool’s lock banner (`Locked fixture: Issue #N | … | path=…`).
+4. Work only on that path until the user switches issue.
+5. To run on this machine: `dart run tool/install_issue_fixture.dart --path <locked>` then `flutter run` (registers `Friend_<Name>` at C4).
+6. After a fix: comment on the Issue + set label `fixed-in-build` or `need-more-info`; ask the friend to try again.

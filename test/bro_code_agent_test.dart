@@ -323,7 +323,7 @@ async function execute(params) {
     final scan = AgentVerificationService().scanScript(script);
     expect(scan.passed, isFalse);
     expect(
-      scan.findings.any((f) => f.contains('Browser/DOM')),
+      scan.findings.any((f) => f.toString().contains('Browser/DOM')),
       isTrue,
     );
   });
@@ -739,7 +739,7 @@ async function execute(params) {
       expect((failing.first as Map)['tool'], 'validate_syntax');
     });
 
-    test('reportVersion 2 includes session with multiple change requests', () {
+    test('reportVersion 3 includes session with multiple change requests', () {
       final session = BroCodeImproveSession(
         agentName: 'Locator',
         startedAt: DateTime.utc(2026, 7, 15, 10),
@@ -785,7 +785,7 @@ async function execute(params) {
       );
 
       final json = report.toJson();
-      expect(json['reportVersion'], 2);
+      expect(json['reportVersion'], 3);
       final sess = json['session'] as Map<String, dynamic>;
       expect(sess['attempts'], hasLength(2));
       expect(

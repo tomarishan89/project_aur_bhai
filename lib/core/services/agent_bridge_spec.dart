@@ -8,7 +8,8 @@ class AgentBridgeSpec {
   static const String slotFillingHint = '''
 Sandbox reality (when filling dataSources / outputs):
 - Agents run in QuickJS with ONLY System.querySQL (SELECT), System.writeVault,
-  System.sendHTTP, and System.log — no browser DOM, fetch, require, or fs in execute().
+  System.sendHTTP, System.readInbox / System.consumeInbox, System.notifyUser,
+  and System.log — no browser DOM, fetch, require, or fs in execute().
 - Dashboards: write self-contained HTML via System.writeVault; the HTML (not execute)
   may use fetch('/api/query') and document.* because it runs in the WebView.
 - Telemetry table: telemetry(id, timestamp, latitude, longitude, accelerometerZ, compassDirection).
@@ -23,6 +24,9 @@ in execute() — there is no browser, Node, require, import, fetch, fs, or DOM:
   System.querySQL(sqlString)              // READ-ONLY SELECT. Returns array of row objects (await).
   System.writeVault(key, value, mimeType) // Persist a string asset (e.g. HTML). Await it.
   System.sendHTTP(url, payload)           // GET if payload is null, else POST JSON. Returns {statusCode, body}. Await.
+  System.readInbox({ unreadOnly, limit }) // Voice/"Tell" inbox entries for this agent (await).
+  System.consumeInbox({ ids })            // Mark inbox entries consumed (await).
+  System.notifyUser({ title, body, speakText }) // Queue a Bro Call (local notification + Aur Bhai cue). Await.
   System.log(message)                     // Emit a step log to the execution console.
   System.assets                           // Read-only map of sidecar strings (HTML/manifest/SW) injected by the host.
 

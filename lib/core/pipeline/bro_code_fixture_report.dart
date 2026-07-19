@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'authoring_trace.dart';
 import 'bro_code_agent_tools.dart';
 import 'bro_code_workspace.dart';
 
@@ -217,9 +218,9 @@ class BroCodeImproveSession {
 /// Diagnostic package when IMPROVE fails — clipboard / future dev-centre upload.
 ///
 /// [reportVersion] 1: single attempt (legacy).
-/// [reportVersion] 2: includes [session] with all attempts / change requests.
+/// [reportVersion] 3: includes optional [authoringTrace] (frozen AUTHOR form).
 class BroCodeFixtureReport {
-  static const int reportVersion = 2;
+  static const int reportVersion = 3;
 
   final DateTime exportedAt;
   final String appVersion;
@@ -243,6 +244,8 @@ class BroCodeFixtureReport {
   final BroCodeImproveSession? session;
   final int? attemptNumber;
   final bool? verified;
+  final AuthoringTrace? authoringTrace;
+  final String? authoringTraceMissingReason;
 
   const BroCodeFixtureReport({
     required this.exportedAt,
@@ -267,6 +270,8 @@ class BroCodeFixtureReport {
     this.session,
     this.attemptNumber,
     this.verified,
+    this.authoringTrace,
+    this.authoringTraceMissingReason,
   });
 
   static String _boundedDetail(String detail) =>
@@ -365,6 +370,14 @@ class BroCodeFixtureReport {
           'diagnostics': _diagnosticsJson(),
         },
         if (session != null) 'session': session!.toJson(),
+        if (authoringTrace != null)
+          'authoringTrace': authoringTrace!.sanitized().toJson()
+        else if (authoringTraceMissingReason != null)
+          'authoringTrace': {
+            'traceVersion': AuthoringTrace.traceVersion,
+            'missing': true,
+            'reason': authoringTraceMissingReason,
+          },
         'fixture': {
           if (expectSyntaxOk != null) 'expectSyntaxOk': expectSyntaxOk,
           if (expectSandboxOk != null) 'expectSandboxOk': expectSandboxOk,
@@ -386,6 +399,7 @@ class BroCodeFixtureReport {
     final fixture = report['fixture'] as Map<String, dynamic>? ?? {};
     final improve = report['improve'] as Map<String, dynamic>? ?? {};
     final session = report['session'];
+    final authoringTrace = report['authoringTrace'];
     return {
       'name': bro['name'],
       'script': bro['script'],
@@ -398,6 +412,7 @@ class BroCodeFixtureReport {
           'improveGoal': improve['changeRequest'],
       },
       'session': ?session,
+      'authoringTrace': ?authoringTrace,
     };
   }
 }

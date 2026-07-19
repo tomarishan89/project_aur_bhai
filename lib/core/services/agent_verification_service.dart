@@ -5,14 +5,60 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../agents/js_agent_adapter.dart';
 import 'js_agent_registry.dart';
 
+/// Structured due-diligence finding (MS-DUE-DILIGENCE).
+class DueDiligenceFinding {
+  final String code;
+  final String message;
+
+  /// `policy` (static scan) vs `syntax` (QuickJS / last RUN).
+  final String category;
+
+  /// `blocking` | `warning` | `info`
+  final String severity;
+
+  /// Suggested IMPROVE chip label.
+  final String improveHint;
+
+  /// True when likely HTML/DOM dashboard false positive.
+  final bool likelyFalsePositive;
+
+  const DueDiligenceFinding({
+    required this.code,
+    required this.message,
+    this.category = 'policy',
+    this.severity = 'blocking',
+    this.improveHint = '',
+    this.likelyFalsePositive = false,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'code': code,
+        'message': message,
+        'category': category,
+        'severity': severity,
+        'improveHint': improveHint,
+        'likelyFalsePositive': likelyFalsePositive,
+      };
+
+  @override
+  String toString() => '[$code] $message';
+}
+
 /// Result of automated due-diligence on agent JS (MS-USER-ECOSYSTEM-ENG3).
 class DueDiligenceResult {
   final bool passed;
-  final List<String> findings;
+  final List<DueDiligenceFinding> findings;
 
-  const DueDiligenceResult({required this.passed, this.findings = const []});
+  const DueDiligenceResult({
+    required this.passed,
+    this.findings = const [],
+  });
 
   bool get flagged => !passed;
+
+  /// Legacy string list for UI that still expects messages only.
+  List<String> get findingMessages =>
+      findings.map((f) => f.toString()).toList();
 }
 
 /// UI-visible promotion request after authoring/refinement (MS-USER-ECOSYSTEM-ENG4).
@@ -65,46 +111,79 @@ class AgentVerificationService extends ChangeNotifier {
 
   /// Heuristic static analysis — no network, runs 100% on-device.
   DueDiligenceResult scanScript(String script) {
-    final findings = <String>[];
+    final findings = <DueDiligenceFinding>[];
     final sandboxOnly = _stripEmbeddedHtmlTemplates(script);
     final lower = sandboxOnly.toLowerCase();
 
     if (RegExp(r'\b(delete|drop|truncate|alter)\s+(from|table|into)\b',
             caseSensitive: false)
         .hasMatch(sandboxOnly)) {
-      findings.add('Destructive SQL pattern detected (DELETE/DROP/TRUNCATE/ALTER).');
+      findings.add(const DueDiligenceFinding(
+        code: 'DD_DESTRUCTIVE_SQL',
+        message: 'Destructive SQL pattern detected (DELETE/DROP/TRUNCATE/ALTER).',
+        severity: 'blocking',
+        improveHint: 'Remove DELETE/DROP/TRUNCATE/ALTER; use read-only SQL.',
+      ));
     }
 
     if (RegExp(
       r"system\.sendhttp\s*\(\s*['\x22]https?://(?!localhost|127\.0\.0\.1)",
       caseSensitive: false,
     ).hasMatch(lower)) {
-      findings.add('Outbound HTTP to an external host via System.sendHTTP.');
+      findings.add(const DueDiligenceFinding(
+        code: 'DD_EXTERNAL_HTTP',
+        message: 'Outbound HTTP to an external host via System.sendHTTP.',
+        severity: 'blocking',
+        improveHint: 'Prefer localhost/System vault; gate external HTTP behind C2.',
+      ));
     }
 
     if (RegExp(r'\beval\s*\(', caseSensitive: false).hasMatch(sandboxOnly) ||
-        RegExp(r'new\s+Function\s*\(', caseSensitive: false).hasMatch(sandboxOnly)) {
-      findings.add('Dynamic code execution pattern (eval / Function constructor).');
+        RegExp(r'new\s+Function\s*\(', caseSensitive: false)
+            .hasMatch(sandboxOnly)) {
+      findings.add(const DueDiligenceFinding(
+        code: 'DD_DYNAMIC_CODE',
+        message: 'Dynamic code execution pattern (eval / Function constructor).',
+        severity: 'blocking',
+        improveHint: 'Delete eval/Function; use static execute() logic.',
+      ));
     }
 
     if (lower.contains('document.') ||
         lower.contains('window.') ||
         lower.contains('fetch(') ||
         lower.contains('xmlhttprequest')) {
-      findings.add('Browser/DOM API usage outside the System bridge sandbox.');
+      findings.add(const DueDiligenceFinding(
+        code: 'DD_BROWSER_DOM',
+        message: 'Browser/DOM API usage outside the System bridge sandbox.',
+        severity: 'warning',
+        improveHint:
+            'Move DOM/fetch into vault HTML assets; keep execute() thin.',
+        likelyFalsePositive: true,
+      ));
     }
 
     if (RegExp(
       r"(api[_-]?key|secret|password|token)\s*[:=]",
       caseSensitive: false,
     ).hasMatch(sandboxOnly)) {
-      findings.add('Hard-coded credential-like key in script source.');
+      findings.add(const DueDiligenceFinding(
+        code: 'DD_HARDCODED_SECRET',
+        message: 'Hard-coded credential-like key in script source.',
+        severity: 'blocking',
+        improveHint: 'Remove secrets; use BYOK Settings keys at runtime.',
+      ));
     }
 
     if (RegExp(r'system\.querysql\s*\([^)]*\b(insert|update|delete|drop)\b',
             caseSensitive: false)
         .hasMatch(lower)) {
-      findings.add('Non-SELECT SQL attempted via System.querySQL.');
+      findings.add(const DueDiligenceFinding(
+        code: 'DD_WRITE_SQL',
+        message: 'Non-SELECT SQL attempted via System.querySQL.',
+        severity: 'blocking',
+        improveHint: 'Use SELECT-only queries via System.querySQL.',
+      ));
     }
 
     return DueDiligenceResult(
@@ -114,15 +193,9 @@ class AgentVerificationService extends ChangeNotifier {
   }
 
   /// Dashboard HTML embedded in agent scripts runs in the browser, not QuickJS.
-  /// Strip HTML document bodies even when inner client JS has unescaped backticks
-  /// (those break QuickJS syntax, but must not become false DOM policy findings).
   String _stripEmbeddedHtmlTemplates(String script) {
-    // 1) Strip by HTML document boundaries regardless of quoting/backticks.
-    //    Nested unescaped ` inside <script> used to close backtick templates early
-    //    and leak document./fetch( into the sandbox scan.
     var cleaned = _stripHtmlDocumentBodies(script);
 
-    // 2) Strip remaining backticks templates that look like HTML fragments.
     final out = StringBuffer();
     var cursor = 0;
     while (cursor < cleaned.length) {
@@ -154,7 +227,6 @@ class AgentVerificationService extends ChangeNotifier {
           lower.contains('<script') ||
           lower.contains('<div') ||
           lower.contains('<meta');
-      // Service-worker source is also browser-bound (written to vault), not QuickJS.
       final isServiceWorker = lower.contains('self.addeventlistener') ||
           lower.contains('self.skipwaiting') ||
           lower.contains('clients.claim');
@@ -164,8 +236,6 @@ class AgentVerificationService extends ChangeNotifier {
     return out.toString();
   }
 
-  /// Removes content from `<!DOCTYPE` / `<html` through matching `</html>`,
-  /// ignoring string/template delimiters so policy never scans browser JS.
   String _stripHtmlDocumentBodies(String script) {
     final out = StringBuffer();
     var cursor = 0;
@@ -186,7 +256,6 @@ class AgentVerificationService extends ChangeNotifier {
       out.write(script.substring(cursor, start));
       final close = lower.indexOf('</html>', start);
       if (close < 0) {
-        // Unclosed document — drop the rest (browser-bound HTML fragment).
         out.write(' ');
         break;
       }
@@ -214,7 +283,6 @@ class AgentVerificationService extends ChangeNotifier {
   }
 
   String _hashPassword(String password) {
-    // Simple local gate — not cryptographic identity; sufficient for vault promotion.
     return password.codeUnits.fold<int>(0, (a, b) => a * 31 + b).toString();
   }
 
@@ -238,7 +306,42 @@ class AgentVerificationService extends ChangeNotifier {
     return _hashPassword(password.trim()) == _passwordHash;
   }
 
-  /// Promote agent to C2 after clean scan or device authentication override.
+  Future<AgentSecurityClass> _currentClass(
+    JsAgentRegistry registry,
+    String agentName,
+  ) async {
+    final bundle = await registry.exportAgentBundle(agentName);
+    final schema = bundle?['schema'] as Map<String, dynamic>?;
+    return AgentSecurityClassX.fromId(schema?['securityClass'] as String?);
+  }
+
+  /// C4 → C3 after a clean static scan (real due-diligence tier).
+  Future<bool> promoteToDueDiligence({
+    required JsAgentRegistry registry,
+    required String agentName,
+    DueDiligenceResult? priorScan,
+  }) async {
+    final bundle = await registry.exportAgentBundle(agentName);
+    final scan = priorScan ?? scanScript(bundle?['script'] as String? ?? '');
+    if (scan.flagged) return false;
+
+    final current = await _currentClass(registry, agentName);
+    if (current == AgentSecurityClass.c1Core ||
+        current == AgentSecurityClass.c2Verified ||
+        current == AgentSecurityClass.c3DueDiligence) {
+      // Already at or beyond C3.
+      if (current == AgentSecurityClass.c3DueDiligence) return true;
+      return false;
+    }
+
+    final ok = await registry.updateSecurityClass(
+      agentName,
+      AgentSecurityClass.c3DueDiligence,
+    );
+    return ok;
+  }
+
+  /// C3 → C2 after clean scan, or force with [deviceAuthenticated].
   Future<bool> promoteToVerified({
     required JsAgentRegistry registry,
     required String agentName,
@@ -249,6 +352,19 @@ class AgentVerificationService extends ChangeNotifier {
     final scan = priorScan ?? scanScript(bundle?['script'] as String? ?? '');
 
     if (scan.flagged && !deviceAuthenticated) return false;
+
+    final current = await _currentClass(registry, agentName);
+
+    // Normal path: must be C3 first.
+    if (!deviceAuthenticated &&
+        current != AgentSecurityClass.c3DueDiligence) {
+      return false;
+    }
+
+    // Force-promote: device auth may jump C4/C3 → C2 (ENG4 override).
+    if (deviceAuthenticated && scan.flagged) {
+      // Allowed — explicit user override after biometric/device gate.
+    }
 
     final ok = await registry.updateSecurityClass(
       agentName,
@@ -261,6 +377,7 @@ class AgentVerificationService extends ChangeNotifier {
   }
 }
 
-final agentVerificationProvider = ChangeNotifierProvider<AgentVerificationService>((ref) {
+final agentVerificationProvider =
+    ChangeNotifierProvider<AgentVerificationService>((ref) {
   return AgentVerificationService();
 });

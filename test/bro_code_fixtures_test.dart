@@ -98,7 +98,7 @@ void main() {
           // browser APIs that live inside the dashboard document body.
           if (tags is List && tags.contains('nested-html-repro')) {
             expect(
-              scan.findings.any((f) => f.contains('Browser/DOM')),
+              scan.findings.any((f) => f.toString().contains('Browser/DOM')),
               isFalse,
               reason: scan.findings.join('; '),
             );

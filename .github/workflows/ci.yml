@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  analyze-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Pub get
+        run: flutter pub get
+      - name: Format
+        run: dart format --output=none --set-exit-if-changed .
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+      - name: Unit / widget tests (includes QuickJS path deps)
+        run: flutter test --reporter expanded
+
+  # Separate job keeps native QuickJS bridge/fixture coverage from being
+  # skipped on a host that lacks the bundled engine — Ubuntu runners load
+  # the path-overridden quickjs_engine from third_party/.
+  quickjs-bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: JS bridge + Bro Code fixture suite (QuickJS)
+        run: |
+          flutter test test/js_bridge_test.dart test/bro_code_fixtures_test.dart test/bro_code_agent_test.dart --reporter expanded

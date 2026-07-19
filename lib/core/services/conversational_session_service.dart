@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
+import '../pipeline/authoring_trace.dart';
 import 'app_spec.dart';
 import 'author_prompts.dart';
 
@@ -59,6 +60,54 @@ class ConversationalSessionService extends ChangeNotifier {
   /// Last due-diligence findings surfaced during review/build (for UI).
   DueDiligenceSnapshot? _lastScan;
   DueDiligenceSnapshot? get lastScan => _lastScan;
+
+  /// In-session authoring form log (typed/spoken). Frozen to vault on BUILD.
+  final List<AuthoringTurn> _authoringTurns = [];
+  String? _authorProvider;
+  String? _authorModelId;
+
+  List<AuthoringTurn> get authoringTurns =>
+      List.unmodifiable(_authoringTurns);
+
+  void setAuthorModel({String? provider, String? modelId}) {
+    _authorProvider = provider;
+    _authorModelId = modelId;
+  }
+
+  void appendAuthoringTurn({
+    required String role,
+    required String text,
+    String? phase,
+  }) {
+    if (_kind != SessionKind.author) return;
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    _authoringTurns.add(AuthoringTurn(
+      role: role,
+      text: trimmed,
+      at: DateTime.now().toUtc(),
+      phase: phase ?? _phase.name,
+      provider: _authorProvider,
+      modelId: _authorModelId,
+      llmSlot: 'author',
+    ));
+  }
+
+  AuthoringTrace buildAuthoringTrace({
+    required String agentName,
+    required String buildOutcome,
+    Map<String, dynamic>? appSpecAtBuild,
+  }) {
+    return AuthoringTrace(
+      agentName: agentName,
+      provider: _authorProvider,
+      modelId: _authorModelId,
+      llmSlot: 'author',
+      turns: List.unmodifiable(_authoringTurns),
+      appSpecAtBuild: appSpecAtBuild,
+      buildOutcome: buildOutcome,
+    ).sanitized();
+  }
 
   void setLastScan({required bool passed, required List<String> findings}) {
     _lastScan = DueDiligenceSnapshot(passed: passed, findings: findings);
@@ -192,6 +241,9 @@ class ConversationalSessionService extends ChangeNotifier {
     _appSpec = initialSpec ?? AppSpec();
     _lastEchoedSlots = [];
     _lastScan = null;
+    _authoringTurns.clear();
+    _authorProvider = null;
+    _authorModelId = null;
     _clearRefine();
     notifyListeners();
     debugPrint('[ConversationalSession] Started AUTHOR session');

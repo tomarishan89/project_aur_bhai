@@ -7,9 +7,11 @@ import '../services/agent_bridge_spec.dart';
 import '../services/byok_service.dart';
 import '../services/llm/llm_provider.dart';
 import '../services/llm/llm_provider_factory.dart';
+import '../services/llm/llm_slot.dart';
 import '../services/llm_service.dart';
 import '../services/telemetry_bus.dart';
 import 'bro_code_agent_tools.dart';
+import 'bro_code_capability_judge.dart';
 import 'bro_code_platform_integrity.dart';
 import 'bro_code_workspace.dart';
 import 'bro_code_workspace_snapshot.dart';
@@ -79,14 +81,30 @@ class BroCodeCodingAgent {
     bool persistSnapshotsToVault = true,
   }) async {
     final byok = _ref.read(byokServiceProvider);
-    if (providerOverride == null && !byok.hasApiKey) {
-      throw Exception('Configure your API Key in Settings to run the coding agent.');
+    if (providerOverride == null && !byok.hasKeyForSlot(LlmSlot.improve)) {
+      throw Exception(
+        'Configure your API Key (improve slot or default) in Settings to run the coding agent.',
+      );
     }
 
     void progress(String msg) => onProgress?.call(msg);
 
     final tools = BroCodeAgentTools(_ref, workspace);
     tools.lastChangeRequest = changeRequest;
+    // MS-BROCODE-PLATFORM-ENG4 — LLM judge on judge slot when BYOK present.
+    if (byok.hasKeyForSlot(LlmSlot.capabilityJudge)) {
+      final judgeProvider = LlmProviderFactory.forConfig(
+        byok,
+        slot: LlmSlot.capabilityJudge,
+      );
+      progress(
+        'Capability judge slot=${LlmSlot.capabilityJudge.id} '
+        'provider=${judgeProvider.id}',
+      );
+      tools.capabilityJudge = LlmBroCodeCapabilityJudge(
+        complete: (prompt) => judgeProvider.complete(prompt: prompt),
+      );
+    }
     final snaps = snapshotStore ?? BroCodeSnapshotStore();
     snaps.capture(
       workspace: workspace,
@@ -260,7 +278,11 @@ class BroCodeCodingAgent {
     ];
 
     final provider = providerOverride ??
-        LlmProviderFactory.forConfig(_ref.read(byokServiceProvider));
+        LlmProviderFactory.forConfig(
+          _ref.read(byokServiceProvider),
+          slot: LlmSlot.improve,
+        );
+    progress('IMPROVE slot=${LlmSlot.improve.id} provider=${provider.id}');
 
     Future<void> persistSnapshots() async {
       if (!persistSnapshotsToVault) return;

@@ -158,5 +158,42 @@ void main() {
       await response.drain<void>();
       client.close();
     });
+
+    test('ENG3 rejects mutating / unbounded SQL on /api/query', () async {
+      final client = HttpClient();
+      final base = server.localhostAddress;
+
+      Future<int> postSql(String sql) async {
+        final request = await client.postUrl(Uri.parse('$base/api/query'));
+        request.headers.contentType = ContentType.json;
+        request.write(jsonEncode({'sql': sql}));
+        final response = await request.close();
+        final code = response.statusCode;
+        await response.drain<void>();
+        return code;
+      }
+
+      expect(await postSql('DELETE FROM telemetry'), 400);
+      expect(await postSql('SELECT * FROM telemetry'), 400);
+      expect(await postSql('SELECT * FROM telemetry; DROP TABLE telemetry'), 400);
+      expect(
+        await postSql('SELECT COUNT(*) AS c FROM telemetry'),
+        200,
+      );
+      client.close();
+    });
+
+    test('ENG4 LAN exposure off rejects non-loopback style via pair gate helpers',
+        () async {
+      expect(server.lanExposureEnabled, isFalse);
+      server.setLanExposureEnabled(true);
+      expect(server.lanExposureEnabled, isTrue);
+      expect(server.pairingToken.length, 6);
+      final before = server.pairingToken;
+      server.rotatePairingToken();
+      expect(server.pairingToken, isNot(before));
+      server.setLanExposureEnabled(false);
+      expect(server.lanExposureEnabled, isFalse);
+    });
   });
 }

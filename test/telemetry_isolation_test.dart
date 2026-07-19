@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:project_aur_bhai/core/services/telemetry_bus.dart';
@@ -148,7 +150,7 @@ void main() {
 
     await bus.openSandbox(reset: true);
     final sandboxed = await bus.executeQuery(
-      'SELECT id, latitude, longitude FROM telemetry ORDER BY id',
+      'SELECT id, latitude, longitude FROM telemetry ORDER BY id LIMIT 50',
     );
     expect(sandboxed.length, 8);
     expect(sandboxed.first['id'], 'sandbox-seed-0');
@@ -165,6 +167,75 @@ void main() {
     expect(sovereignAfter.length, sovereignBefore.length);
     expect(sovereignAfter.first.latitude, 12.34);
 
+    bus.dispose();
+  });
+
+  test('single-flight skips overlapping GPS reads', () async {
+    final bus = _freshBus();
+    await bus.initialize();
+
+    var reads = 0;
+    final started = <Completer<Position?>>[];
+    final collector = TelemetryCollector(
+      bus: bus,
+      sampleInterval: const Duration(milliseconds: 20),
+      forceMobilePlatform: true,
+      requestLocationPermission: () async => true,
+      accelerometerEvents: () => const Stream.empty(),
+      readPosition: () async {
+        reads++;
+        final c = Completer<Position?>();
+        started.add(c);
+        return c.future;
+      },
+    );
+
+    unawaited(collector.start());
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    expect(reads, 1, reason: 'second tick must not stack while in-flight');
+    expect(collector.inFlight, isTrue);
+
+    started.first.complete(
+      Position(
+        longitude: 1,
+        latitude: 2,
+        timestamp: DateTime.now(),
+        accuracy: 1,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0,
+      ),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+    await collector.stop();
+    bus.dispose();
+  });
+
+  test('backoff engages after consecutive failures', () async {
+    final bus = _freshBus();
+    await bus.initialize();
+
+    final collector = TelemetryCollector(
+      bus: bus,
+      sampleInterval: const Duration(milliseconds: 30),
+      maxBackoff: const Duration(seconds: 2),
+      forceMobilePlatform: true,
+      requestLocationPermission: () async => true,
+      accelerometerEvents: () => const Stream.empty(),
+      readPosition: () async {
+        throw TimeoutException('gps');
+      },
+    );
+
+    await collector.start();
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(collector.status, TelemetryCollectorStatus.backoff);
+    expect(collector.currentBackoff > Duration.zero, isTrue);
+
+    await collector.stop();
     bus.dispose();
   });
 

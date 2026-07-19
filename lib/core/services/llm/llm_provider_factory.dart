@@ -2,6 +2,7 @@ import '../byok_service.dart';
 import 'anthropic_provider.dart';
 import 'gemini_provider.dart';
 import 'llm_provider.dart';
+import 'llm_slot.dart';
 import 'openai_provider.dart';
 
 /// Single source of truth for registered BYOK providers (MS-LLM-AGNOSTIC).
@@ -17,13 +18,14 @@ class LlmProviderFactory {
   ];
 
   /// Builds a concrete [LlmProvider] from the active [ByokService] config.
-  static LlmProvider forConfig(ByokService byok) {
+  static LlmProvider forConfig(ByokService byok, {LlmSlot slot = LlmSlot.defaultSlot}) {
+    final slotCfg = byok.configForSlot(slot);
     final config = LlmProviderConfig(
-      apiKey: byok.apiKey,
-      model: byok.modelName,
-      customUrl: byok.customUrl,
+      apiKey: slotCfg.apiKey,
+      model: slotCfg.modelName,
+      customUrl: slotCfg.customUrl,
     );
-    return forProviderId(byok.apiProvider, config);
+    return forProviderId(slotCfg.provider, config);
   }
 
   /// Builds a provider by its Settings dropdown id (useful for UI defaults).
