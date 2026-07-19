@@ -49,15 +49,18 @@ android/.gradle/
 android/build/
 **/local.properties
 
-# Feedback Related:
+# Feedback Related (never commit — local only):
 feedback/
 
 # Friend fixture install queue (local maintainer tooling)
 tool/.friend_install_queue.json
 tool/.friend_install_queue.json.installed
 
-# Local friend APK drops (do not commit binaries)
+# Local friend APK drops (never commit binaries)
 friend_share/
+
+# Bro Code fixture captures / screenshots (local + pull tool only — never commit)
+test/fixtures/bro_code/
 
 
 # Vendored plugin build caches (must never be committed)
