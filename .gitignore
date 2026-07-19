@@ -12,16 +12,12 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# IntelliJ / VS Code (local editor settings)
 *.iml
 *.ipr
 *.iws
 .idea/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+.vscode/
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -49,19 +45,34 @@ android/.gradle/
 android/build/
 **/local.properties
 
-# Feedback Related (never commit — local only):
+# Secrets / env (never commit)
+.env
+.env.*
+!.env.example
+
+# Feedback Related (never commit — local only)
 feedback/
 
 # Friend fixture install queue (local maintainer tooling)
 tool/.friend_install_queue.json
 tool/.friend_install_queue.json.installed
 
-# Local friend APK drops (never commit binaries)
+# Local friend APK drops and any APK/AAB binaries
 friend_share/
+*.apk
+*.aab
 
 # Bro Code fixture captures / screenshots (local + pull tool only — never commit)
 test/fixtures/bro_code/
 
+# One-off scratch scripts / snippets at repo root
+/_acts.txt
+/_html_snip.txt
+/patch.dart
+/patch.py
+/patch2.dart
+/search.dart
+/test_quickjs.dart
 
 # Vendored plugin build caches (must never be committed)
 third_party/**/.cxx/
