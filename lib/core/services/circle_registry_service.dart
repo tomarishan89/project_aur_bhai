@@ -7,11 +7,14 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
+import 'bhai_code_access.dart';
+import 'bhai_code_origin.dart';
 import 'js_agent_registry.dart';
 import 'marketplace_catalog.dart';
 import 'secure_secret_store.dart';
+import 'telemetry_bus.dart';
 
-/// Bro Code bundle published to the closed-circle GitHub registry (MVP-S10).
+/// Bhai Code bundle published to the Friend Circle GitHub registry (MVP-S10).
 class CircleListing {
   final String id;
   final String name;
@@ -22,6 +25,7 @@ class CircleListing {
   final String script;
   final Map<String, dynamic> inputSchema;
   final String? parentRevisionId;
+  final BhaiCodeAccess access;
 
   const CircleListing({
     required this.id,
@@ -33,6 +37,7 @@ class CircleListing {
     required this.script,
     this.inputSchema = const {},
     this.parentRevisionId,
+    this.access = BhaiCodeAccess.defaults,
   });
 
   Map<String, dynamic> toBundleJson() => {
@@ -45,6 +50,7 @@ class CircleListing {
         'author': author,
         'script': script,
         'inputSchema': inputSchema,
+        'access': access.toJson(),
       };
 
   factory CircleListing.fromBundleJson(Map<String, dynamic> json) {
@@ -60,16 +66,23 @@ class CircleListing {
       inputSchema: Map<String, dynamic>.from(
         (json['inputSchema'] as Map?) ?? const {},
       ),
+      access: BhaiCodeAccess.fromJson(
+        json['access'] is Map
+            ? Map<String, dynamic>.from(json['access'] as Map)
+            : null,
+      ),
     );
   }
 
   MarketplaceListing toMarketplaceListing() => MarketplaceListing(
         id: id,
         name: name,
-        description: '$description · by $author · $license · $revisionId',
+        description: description,
         script: script,
         inputSchema: inputSchema,
         license: license,
+        author: author,
+        access: access,
       );
 }
 
@@ -93,6 +106,7 @@ class CircleRegistryService {
   String get owner => _owner;
   String get repo => _repo;
   String get authorDisplay => _author;
+  bool get hasToken => _token.isNotEmpty;
   bool get isConfigured =>
       _owner.isNotEmpty && _repo.isNotEmpty && _token.isNotEmpty;
 
@@ -105,6 +119,18 @@ class CircleRegistryService {
     _token = await _secrets.read(AppConfig.circlePrefsTokenKey) ?? '';
   }
 
+  /// GitHub login for the current PAT (`GET /user`). Null if unavailable.
+  Future<String?> fetchTokenLogin() async {
+    if (_token.isEmpty) return null;
+    final res = await _http.get(
+      Uri.parse('https://api.github.com/user'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) return null;
+    final login = (jsonDecode(res.body) as Map<String, dynamic>)['login'];
+    return login is String && login.trim().isNotEmpty ? login.trim() : null;
+  }
+
   Future<void> saveConfig({
     required String owner,
     required String repo,
@@ -114,16 +140,75 @@ class CircleRegistryService {
     final prefs = await SharedPreferences.getInstance();
     _owner = owner.trim();
     _repo = repo.trim().isEmpty ? AppConfig.circleDefaultRepo : repo.trim();
-    _author = authorDisplay.trim().isEmpty ? 'circle-user' : authorDisplay.trim();
-    _token = token.trim();
+    _author =
+        authorDisplay.trim().isEmpty ? 'circle-user' : authorDisplay.trim();
+    final incoming = token.trim();
+    final existing = await _secrets.read(AppConfig.circlePrefsTokenKey) ?? '';
+    // Empty PAT field means "keep stored token" — never wipe on blank re-save.
+    final tokenChanged = incoming.isNotEmpty;
+    if (tokenChanged) {
+      _token = incoming;
+      await _secrets.write(AppConfig.circlePrefsTokenKey, _token);
+    } else {
+      _token = existing;
+    }
+    if (_owner.isEmpty && _token.isNotEmpty) {
+      final login = await fetchTokenLogin();
+      if (login != null) {
+        _owner = login;
+      }
+    }
     await prefs.setString(AppConfig.circlePrefsOwnerKey, _owner);
     await prefs.setString(AppConfig.circlePrefsRepoKey, _repo);
     await prefs.setString(AppConfig.circlePrefsAuthorKey, _author);
-    if (_token.isEmpty) {
-      await _secrets.delete(AppConfig.circlePrefsTokenKey);
-    } else {
-      await _secrets.write(AppConfig.circlePrefsTokenKey, _token);
+  }
+
+  Future<void> clearToken() async {
+    _token = '';
+    await _secrets.delete(AppConfig.circlePrefsTokenKey);
+  }
+
+  /// Probes GitHub with the stored owner/repo/token. Returns a short status.
+  Future<String> verifyConnection() async {
+    await loadConfig();
+    if (!isConfigured) {
+      throw Exception(
+        'Configure circle GitHub owner / repo / token in Settings first.',
+      );
     }
+    // Prove the PAT itself first — 404 on the repo is often "no access", not a bad token.
+    final userRes = await _http.get(
+      Uri.parse('https://api.github.com/user'),
+      headers: _headers,
+    );
+    if (userRes.statusCode == 401 || userRes.statusCode == 403) {
+      throw Exception(AppConfig.circleAuthFailedHint);
+    }
+    if (userRes.statusCode != 200) {
+      throw Exception('PAT check failed: HTTP ${userRes.statusCode}');
+    }
+    final login = (jsonDecode(userRes.body) as Map<String, dynamic>)['login'];
+    final loginStr = login is String ? login : '?';
+
+    final res = await _http.get(
+      Uri.parse('https://api.github.com/repos/$_owner/$_repo'),
+      headers: _headers,
+    );
+    if (res.statusCode == 200) {
+      return '$_owner/$_repo reachable (PAT @$loginStr)';
+    }
+    if (res.statusCode == 401 || res.statusCode == 403) {
+      throw Exception(AppConfig.circleAuthFailedHint);
+    }
+    if (res.statusCode == 404) {
+      throw Exception(
+        'PAT is valid (@$loginStr) but cannot see $_owner/$_repo (HTTP 404). '
+        'Check: (1) owner/repo match the GitHub URL exactly, '
+        '(2) fine-grained PAT → Repository access includes this private repo, '
+        '(3) Contents + Issues permissions enabled for that repo.',
+      );
+    }
+    throw Exception('Circle verify failed: HTTP ${res.statusCode}');
   }
 
   Uri _contentsUri(String path) => Uri.parse(
@@ -193,6 +278,7 @@ class CircleRegistryService {
     required Map<String, dynamic> inputSchema,
     String license = 'remix_free',
     String? parentRevisionId,
+    BhaiCodeAccess access = BhaiCodeAccess.defaults,
   }) async {
     await loadConfig();
     if (!isConfigured) {
@@ -224,12 +310,13 @@ class CircleRegistryService {
       script: script,
       inputSchema: inputSchema,
       parentRevisionId: license == 'lineage_indexed' ? parentRevisionId : null,
+      access: access,
     );
     final bundlePath = '${AppConfig.circleBundleDir}/$id/bundle.json';
     await _putFile(
       path: bundlePath,
       content: jsonEncode(listing.toBundleJson()),
-      message: 'Publish Bro Code $name ($revisionId)',
+      message: 'Publish Bhai Code $name ($revisionId)',
     );
 
     final index = await _readIndex();
@@ -312,11 +399,34 @@ class CircleRegistryService {
 
   Future<bool> pickup(CircleListing listing) async {
     final catalog = _ref.read(marketplaceCatalogProvider);
-    return catalog.pickup(listing.toMarketplaceListing());
+    final ok = await catalog.pickup(listing.toMarketplaceListing());
+    if (!ok) return false;
+    // Override pool source set by catalog with Friend Circle provenance.
+    final registry = _ref.read(jsAgentRegistryProvider);
+    final telemetry = _ref.read(telemetryBusProvider);
+    final schemaEntry =
+        await telemetry.readVaultData(registry.schemaKeyFor(listing.name));
+    if (schemaEntry != null) {
+      final schema = Map<String, dynamic>.from(
+        jsonDecode(schemaEntry['value']!) as Map,
+      );
+      schema['source'] = BhaiCodeOrigin.friendCircle;
+      await telemetry.writeVaultData(
+        registry.schemaKeyFor(listing.name),
+        jsonEncode(schema),
+        mimeType: 'application/json',
+      );
+    }
+    await registry.loadAndRegisterAgents();
+    return true;
   }
 
-  /// Publish a vault Bro Code by name.
-  Future<void> publishAgent(String agentName, {String license = 'remix_free'}) async {
+  /// Publish a vault Bhai Code by name.
+  Future<void> publishAgent(
+    String agentName, {
+    String license = 'remix_free',
+    BhaiCodeAccess access = BhaiCodeAccess.defaults,
+  }) async {
     final registry = _ref.read(jsAgentRegistryProvider);
     final bundle = await registry.exportAgentBundle(agentName);
     if (bundle == null) throw Exception('Agent $agentName not found');
@@ -330,6 +440,7 @@ class CircleRegistryService {
       inputSchema: input,
       license: license,
       parentRevisionId: schema['parentRevisionId'] as String?,
+      access: access,
     );
   }
 }

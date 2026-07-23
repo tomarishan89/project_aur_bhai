@@ -815,18 +815,69 @@ class VoiceHandshakeEngine extends ChangeNotifier {
 
   Future<void> setTtsGender(String gender) async {
     try {
+      final wantFemale = gender.toLowerCase().trim() == 'female';
       final voices = await _tts.getVoices;
-      for (var voice in voices) {
-        if (voice["locale"].toString().contains('en')) {
-          if (voice["name"]
-              .toString()
-              .toLowerCase()
-              .contains(gender.toLowerCase())) {
-            await _tts.setVoice(
-                {"name": voice["name"], "locale": voice["locale"]});
-            break;
-          }
+      Map<String, String>? picked;
+
+      bool isFemaleName(String name) {
+        final n = name.toLowerCase();
+        // Whole-token / labeled female — never match via substring of "male".
+        return RegExp(r'(^|[^a-z])female([^a-z]|$)').hasMatch(n) ||
+            n.contains('woman') ||
+            n.contains('girl');
+      }
+
+      bool isMaleName(String name) {
+        final n = name.toLowerCase();
+        if (isFemaleName(n)) return false;
+        return RegExp(r'(^|[^a-z])male([^a-z]|$)').hasMatch(n) ||
+            (n.contains('man') && !n.contains('woman')) ||
+            n.contains('boy');
+      }
+
+      for (final voice in voices) {
+        if (voice is! Map) continue;
+        final map = Map<String, String>.from(
+          voice.map((k, v) => MapEntry(k.toString(), v.toString())),
+        );
+        final locale = map['locale'] ?? '';
+        if (!locale.toLowerCase().contains('en')) continue;
+        final name = map['name'] ?? '';
+        final genderField = (map['gender'] ?? '').toLowerCase();
+
+        final female = genderField.contains('female') ||
+            genderField == 'f' ||
+            isFemaleName(name);
+        final male =
+            (genderField.contains('male') && !genderField.contains('female')) ||
+                genderField == 'm' ||
+                isMaleName(name);
+
+        if (wantFemale && female) {
+          picked = map;
+          break;
         }
+        if (!wantFemale && male) {
+          picked = map;
+          break;
+        }
+      }
+
+      if (picked != null) {
+        await _tts.setVoice(
+          {'name': picked['name']!, 'locale': picked['locale']!},
+        );
+        // Slight pitch bias as a soft cue when the engine still ignores gender.
+        await _tts.setPitch(wantFemale ? 1.05 : 0.9);
+        debugPrint(
+          '[VoiceHandshake] TTS voice → ${picked['name']} (${wantFemale ? "female" : "male"})',
+        );
+      } else {
+        // No gendered label on this device — pitch-only fallback.
+        await _tts.setPitch(wantFemale ? 1.15 : 0.85);
+        debugPrint(
+          '[VoiceHandshake] No gendered TTS voice for "$gender"; using pitch fallback',
+        );
       }
     } catch (e) {
       debugPrint('[VoiceHandshake] TTS setGender error: $e');
@@ -868,6 +919,9 @@ class VoiceHandshakeEngine extends ChangeNotifier {
       );
     }
     try {
+      // Re-apply Settings gender on every utterance (wake, errors, replies).
+      final gender = _ref.read(byokServiceProvider).voiceGender;
+      await setTtsGender(gender);
       await _tts.speak(text);
     } catch (e) {
       debugPrint('[VoiceHandshake TTS Error] $e');
@@ -882,16 +936,19 @@ class VoiceHandshakeEngine extends ChangeNotifier {
       return;
     }
 
+    final word =
+        byok.responseWord.trim().isEmpty ? "Haan bhai" : byok.responseWord.trim();
     try {
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/custom_response.m4a');
-      if (await file.exists()) {
-        await _audioPlayer.play(DeviceFileSource(file.path));
-      } else {
-        await speak("Haan bhai");
-      }
+      // speak() already applies voiceGender from Settings.
+      await speak(word);
     } catch (e) {
-      await speak("Haan bhai");
+      try {
+        final dir = await getApplicationDocumentsDirectory();
+        final file = File('${dir.path}/custom_response.m4a');
+        if (await file.exists()) {
+          await _audioPlayer.play(DeviceFileSource(file.path));
+        }
+      } catch (_) {}
     }
   }
 

@@ -90,7 +90,7 @@ class BroCallService extends ChangeNotifier {
         const AndroidNotificationChannel(
           AppConfig.broCallChannelId,
           AppConfig.broCallChannelName,
-          description: 'Alerts from Bro Codes (tap or say Haan Bhai)',
+          description: 'Alerts from Bhai Codes (tap or say Haan Bhai)',
           importance: Importance.high,
         ),
       );
@@ -171,7 +171,7 @@ class BroCallService extends ChangeNotifier {
           android: AndroidNotificationDetails(
             AppConfig.broCallChannelId,
             AppConfig.broCallChannelName,
-            channelDescription: 'Bro Code calls',
+            channelDescription: 'Bhai Code calls',
             importance: Importance.high,
             priority: Priority.high,
           ),

@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../agents/agent_base.dart';
 import '../agents/js_agent_adapter.dart';
+import 'bhai_code_access.dart';
+import 'bhai_code_origin.dart';
 import 'js_agent_registry.dart';
 import 'telemetry_bus.dart';
 
-/// Local C4 community pool listing (near-term shell; no remote commons).
+/// Local Sabke Bhai pool listing (seed catalog; Friend Circle is remote).
 class MarketplaceListing {
   final String id;
   final String name;
@@ -15,6 +17,8 @@ class MarketplaceListing {
   final String script;
   final Map<String, dynamic> inputSchema;
   final String license;
+  final String author;
+  final BhaiCodeAccess access;
 
   const MarketplaceListing({
     required this.id,
@@ -23,10 +27,12 @@ class MarketplaceListing {
     required this.script,
     this.inputSchema = const {},
     this.license = 'remix_free',
+    this.author = '',
+    this.access = BhaiCodeAccess.defaults,
   });
 }
 
-/// Seed catalog of pick-upable Bro Code (device-local marketplace UX3/AGT2).
+/// Seed catalog of pick-upable Bhai Code (shown under Sabke Bhai).
 class MarketplaceCatalog {
   MarketplaceCatalog(this._ref);
 
@@ -102,6 +108,7 @@ async function execute(params) {
       script: listing.script,
       inputSchema: schema,
       securityClass: AgentSecurityClass.c4Unverified,
+      source: BhaiCodeOrigin.pool,
     );
 
     final telemetry = _ref.read(telemetryBusProvider);
@@ -117,7 +124,7 @@ async function execute(params) {
           };
     schemaMap['license'] = listing.license;
     schemaMap['marketplaceId'] = listing.id;
-    schemaMap['source'] = 'marketplace_local';
+    schemaMap['source'] = BhaiCodeOrigin.pool;
     await telemetry.writeVaultData(
       registry.schemaKeyFor(listing.name),
       jsonEncode(schemaMap),

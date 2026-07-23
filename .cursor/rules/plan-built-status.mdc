@@ -1,42 +1,55 @@
 ---
-description: Deduplicate plans early; mark plan.md built when implementation completes
+description: HARD GATE — dedupe plans; mark plan.md built before claiming implementation done
 alwaysApply: true
 ---
 
-# Plan dedupe + built status
+# Plan dedupe + built status (hard gate)
+
+This rule is a **completion blocker**. Skipping it is a defect, same class as shipping broken code.
+
+## Non-waivers (read first)
+
+These phrases do **NOT** cancel this gate:
+
+- “Do NOT edit the plan file itself”
+- “Do not modify the plan”
+- “Plan is attached for reference only”
+- “Don’t create todos again”
+
+**Correct reading:** do not rewrite the plan *body* mid-build for fluff or re-scoping. You **must** still:
+
+1. Deduplicate sibling `*.plan.md` files for the same work.
+2. At the end of implementation, edit the canonical plan’s **frontmatter** (`status: built`, todos `completed`) and body CTA (**Built**).
+
+If those two conflict in your head, **this rule wins**. Only an explicit user line such as “skip marking the plan built” waives the completion gate.
 
 ## When this applies
 
-Run this gate in **both** of these moments (not only at the end):
+Run in **both** moments:
 
-1. **Start of implement** — user says “implement the plan”, attaches a plan, or Build is confirmed.
-2. **End of implement** — all todos done, or user confirms the work is complete.
-
-A user line like “Do NOT edit the plan file itself” means: do not rewrite the plan body mid-implementation for fluff. It does **not** waive:
-
-- locating and **deduplicating** sibling plans with the same `name` / topic, or
-- the **completion gate** (`status: built`, todos completed, Built heading) when work is finished.
-
-If the user later says “deduplicate” / “mark built”, do that immediately.
+1. **Start of implement** — “implement the plan”, plan attached, or Build confirmed → **dedupe first**.
+2. **End of implement** — all todos done, or user confirms complete → **completion gate before any “done” claim**.
 
 ## Deduplicate (mandatory, before other plan edits)
 
 1. Search **both** the workspace plan directory and user-level `~/.cursor/plans/` for `*.plan.md`.
-2. Match duplicates by frontmatter `name` (exact) **or** clearly the same topic/continuation (e.g. two “Friend share readiness” files with different hashes).
-3. Keep **one** canonical file — prefer the copy that has unique sections the others lack (merge those sections in), or the one actively attached in the session.
-4. **Delete** the extra copies. Never leave two plans for the same work (built or not).
-5. Do not start (or re-start) implementation against a duplicate; work only against the canonical path after dedupe.
+2. Match by frontmatter `name` (exact) **or** same topic/continuation.
+3. Keep **one** canonical file (prefer the one attached / used this session; merge unique notes from duplicates into it).
+4. **Delete** extra copies. Never leave two plans for the same work.
+5. Implement only against the canonical path after dedupe.
 
 ## Completion gate (mandatory before claiming done)
 
-After dedupe, on the canonical `*.plan.md`:
+On the canonical `*.plan.md`, **before** telling the user the work is complete:
 
 1. Verify frontmatter todos against work actually completed.
-2. Set frontmatter `status: built` **near the top** (immediately after `name` / `overview`) — not buried after a long `todos:` list, or the UI may still show **Build**.
-3. Mark every implemented todo `status: completed` (or `built` if that field exists). Do not mark unfinished work completed.
-4. Replace body CTA/heading **Build** / “Ready to build” with **Built** (e.g. `# Built — …`). Frontmatter alone is not enough if the body still reads like a pre-build plan.
-5. Re-read and confirm `status`, todos, and wording agree.
-6. Do not tell the user implementation is complete until this succeeds. If the plan cannot be found or updated, report that as a blocker.
+2. Set `status: built` **immediately after** `name` / `overview` (not buried under a long `todos:` list — UI may still show Build).
+3. Mark every implemented todo `status: completed`. Do not mark unfinished work completed.
+4. Replace body **Build** / “Ready to build” with **Built** (e.g. `# Built — …`).
+5. Re-read the file and confirm `status`, todos, and wording agree.
+6. In the same turn’s final user message, briefly note that the plan was marked **built** (path or name). Silent skip is not allowed.
+
+If the plan cannot be found or updated → report a **blocker**; do **not** claim implementation complete.
 
 Example frontmatter after completion:
 
@@ -49,5 +62,13 @@ todos:
     content: ...
     status: completed
 ```
+
+## Ordering (mandatory)
+
+```
+implement code → finish todos → dedupe plans → mark canonical built → THEN say “done”
+```
+
+Never reverse the last two steps. “I’ll mark the plan later” is not acceptable.
 
 Do this in the same session as the implementation (and again if a later session finishes residual work).

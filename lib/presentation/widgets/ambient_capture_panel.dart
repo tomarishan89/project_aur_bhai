@@ -6,8 +6,13 @@ import '../../core/services/model_studio/ambient_capture_service.dart';
 /// Confirm/reject Path L label candidates (MS-AMBIENT-CAPTURE-UX1).
 class AmbientCapturePanel extends ConsumerStatefulWidget {
   final String? defaultAgentName;
+  final bool showTitle;
 
-  const AmbientCapturePanel({super.key, this.defaultAgentName});
+  const AmbientCapturePanel({
+    super.key,
+    this.defaultAgentName,
+    this.showTitle = true,
+  });
 
   @override
   ConsumerState<AmbientCapturePanel> createState() =>
@@ -47,7 +52,7 @@ class _AmbientCapturePanelState extends ConsumerState<AmbientCapturePanel> {
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      margin: const EdgeInsets.fromLTRB(0, 0, 0, 8),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: const Color(0xFF161616),
@@ -57,16 +62,18 @@ class _AmbientCapturePanelState extends ConsumerState<AmbientCapturePanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'MODEL STUDIO — AMBIENT CAPTURE',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1,
+          if (widget.showTitle) ...[
+            const Text(
+              'MODEL STUDIO — AMBIENT CAPTURE',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
+            const SizedBox(height: 4),
+          ],
           Text(
             _loaded
                 ? 'Fine buffer: $bufLen samples · window hint ${_fineWindowSecs}s '

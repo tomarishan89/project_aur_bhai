@@ -60,7 +60,7 @@ void main() {
 
   test('app config centralizes circle and wake keys', () {
     expect(AppConfig.circleIndexPath, 'commons/index.json');
-    expect(AppConfig.circleDefaultRepo, 'aur-bhai-circle');
+    expect(AppConfig.circleDefaultRepo, 'aur_bhai_circle');
     expect(AppConfig.wakeWordInterimBuiltIn, 'Jarvis');
   });
 }

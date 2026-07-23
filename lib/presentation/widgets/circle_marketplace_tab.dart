@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/services/circle_registry_service.dart';
-import '../../core/services/js_agent_registry.dart';
+import 'bhai_code_preview_sheet.dart';
 
-/// Remote closed-circle listings (multi-city GitHub registry).
+/// Remote Friend Circle listings (multi-city GitHub registry).
 class CircleMarketplaceTab extends ConsumerStatefulWidget {
   const CircleMarketplaceTab({super.key});
 
@@ -49,7 +49,7 @@ class _CircleMarketplaceTabState extends ConsumerState<CircleMarketplaceTab> {
               Text(
                 notConfigured
                     ? AppConfig.circleNotConfiguredHint
-                    : 'Circle error: $err',
+                    : 'Friend Circle error: $err',
                 style: TextStyle(
                   color: notConfigured ? Colors.amberAccent : Colors.redAccent,
                   fontSize: 12,
@@ -86,12 +86,23 @@ class _CircleMarketplaceTabState extends ConsumerState<CircleMarketplaceTab> {
           onRefresh: () async => _refresh(),
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
-            itemCount: listings.length,
+            itemCount: listings.length + 1,
             itemBuilder: (context, i) {
-              final l = listings[i];
+              if (i == 0) {
+                return const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Friend Circle — open a listing to preview, test, or add to Sandbox.',
+                    style: TextStyle(color: Colors.white54, fontSize: 11),
+                  ),
+                );
+              }
+              final l = listings[i - 1];
               return Card(
                 color: const Color(0xFF1A1A1A),
                 child: ListTile(
+                  leading: const Icon(Icons.groups_outlined,
+                      color: Colors.greenAccent),
                   title: Text(l.name,
                       style: const TextStyle(color: Colors.white)),
                   subtitle: Text(
@@ -100,32 +111,14 @@ class _CircleMarketplaceTabState extends ConsumerState<CircleMarketplaceTab> {
                         const TextStyle(color: Colors.white54, fontSize: 11),
                   ),
                   isThreeLine: true,
-                  trailing: TextButton(
-                    onPressed: () async {
-                      try {
-                        final ok =
-                            await ref.read(circleRegistryProvider).pickup(l);
-                        await ref
-                            .read(jsAgentRegistryProvider)
-                            .loadAndRegisterAgents();
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              ok
-                                  ? 'Picked up ${l.name} at C4'
-                                  : '${l.name} already installed',
-                            ),
-                          ),
-                        );
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Pick up failed: $e')),
-                        );
-                      }
-                    },
-                    child: const Text('PICK UP'),
+                  trailing: const Icon(Icons.chevron_right,
+                      color: Colors.white38),
+                  onTap: () => BhaiCodePreviewSheet.open(
+                    context,
+                    listing: l.toMarketplaceListing(),
+                    showPickup: true,
+                    customPickup: (_) => pickupCircleListing(ref, l),
+                    onInstalled: _refresh,
                   ),
                 ),
               );

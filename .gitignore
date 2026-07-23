@@ -51,6 +51,7 @@ android/build/
 !.env.example
 
 # Feedback Related (never commit — local only)
+# Includes feedback/images/ screenshots and feedback/inbox/ notes.
 feedback/
 
 # Friend fixture install queue (local maintainer tooling)

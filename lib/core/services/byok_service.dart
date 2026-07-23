@@ -37,6 +37,8 @@ class ByokService extends ChangeNotifier {
   static const String _keyMaxRecSeconds = 'byok_max_rec';
   static const String _keyResponseMode = 'byok_resp_mode';
   static const String _keyVibrate = 'byok_vibrate';
+  static const String _keyResponseWord = 'byok_resp_word';
+  static const String _keyVoiceGender = 'byok_voice_gender';
   static const String _keyExternalPrefix = 'byok_ext_';
   static const String _migratedFlag = 'byok_secrets_migrated_v1';
   static const String _keyMultiSlot = 'byok_multi_slot_enabled';
@@ -50,6 +52,8 @@ class ByokService extends ChangeNotifier {
   int _maxRecordingSeconds = 10;
   String _responseMode = "Spoken Word";
   bool _vibrateOnWake = false;
+  String _responseWord = "Haan bhai";
+  String _voiceGender = "Male";
   bool _multiSlotEnabled = false;
   final Map<LlmSlot, ByokSlotConfig> _slots = {};
 
@@ -75,6 +79,8 @@ class ByokService extends ChangeNotifier {
   int get maxRecordingSeconds => _maxRecordingSeconds;
   String get responseMode => _responseMode;
   bool get vibrateOnWake => _vibrateOnWake;
+  String get responseWord => _responseWord;
+  String get voiceGender => _voiceGender;
 
   bool get hasApiKey {
     if (_multiSlotEnabled) {
@@ -131,6 +137,8 @@ class ByokService extends ChangeNotifier {
       _maxRecordingSeconds = prefs.getInt(_keyMaxRecSeconds) ?? 10;
       _responseMode = prefs.getString(_keyResponseMode) ?? "Spoken Word";
       _vibrateOnWake = prefs.getBool(_keyVibrate) ?? false;
+      _responseWord = prefs.getString(_keyResponseWord) ?? "Haan bhai";
+      _voiceGender = prefs.getString(_keyVoiceGender) ?? "Male";
 
       await _migratePlaintextSecretsIfNeeded(prefs);
 
@@ -258,6 +266,8 @@ class ByokService extends ChangeNotifier {
     int maxRecordingSeconds = 10,
     String responseMode = "Spoken Word",
     bool vibrateOnWake = false,
+    String responseWord = "Haan bhai",
+    String voiceGender = "Male",
     Map<String, String>? externalPlatformKeys,
   }) async {
     _apiProvider = provider;
@@ -267,6 +277,8 @@ class ByokService extends ChangeNotifier {
     _maxRecordingSeconds = maxRecordingSeconds;
     _responseMode = responseMode;
     _vibrateOnWake = vibrateOnWake;
+    _responseWord = responseWord.trim().isEmpty ? "Haan bhai" : responseWord.trim();
+    _voiceGender = voiceGender;
 
     if (externalPlatformKeys != null) {
       _externalPlatformKeys
@@ -282,6 +294,8 @@ class ByokService extends ChangeNotifier {
       await prefs.setInt(_keyMaxRecSeconds, maxRecordingSeconds);
       await prefs.setString(_keyResponseMode, responseMode);
       await prefs.setBool(_keyVibrate, vibrateOnWake);
+      await prefs.setString(_keyResponseWord, _responseWord);
+      await prefs.setString(_keyVoiceGender, _voiceGender);
       // Never persist API keys in SharedPreferences (ENG5).
       await prefs.remove(_keyApiKey);
 

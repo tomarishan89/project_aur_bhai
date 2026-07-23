@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/js_bridge_service.dart';
 import 'agent_base.dart';
 
-/// 4-tier trust classification for Bro Code (Bhai log).
+/// 4-tier trust classification for Bhai Code (Bhai log).
 enum AgentSecurityClass {
   c1Core,
   c2Verified,
@@ -19,11 +19,18 @@ extension AgentSecurityClassX on AgentSecurityClass {
         AgentSecurityClass.c4Unverified => 'C4',
       };
 
+  /// Product-facing pool / status labels (ids stay C1–C4 for vault).
   String get label => switch (this) {
-        AgentSecurityClass.c1Core => 'C1: Core',
-        AgentSecurityClass.c2Verified => 'C2: Verified',
-        AgentSecurityClass.c3DueDiligence => 'C3: Due Diligence',
-        AgentSecurityClass.c4Unverified => 'C4: Unverified',
+        AgentSecurityClass.c1Core => 'Core',
+        AgentSecurityClass.c2Verified => 'Mere Bhai',
+        AgentSecurityClass.c3DueDiligence => 'Due Diligence',
+        AgentSecurityClass.c4Unverified => 'Sabke Bhai',
+      };
+
+  /// Short status for cards when diligence is in progress / done.
+  String? get diligenceChip => switch (this) {
+        AgentSecurityClass.c3DueDiligence => 'Due diligence…',
+        _ => null,
       };
 
   static AgentSecurityClass fromId(String? id) {
@@ -54,6 +61,12 @@ class JsAgentAdapter extends BroCode {
   /// Trust tier assigned at import/authoring time.
   final AgentSecurityClass securityClass;
 
+  /// Vault schema `source`: self | pool | friend_circle (see [BhaiCodeOrigin]).
+  final String source;
+
+  /// Last on-demand diligence scan passed (schema `diligencePassed`).
+  final bool diligencePassed;
+
   /// When the Bro Code was first saved to the vault (ISO-8601).
   final DateTime? createdAt;
 
@@ -80,6 +93,8 @@ class JsAgentAdapter extends BroCode {
     required this._script,
     Map<String, String> assets = const {},
     this.securityClass = AgentSecurityClass.c4Unverified,
+    this.source = 'self',
+    this.diligencePassed = false,
     this.createdAt,
     this.updatedAt,
   })  : _name = name,

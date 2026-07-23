@@ -32,30 +32,33 @@ class AppConfig {
   static const String circlePrefsRepoKey = 'circle_github_repo';
   static const String circlePrefsTokenKey = 'circle_github_token';
   static const String circlePrefsAuthorKey = 'circle_author_display';
-  static const String circleDefaultRepo = 'aur-bhai-circle';
+  /// Must match the GitHub repo name exactly (hyphens vs underscores).
+  static const String circleDefaultRepo = 'aur_bhai_circle';
   static const String circleIndexPath = 'commons/index.json';
   static const String circleBundleDir = 'commons';
   static const String circlePublishConfirm =
       'Publish source + schema only to your private circle registry. '
       'Telemetry and bound models are not included. Continues over the internet.';
-  static const String circleTabLabel = 'CIRCLE';
+  static const String circleTabLabel = 'FRIEND CIRCLE';
   static const String circleEmptyHint =
-      'Circle is configured but has no listings yet. Ask a friend to Publish, then Refresh.';
+      'Friend Circle is configured but has no listings yet. Ask a friend to Publish, then Refresh.';
   static const String circleNotConfiguredHint =
-      'Circle not configured. Open Settings → CLOSED CIRCLE, paste GitHub owner, '
-      'repo (default aur-bhai-circle), and a fine-grained PAT with contents + issues. '
-      'Then Refresh this tab.';
+      'Friend Circle not configured. Open Settings → CLOSED CIRCLE, paste GitHub owner, '
+      'repo (default aur_bhai_circle — exact name as on GitHub), and a fine-grained '
+      'PAT with contents + issues. Then Refresh this tab.';
   static const String circleAuthFailedHint =
       'GitHub rejected the request (401/403). Check PAT scopes (contents + issues) '
       'and that you can access the private repo.';
   static const String circleFriendApkHint =
       'Friends install a signed release APK (not Play Store for closed circle). '
       'Share APK privately; they paste the same owner/repo/token in Settings.';
+  /// Future: search on Mere Bhai / Sabke Bhai (deferred).
+  static const bool bhaiLogSearchDeferred = true;
 
   // --- Issue reports (MVP-S12 / S15) ---
   static const String issuePrefsLocalKey = 'issue_reports_v1';
   static const String issueSendConsent =
-      'Send a diagnostic fixture (Bro Code state + errors) to the private circle Issues tracker. '
+      'Send a diagnostic fixture (Bhai Code state + errors) to the private circle Issues tracker. '
       'No silent upload — only when you tap Send.';
   static const String issueReporterNoteLabel = 'What is wrong? (optional note)';
   static const String issueReporterNoteHint =
@@ -67,12 +70,12 @@ class AppConfig {
   static const int authoringTraceMaxTurns = 40;
   static const int authoringTraceMaxCharsPerTurn = 4000;
 
-  // --- Bro Code Call (S17) ---
+  // --- Bhai Code Call (S17) ---
   static const bool broCallFeatureEnabled = true;
   static const String broCallCuePhrase = 'Aur Bhai';
   static const String broCallAckPhrase = 'Haan Bhai';
   static const String broCallChannelId = 'aur_bhai_bro_call';
-  static const String broCallChannelName = 'Bro Code calls';
+  static const String broCallChannelName = 'Bhai Code calls';
 
   // --- Headset (S18) ---
   static const String headsetRidingHint =
@@ -84,7 +87,7 @@ class AppConfig {
   static const String vaultAmbientCandidates = 'model_studio:ambient_candidates';
   static String agentInboxKey(String name) => 'agent:$name:inbox';
 
-  // --- Social seed Bro Codes (MVP-S13) ---
+  // --- Social seed Bhai Codes (MVP-S13) ---
   static const String socialXterName = 'Xter';
   static const String socialFacebookName = 'FacebookPoster';
 }

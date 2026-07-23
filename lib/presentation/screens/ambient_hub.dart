@@ -40,14 +40,28 @@ import '../widgets/due_diligence_findings_list.dart';
 import '../widgets/ambient_capture_panel.dart';
 import '../widgets/llm_slot_editors.dart';
 import '../widgets/circle_marketplace_tab.dart';
+import '../widgets/bhai_code_preview_sheet.dart';
+import '../widgets/sandbox_queue_tab.dart';
+import '../widgets/publish_to_circle_dialog.dart';
 import '../../core/config/app_config.dart';
 import '../../core/services/wake_word_service.dart';
 import '../../core/services/bro_call_service.dart';
 import '../../core/services/circle_registry_service.dart';
+import '../../core/services/bhai_code_origin.dart';
 import '../../core/services/issue_report_service.dart';
-import '../../core/services/model_studio/bro_code_ml_meta.dart';
 import 'package:flutter_riverpod/legacy.dart' show ChangeNotifierProvider;
 import 'package:url_launcher/url_launcher.dart';
+
+IconData _bhaiOriginIcon(String? source) {
+  switch (BhaiCodeOrigin.normalize(source)) {
+    case BhaiCodeOrigin.friendCircle:
+      return Icons.groups_outlined;
+    case BhaiCodeOrigin.pool:
+      return Icons.public;
+    default:
+      return Icons.person_outline;
+  }
+}
 
 /// Bumped after agent RUN so the Vault Dashboards banner reloads.
 class VaultDashboardRefresh extends ChangeNotifier {
@@ -139,7 +153,7 @@ Future<void> showAgentPromotionDialog(
         backgroundColor: const Color(0xFF1A1A1A),
         title: const Text('Promote Agent?', style: TextStyle(color: Colors.white)),
         content: Text(
-          '${pending.agentName} passed due diligence. Advance C4 → C3 → C2?',
+          '${pending.agentName} passed due diligence. Promote to Mere Bhai?',
           style: const TextStyle(color: Colors.white70),
         ),
         actions: [
@@ -169,12 +183,12 @@ Future<void> showAgentPromotionDialog(
           onPromoted?.call();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${pending.agentName} promoted C4→C3→C2.'),
+              content: Text('${pending.agentName} promoted to Mere Bhai.'),
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Promotion failed (need C3 before C2).')),
+            const SnackBar(content: Text('Promotion failed (need due diligence before Mere Bhai).')),
           );
         }
       }
@@ -196,12 +210,12 @@ Future<void> showAgentPromotionDialog(
       },
       onForcePromote: () async {
         final authResult = await ref.read(deviceAuthServiceProvider).authenticate(
-              reason: 'Authenticate to promote ${pending.agentName} to Verified',
+              reason: 'Authenticate to promote ${pending.agentName} to Mere Bhai',
             );
         if (!authResult.success) {
           // Keep dialog open; caller shows inline error via return value.
           return authResult.errorMessage ??
-              'Authentication cancelled or failed. Agent stays at C4.';
+              'Authentication cancelled or failed. Agent stays in Sabke Bhai.';
         }
         final ok = await verification.promoteToVerified(
           registry: ref.read(jsAgentRegistryProvider),
@@ -215,7 +229,7 @@ Future<void> showAgentPromotionDialog(
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(ok
-                  ? '${pending.agentName} force-promoted to C2.'
+                  ? '${pending.agentName} force-promoted to Mere Bhai.'
                   : 'Promotion failed.'),
             ),
           );
@@ -306,7 +320,7 @@ class _ForcePromoteDialogState extends State<_ForcePromoteDialog> {
       actions: [
         TextButton(
           onPressed: _busy ? null : widget.onKeepAtC4,
-          child: const Text('KEEP AT C4'),
+          child: const Text('KEEP IN SABKE BHAI'),
         ),
         TextButton(
           onPressed: _busy ? null : _tryPromote,
@@ -468,6 +482,8 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage> with Tic
   late Animation<double> _bOpacity;
   final _simulatorCtrl = TextEditingController();
   bool _simulatorBusy = false;
+  /// Optional Mere Bhai target for text send (`null` = Any / auto).
+  String? _textTargetBhai;
 
   @override
   void initState() {
@@ -483,21 +499,41 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage> with Tic
     super.dispose();
   }
 
+  String _audioCueLabel(String source) {
+    final s = source.toLowerCase();
+    if (s.contains('bluetooth')) return 'Bluetooth';
+    if (s.contains('headset') || s.contains('headphones')) return 'Headset';
+    return 'Mic ready';
+  }
+
   Future<void> _runSimulator() async {
-    final text = _simulatorCtrl.text.trim();
+    var text = _simulatorCtrl.text.trim();
     if (text.isEmpty || _simulatorBusy) return;
+
+    final target = _textTargetBhai;
+    if (target != null && target.isNotEmpty) {
+      final lower = text.toLowerCase();
+      final named = lower.contains(target.toLowerCase()) ||
+          lower.startsWith('ask ${target.toLowerCase()}');
+      if (!named) {
+        text = 'Ask $target: $text';
+      }
+    }
+
     setState(() => _simulatorBusy = true);
     try {
       await ref.read(voiceHandshakeProvider).processVoiceCommand(text);
+      if (mounted) _simulatorCtrl.clear();
     } finally {
       if (mounted) setState(() => _simulatorBusy = false);
     }
   }
 
   IconData _getAudioIcon(String source) {
-    if (source.toLowerCase().contains("bluetooth")) return Icons.bluetooth_audio;
-    if (source.toLowerCase().contains("headset") || source.toLowerCase().contains("headphones")) return Icons.headphones;
-    return Icons.speaker;
+    final s = source.toLowerCase();
+    if (s.contains('bluetooth')) return Icons.bluetooth_audio;
+    if (s.contains('headset') || s.contains('headphones')) return Icons.headphones;
+    return Icons.mic_none;
   }
 
   @override
@@ -515,9 +551,14 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage> with Tic
           final sessionLabel = session.isActive
               ? (session.kind == SessionKind.author ? 'AUTHOR SESSION' : 'REFINE SESSION')
               : null;
+          final audioLabel = _audioCueLabel(eng.audioSource);
+          final mereBhai = ref.watch(agentServiceProvider).agents.where((a) {
+            if (a is! JsAgentAdapter) return true;
+            return a.securityClass == AgentSecurityClass.c2Verified;
+          }).toList();
           return Column(
         children: [
-          // Audio & System Status Header
+          // User-facing status cues (no IP / raw audio route names)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Row(
@@ -527,45 +568,42 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage> with Tic
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        Icon(_getAudioIcon(eng.audioSource), color: Colors.grey, size: 16),
+                        Icon(_getAudioIcon(eng.audioSource),
+                            color: Colors.grey, size: 16),
                         const SizedBox(width: 6),
                         Text(
-                          eng.audioSource.toUpperCase(),
-                          style: const TextStyle(color: Colors.grey, fontSize: 10, fontFamily: 'Courier', fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(width: 12),
-                        Icon(Icons.dns, color: server.isRunning ? Colors.green : Colors.red, size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          'EDGE ${server.statusLabel}',
-                          style: TextStyle(
-                            color: server.isRunning ? Colors.green : Colors.red,
+                          audioLabel,
+                          style: const TextStyle(
+                            color: Colors.grey,
                             fontSize: 10,
-                            fontFamily: 'Courier',
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        if (server.isRunning) ...[
-                          const SizedBox(width: 6),
-                          Text(
-                            server.lanIp != null
-                                ? '${server.lanIp}:${server.port}'
-                                : 'localhost:${server.port}',
-                            style: TextStyle(
-                              color: server.lanIp != null ? Colors.green : Colors.white38,
-                              fontSize: 10,
-                              fontFamily: 'Courier',
-                            ),
+                        const SizedBox(width: 14),
+                        Icon(Icons.dns,
+                            color: server.isRunning ? Colors.green : Colors.red,
+                            size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          server.isRunning ? 'Edge on' : 'Edge off',
+                          style: TextStyle(
+                            color: server.isRunning ? Colors.green : Colors.red,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
                           ),
-                        ],
+                        ),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  byok.hasApiKey ? 'KEY ACTIVE' : 'KEY REQ',
-                  style: TextStyle(color: byok.hasApiKey ? Colors.green : Colors.amber, fontSize: 10, fontFamily: 'Courier', fontWeight: FontWeight.bold),
+                  byok.hasApiKey ? 'AI key set' : 'AI key needed',
+                  style: TextStyle(
+                    color: byok.hasApiKey ? Colors.green : Colors.amber,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -618,7 +656,16 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage> with Tic
                 border: Border.all(color: Colors.white10),
               ),
               child: eng.sessionLogs.isEmpty
-                  ? const Center(child: Text("Waiting for handshake...", style: TextStyle(color: Colors.white30, fontSize: 12, fontStyle: FontStyle.italic)))
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text(
+                          'Tap the mic to talk, or type below.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white30, fontSize: 13),
+                        ),
+                      ),
+                    )
                   : ListView.separated(
                       padding: const EdgeInsets.all(12),
                       reverse: true, // newest logs at bottom (wait, if we reverse, and list is inserted at 0, 0 is at bottom)
@@ -682,7 +729,59 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage> with Tic
           
           Text(eng.micStatusMessage, style: const TextStyle(color: Colors.white54, fontSize: 10)),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Row(
+              children: [
+                const Text(
+                  'Bhai:',
+                  style: TextStyle(color: Colors.white38, fontSize: 11),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String?>(
+                      isExpanded: true,
+                      dropdownColor: const Color(0xFF1E1E1E),
+                      value: _textTargetBhai != null &&
+                              mereBhai.any((a) => a.name == _textTargetBhai)
+                          ? _textTargetBhai
+                          : null,
+                      hint: const Text(
+                        'Any / auto',
+                        style: TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                      icon: const Icon(Icons.arrow_drop_down,
+                          color: Colors.white38, size: 20),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text(
+                            'Any / auto',
+                            style:
+                                TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                        ),
+                        ...mereBhai.map(
+                          (a) => DropdownMenuItem<String?>(
+                            value: a.name,
+                            child: Text(
+                              a.name,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                      onChanged: (v) => setState(() => _textTargetBhai = v),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: Row(
               children: [
                 Expanded(
@@ -690,10 +789,12 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage> with Tic
                     controller: _simulatorCtrl,
                     style: const TextStyle(color: Colors.white, fontSize: 12),
                     decoration: const InputDecoration(
-                      hintText: 'Test simulator — e.g. Build me an agent that...',
+                      hintText:
+                          'Ask a Mere Bhai, build a Bhai, or type a command…',
                       hintStyle: TextStyle(color: Colors.white24, fontSize: 11),
                       isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       border: OutlineInputBorder(),
                     ),
                     onSubmitted: (_) => _runSimulator(),
@@ -733,6 +834,8 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
   final _circleRepoCtrl = TextEditingController();
   final _circleTokenCtrl = TextEditingController();
   final _circleAuthorCtrl = TextEditingController();
+  String _circleStatus = 'Loading circle settings…';
+  bool _circleBusy = false;
   String _provider = "Google Gemini";
   bool _obscure = true;
   String _gender = "Male";
@@ -757,6 +860,8 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
     _maxRecSecs = byok.maxRecordingSeconds.toDouble();
     _responseMode = byok.responseMode;
     _vibrate = byok.vibrateOnWake;
+    _respWordCtrl.text = byok.responseWord;
+    _gender = byok.voiceGender;
     for (final platform in ExternalPlatform.values) {
       _externalKeyCtrls[platform.name]?.text =
           byok.externalKeyFor(platform);
@@ -768,7 +873,15 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
       _circleOwnerCtrl.text = circle.owner;
       _circleRepoCtrl.text = circle.repo;
       _circleAuthorCtrl.text = circle.authorDisplay;
-      setState(() {});
+      // Never put the PAT into the TextField (blank = keep stored token).
+      _circleTokenCtrl.clear();
+      setState(() {
+        _circleStatus = circle.isConfigured
+            ? 'Ready: ${circle.owner}/${circle.repo} · PAT on device'
+            : circle.hasToken
+                ? 'PAT on device — set GitHub owner/repo and SAVE'
+                : 'Not configured — enter owner, repo, PAT, then SAVE';
+      });
     });
   }
 
@@ -823,11 +936,41 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
       maxRecordingSeconds: _maxRecSecs.toInt(),
       responseMode: _responseMode,
       vibrateOnWake: _vibrate,
+      responseWord: _respWordCtrl.text.trim(),
+      voiceGender: _gender,
       externalPlatformKeys: externalKeys,
     );
+    await ref.read(voiceHandshakeProvider).setTtsGender(_gender);
     if (mounted) {
-       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Credentials Saved")));
+       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Credentials & voice settings saved")));
     }
+  }
+
+  Widget _settingsSection({
+    required String title,
+    required List<Widget> children,
+    bool initiallyExpanded = false,
+  }) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        initiallyExpanded: initiallyExpanded,
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(bottom: 12),
+        collapsedIconColor: Colors.white54,
+        iconColor: Colors.greenAccent,
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+        children: children,
+      ),
+    );
   }
 
   @override
@@ -839,26 +982,47 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text("SOVEREIGN VAULT & SETTINGS", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1)),
-            const Divider(color: Colors.white12, height: 30),
-            const _EdgeServerPanel(),
-            const Divider(color: Colors.white12, height: 30),
-            const Text("VAULT SECURITY", style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             const Text(
-              'Force-promoting flagged agents uses your device screen lock, PIN, or fingerprint — the same gate as your banking apps. No separate vault password is required.',
+              'Open a section below. Vault dashboards and Model Studio live here so BHAI LOG stays for Bhai Codes.',
               style: TextStyle(color: Colors.white38, fontSize: 11),
             ),
-            const Divider(color: Colors.white12, height: 30),
-            const Text(
-              'VOICE & LANGUAGE',
-              style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
+            const Divider(color: Colors.white12, height: 24),
+            _settingsSection(
+              title: 'VAULT DASHBOARDS',
+              initiallyExpanded: true,
+              children: const [_VaultDashboardsBanner(showTitle: false)],
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'English only (Arch v3.7). Commands and agent authoring replies are in English.',
-              style: TextStyle(color: Colors.white38, fontSize: 11),
+            _settingsSection(
+              title: 'MODEL STUDIO — AMBIENT CAPTURE',
+              children: const [AmbientCapturePanel(showTitle: false)],
             ),
-            const SizedBox(height: 16),
+            _settingsSection(
+              title: 'LOCAL EDGE SERVER',
+              children: const [_EdgeServerPanel(compactTitle: true)],
+            ),
+            _settingsSection(
+              title: 'VAULT SECURITY',
+              children: const [
+                Text(
+                  'Force-promoting flagged agents uses your device screen lock, PIN, or fingerprint — the same gate as your banking apps. No separate vault password is required.',
+                  style: TextStyle(color: Colors.white38, fontSize: 11),
+                ),
+              ],
+            ),
+            _settingsSection(
+              title: 'VOICE & LANGUAGE',
+              children: const [
+                Text(
+                  'English only (Arch v3.7). Commands and agent authoring replies are in English.',
+                  style: TextStyle(color: Colors.white38, fontSize: 11),
+                ),
+              ],
+            ),
+            _settingsSection(
+              title: 'API / LLM',
+              initiallyExpanded: true,
+              children: [
             DropdownButtonFormField<String>(
               initialValue: _provider, dropdownColor: const Color(0xFF1E1E1E),
               style: const TextStyle(color: Colors.white, fontSize: 13),
@@ -924,14 +1088,22 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
             ),
             if (ref.watch(byokServiceProvider).multiSlotEnabled) ...[
               const SizedBox(height: 8),
-              const LlmSlotEditors(),
+              Container(
+                margin: const EdgeInsets.only(left: 8),
+                padding: const EdgeInsets.only(left: 12),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    left: BorderSide(color: Colors.greenAccent, width: 2),
+                  ),
+                ),
+                child: const LlmSlotEditors(),
+              ),
             ],
-            const SizedBox(height: 24),
-            const Text(
-              'WAKE WORD (ON-DEVICE)',
-              style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
+              ],
             ),
-            const SizedBox(height: 8),
+            _settingsSection(
+              title: 'WAKE WORD (ON-DEVICE)',
+              children: [
             Text(
               AppConfig.wakePrivacyBody,
               style: const TextStyle(color: Colors.white38, fontSize: 11),
@@ -990,12 +1162,11 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
                 ],
               );
             }),
-            const SizedBox(height: 24),
-            const Text(
-              'CLOSED CIRCLE (GITHUB REGISTRY)',
-              style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
+              ],
             ),
-            const SizedBox(height: 8),
+            _settingsSection(
+              title: 'CLOSED CIRCLE (GITHUB REGISTRY)',
+              children: [
             Text(
               AppConfig.circlePublishConfirm,
               style: const TextStyle(color: Colors.white38, fontSize: 11),
@@ -1009,15 +1180,18 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
               controller: _circleOwnerCtrl,
               style: const TextStyle(color: Colors.white, fontSize: 13),
               decoration: const InputDecoration(
-                labelText: 'GitHub owner',
+                labelText: 'GitHub owner (optional)',
+                hintText: 'Defaults to PAT account; set if repo is under an org',
                 labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
+                hintStyle: TextStyle(color: Colors.white30, fontSize: 11),
               ),
             ),
             TextField(
               controller: _circleRepoCtrl,
               style: const TextStyle(color: Colors.white, fontSize: 13),
               decoration: InputDecoration(
-                labelText: 'Repo (default ${AppConfig.circleDefaultRepo})',
+                labelText:
+                    'Repo (optional, default ${AppConfig.circleDefaultRepo})',
                 labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
               ),
             ),
@@ -1027,34 +1201,132 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
               style: const TextStyle(color: Colors.white, fontSize: 13),
               decoration: const InputDecoration(
                 labelText: 'Fine-grained PAT (contents + issues)',
+                hintText: 'Leave blank to keep the stored PAT',
                 labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
+                hintStyle: TextStyle(color: Colors.white30, fontSize: 11),
               ),
             ),
             TextField(
               controller: _circleAuthorCtrl,
               style: const TextStyle(color: Colors.white, fontSize: 13),
               decoration: const InputDecoration(
-                labelText: 'Display name on publishes',
+                labelText: 'Display name on publishes (optional)',
+                hintText: 'Defaults to circle-user',
                 labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
+                hintStyle: TextStyle(color: Colors.white30, fontSize: 11),
               ),
             ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () async {
-                  await ref.read(circleRegistryProvider).saveConfig(
-                        owner: _circleOwnerCtrl.text,
-                        repo: _circleRepoCtrl.text,
-                        token: _circleTokenCtrl.text,
-                        authorDisplay: _circleAuthorCtrl.text,
-                      );
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Circle registry settings saved')),
-                  );
-                },
-                child: const Text('SAVE CIRCLE SETTINGS'),
+            const SizedBox(height: 6),
+            Text(
+              _circleStatus,
+              style: TextStyle(
+                color: _circleStatus.startsWith('Connected') ||
+                        _circleStatus.startsWith('Verified') ||
+                        _circleStatus.startsWith('Ready')
+                    ? Colors.tealAccent
+                    : _circleStatus.startsWith('Failed')
+                        ? Colors.redAccent
+                        : Colors.white54,
+                fontSize: 11,
               ),
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              alignment: WrapAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _circleBusy
+                      ? null
+                      : () async {
+                          setState(() => _circleBusy = true);
+                          try {
+                            final circle = ref.read(circleRegistryProvider);
+                            await circle.saveConfig(
+                              owner: _circleOwnerCtrl.text,
+                              repo: _circleRepoCtrl.text,
+                              token: _circleTokenCtrl.text,
+                              authorDisplay: _circleAuthorCtrl.text,
+                            );
+                            _circleTokenCtrl.clear();
+                            _circleOwnerCtrl.text = circle.owner;
+                            _circleRepoCtrl.text = circle.repo;
+                            final verified = await circle.verifyConnection();
+                            if (!mounted) return;
+                            setState(() {
+                              _circleStatus = 'Connected: $verified';
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Circle connected — $verified'),
+                              ),
+                            );
+                          } catch (e) {
+                            if (!mounted) return;
+                            setState(() => _circleStatus = 'Failed: $e');
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Circle save/verify failed: $e'),
+                                backgroundColor: Colors.red.shade800,
+                              ),
+                            );
+                          } finally {
+                            if (mounted) setState(() => _circleBusy = false);
+                          }
+                        },
+                  child: Text(_circleBusy ? 'SAVING…' : 'SAVE & VERIFY'),
+                ),
+                TextButton(
+                  onPressed: _circleBusy
+                      ? null
+                      : () async {
+                          setState(() => _circleBusy = true);
+                          try {
+                            final verified = await ref
+                                .read(circleRegistryProvider)
+                                .verifyConnection();
+                            if (!mounted) return;
+                            setState(
+                                () => _circleStatus = 'Connected: $verified');
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Circle OK — $verified'),
+                              ),
+                            );
+                          } catch (e) {
+                            if (!mounted) return;
+                            setState(() => _circleStatus = 'Failed: $e');
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Circle test failed: $e'),
+                                backgroundColor: Colors.red.shade800,
+                              ),
+                            );
+                          } finally {
+                            if (mounted) setState(() => _circleBusy = false);
+                          }
+                        },
+                  child: const Text('TEST CONNECTION'),
+                ),
+                TextButton(
+                  onPressed: _circleBusy
+                      ? null
+                      : () async {
+                          await ref.read(circleRegistryProvider).clearToken();
+                          if (!mounted) return;
+                          _circleTokenCtrl.clear();
+                          setState(() {
+                            _circleStatus =
+                                'PAT cleared — paste a new PAT and SAVE & VERIFY';
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Circle PAT cleared')),
+                          );
+                        },
+                  child: const Text('CLEAR PAT'),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             TextButton(
@@ -1099,14 +1371,13 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
               },
               child: const Text('MY ISSUE REPORTS'),
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'EXTERNAL PLATFORM KEYS (user-authorized egress)',
-              style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
+              ],
             ),
-            const SizedBox(height: 8),
+            _settingsSection(
+              title: 'EXTERNAL PLATFORM KEYS',
+              children: [
             const Text(
-              'Agents that post to Twitter/X, Facebook, Instagram, YouTube, Threads, or a webhook need keys here. Promotion to Verified (C2) is required before external posting.',
+              'Agents that post to Twitter/X, Facebook, Instagram, YouTube, Threads, or a webhook need keys here. Promotion to Mere Bhai is required before external posting.',
               style: TextStyle(color: Colors.white38, fontSize: 11),
             ),
             const SizedBox(height: 12),
@@ -1122,9 +1393,11 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
               ),
               const SizedBox(height: 12),
             ],
-            const SizedBox(height: 12),
-            const Text("BEHAVIOR SETTINGS", style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
+              ],
+            ),
+            _settingsSection(
+              title: 'BEHAVIOR SETTINGS',
+              children: [
             Row(
               children: [
                 const Text("Max Recording Duration:", style: TextStyle(color: Colors.white, fontSize: 12)),
@@ -1154,15 +1427,25 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
               value: _vibrate,
               onChanged: (val) => setState(() => _vibrate = val),
             ),
-            
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
-              onPressed: _save, child: const Text("SAVE CREDENTIALS & SETTINGS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              onPressed: _save,
+              child: const Text(
+                "SAVE CREDENTIALS, BEHAVIOR & VOICE",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
             ),
-            const Divider(color: Colors.white12, height: 40),
-            const Text("AI VOICE RESPONSE GENERATOR", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1)),
-            const SizedBox(height: 16),
+            const SizedBox(height: 6),
+            const Text(
+              'Saves API keys, recording/wake behavior, Response Word, and Voice Gender.',
+              style: TextStyle(color: Colors.white38, fontSize: 10),
+            ),
+              ],
+            ),
+            _settingsSection(
+              title: 'AI VOICE RESPONSE GENERATOR',
+              children: [
             TextField(controller: _respWordCtrl, style: const TextStyle(color: Colors.white, fontSize: 13), decoration: const InputDecoration(labelText: "Response Word", labelStyle: TextStyle(color: Colors.white54, fontSize: 12))),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
@@ -1187,8 +1470,31 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
               icon: _isGeneratingTTS ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome, size: 18),
               label: Text(_isGeneratingTTS ? "GENERATING..." : "GENERATE VOICE VIA LLM", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
             ),
-            const Divider(color: Colors.white12, height: 40),
-            const _VoiceTrainingStudio(),
+              ],
+            ),
+            Theme(
+              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                initiallyExpanded: false,
+                enabled: false,
+                tilePadding: EdgeInsets.zero,
+                collapsedIconColor: Colors.white24,
+                title: const Text(
+                  'VOICE TRAINING STUDIO (DEACTIVATED)',
+                  style: TextStyle(
+                    color: Colors.white38,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Custom wake/response recording is turned off for now. Use Response Word + Voice Gender above.',
+                  style: TextStyle(color: Colors.white24, fontSize: 11),
+                ),
+                children: const [],
+              ),
+            ),
           ],
         ),
       ),
@@ -1197,7 +1503,10 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
 }
 
 class _EdgeServerPanel extends ConsumerWidget {
-  const _EdgeServerPanel();
+  const _EdgeServerPanel({this.compactTitle = false});
+
+  /// When true, omit the large LOCAL EDGE SERVER heading (Settings ExpansionTile supplies it).
+  final bool compactTitle;
 
   Future<void> _copyToClipboard(BuildContext context, String text, String label) async {
     await Clipboard.setData(ClipboardData(text: text));
@@ -1218,11 +1527,13 @@ class _EdgeServerPanel extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'LOCAL EDGE SERVER',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1),
-            ),
-            const SizedBox(height: 12),
+            if (!compactTitle) ...[
+              const Text(
+                'LOCAL EDGE SERVER',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1),
+              ),
+              const SizedBox(height: 12),
+            ],
             _edgeInfoRow('Status', server.statusLabel, valueColor: statusColor),
             _edgeInfoRow('Host', server.host),
             _edgeInfoRow('Port', server.isRunning ? '${server.port}' : '${LocalServerService.defaultPort} (not bound)'),
@@ -1496,8 +1807,14 @@ class _PluginsPage extends ConsumerWidget {
     }
 
     final wake = ref.watch(wakeWordServiceProvider);
+    // Sandbox = unverified installs (C4/C3); Sabke = browse only.
+    final sandboxInstalled = [
+      ...grouped[AgentSecurityClass.c4Unverified]!,
+      ...grouped[AgentSecurityClass.c3DueDiligence]!,
+    ];
     return DefaultTabController(
-      length: 6,
+      length: 5,
+      initialIndex: 0, // Mere Bhai
       child: SafeArea(
         child: Column(
           children: [
@@ -1516,7 +1833,7 @@ class _PluginsPage extends ConsumerWidget {
                     ),
                     onPressed: () => _openAuthoringSheet(context, ref),
                     icon: const Icon(Icons.auto_awesome, size: 16),
-                    label: const Text("CREATE BRO CODE", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    label: const Text("CREATE BHAI CODE", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -1531,29 +1848,38 @@ class _PluginsPage extends ConsumerWidget {
                   style: const TextStyle(color: Colors.greenAccent, fontSize: 11),
                 ),
               ),
-            const _VaultDashboardsBanner(),
-            const AmbientCapturePanel(),
-            const TabBar(
+            TabBar(
               isScrollable: true,
               indicatorColor: Colors.greenAccent,
               labelColor: Colors.greenAccent,
               unselectedLabelColor: Colors.white54,
               tabs: [
-                Tab(text: "C1: CORE"),
-                Tab(text: "C2: VERIFIED"),
-                Tab(text: "C3: DUE DILIGENCE"),
-                Tab(text: "C4: UNVERIFIED"),
-                Tab(text: "MARKETPLACE"),
-                Tab(text: "CIRCLE"),
+                const Tab(text: "MERE BHAI"),
+                const Tab(text: "SABKE BHAI"),
+                const Tab(text: "SANDBOX"),
+                Tab(text: AppConfig.circleTabLabel),
+                const Tab(text: "CORE"),
               ],
             ),
             Expanded(
               child: TabBarView(
                 children: [
-                  ...AgentSecurityClass.values
-                      .map((c) => _buildAgentGrid(context, ref, grouped[c]!)),
-                  const _MarketplacePoolTab(),
+                  _buildAgentGrid(
+                    context,
+                    ref,
+                    grouped[AgentSecurityClass.c2Verified]!,
+                    showOrigin: true,
+                  ),
+                  _buildSabkeBrowseGrid(context, ref, sandboxInstalled),
+                  SandboxQueueTab(
+                    onOpenInstalled: _openAgentDetail,
+                  ),
                   const CircleMarketplaceTab(),
+                  _buildAgentGrid(
+                    context,
+                    ref,
+                    grouped[AgentSecurityClass.c1Core]!,
+                  ),
                 ],
               ),
             ),
@@ -1563,9 +1889,94 @@ class _PluginsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildAgentGrid(BuildContext context, WidgetRef ref, List<AurBhaiAgent> agents) {
+  /// Sabke Bhai: browse seed catalog only (not installed).
+  Widget _buildSabkeBrowseGrid(
+    BuildContext context,
+    WidgetRef ref,
+    List<AurBhaiAgent> installed,
+  ) {
+    final catalog = ref.watch(marketplaceCatalogProvider);
+    final installedNames = installed.map((a) => a.name).toSet();
+    final available = catalog
+        .listings()
+        .where((l) => !installedNames.contains(l.name))
+        .toList();
+
+    if (available.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'No more seed listings to browse.\nFriend Circle has shared Bhai Codes from friends.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white30, fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.0,
+      ),
+      itemCount: available.length,
+      itemBuilder: (context, index) {
+        final listing = available[index];
+        return GestureDetector(
+          onTap: () => BhaiCodePreviewSheet.open(context, listing: listing),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF161616),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.lightBlueAccent.withValues(alpha: 0.45),
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.public,
+                    color: Colors.lightBlueAccent, size: 28),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    listing.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Browse',
+                  style: TextStyle(color: Colors.lightBlueAccent, fontSize: 7),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAgentGrid(
+    BuildContext context,
+    WidgetRef ref,
+    List<AurBhaiAgent> agents, {
+    bool showOrigin = false,
+  }) {
     if (agents.isEmpty) {
-      return const Center(child: Text("No agents in this trust tier.", style: TextStyle(color: Colors.white30)));
+      return const Center(child: Text("No Bhai Codes in this pool.", style: TextStyle(color: Colors.white30)));
     }
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -1573,26 +1984,38 @@ class _PluginsPage extends ConsumerWidget {
         crossAxisCount: 3,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 1.1,
+        childAspectRatio: 1.0,
       ),
       itemCount: agents.length,
       itemBuilder: (context, index) {
         final a = agents[index];
-        final isJs = a is JsAgentAdapter;
-        final builtAt = isJs ? (a.updatedAt ?? a.createdAt) : null;
+        final js = a is JsAgentAdapter ? a : null;
+        final builtAt = js != null ? (js.updatedAt ?? js.createdAt) : null;
+        final diligenceChip = js?.securityClass.diligenceChip;
+        final originLabel =
+            showOrigin && js != null ? BhaiCodeOrigin.label(js.source) : null;
         return GestureDetector(
           onTap: () => _openAgentDetail(context, ref, a),
           child: Container(
             decoration: BoxDecoration(
               color: const Color(0xFF161616),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white10),
+              border: Border.all(
+                color: diligenceChip != null
+                    ? Colors.amber.withValues(alpha: 0.5)
+                    : Colors.white10,
+              ),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(isJs ? Icons.javascript : Icons.extension,
-                    color: isJs ? Colors.amberAccent : Colors.greenAccent, size: 28),
+                Icon(
+                  showOrigin && js != null
+                      ? _bhaiOriginIcon(js.source)
+                      : (js != null ? Icons.javascript : Icons.extension),
+                  color: js != null ? Colors.amberAccent : Colors.greenAccent,
+                  size: 28,
+                ),
                 const SizedBox(height: 6),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -1600,7 +2023,26 @@ class _PluginsPage extends ConsumerWidget {
                       style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
                 ),
-                if (builtAt != null) ...[
+                if (originLabel != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    originLabel,
+                    style: const TextStyle(color: Colors.white54, fontSize: 7),
+                    textAlign: TextAlign.center,
+                  ),
+                ] else if (diligenceChip != null) ...[
+                  const SizedBox(height: 4),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      diligenceChip,
+                      style: const TextStyle(color: Colors.amberAccent, fontSize: 7),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ] else if (builtAt != null) ...[
                   const SizedBox(height: 2),
                   Text(
                     DateFormat('MMM d, HH:mm').format(builtAt.toLocal()),
@@ -1628,88 +2070,16 @@ class _PluginsPage extends ConsumerWidget {
   }
 
   void _openAgentDetail(BuildContext context, WidgetRef ref, AurBhaiAgent agent) {
+    final fromSandbox = agent is JsAgentAdapter &&
+        (agent.securityClass == AgentSecurityClass.c4Unverified ||
+            agent.securityClass == AgentSecurityClass.c3DueDiligence);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: const Color(0xFF141414),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => _AgentDetailSheet(agent: agent),
-    );
-  }
-}
-
-/// Local C4 pool browse + pickup (MS-USER-ECOSYSTEM-UX3 / AGT2).
-class _MarketplacePoolTab extends ConsumerWidget {
-  const _MarketplacePoolTab();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final catalog = ref.watch(marketplaceCatalogProvider);
-    final listings = catalog.listings();
-    if (listings.isEmpty) {
-      return const Center(
-        child: Text('Marketplace pool is empty.',
-            style: TextStyle(color: Colors.white30)),
-      );
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      itemCount: listings.length + 1,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return const Text(
-            'Local C4 pool — pickup installs at Unverified. Run Test in Sandbox, then promote.',
-            style: TextStyle(color: Colors.white54, fontSize: 11),
-          );
-        }
-        final listing = listings[index - 1];
-        return Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF161616),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white10),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(listing.name,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14)),
-              const SizedBox(height: 4),
-              Text(listing.description,
-                  style: const TextStyle(color: Colors.white60, fontSize: 11)),
-              const SizedBox(height: 4),
-              Text('license: ${listing.license}',
-                  style: const TextStyle(color: Colors.white38, fontSize: 10)),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: () async {
-                    final ok = await catalog.pickup(listing);
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(ok
-                            ? '${listing.name} installed at C4.'
-                            : '${listing.name} already exists — rename or delete first.'),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.download, size: 16, color: Colors.greenAccent),
-                  label: const Text('PICK UP',
-                      style: TextStyle(color: Colors.greenAccent, fontSize: 11)),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (_) => _AgentDetailSheet(agent: agent, fromSandbox: fromSandbox),
     );
   }
 }
@@ -1717,7 +2087,10 @@ class _MarketplacePoolTab extends ConsumerWidget {
 /// Surfaces user-created HTML dashboards stored in the sovereign vault
 /// (MS-TELEMETRY-DASHBOARD-UX1). Compact rows + kebab; TTL renew/extend (UX3).
 class _VaultDashboardsBanner extends ConsumerStatefulWidget {
-  const _VaultDashboardsBanner();
+  const _VaultDashboardsBanner({this.showTitle = true});
+
+  final bool showTitle;
+
   @override
   ConsumerState<_VaultDashboardsBanner> createState() =>
       _VaultDashboardsBannerState();
@@ -1787,7 +2160,7 @@ class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No Bro Code matched "$key" (may be orphaned).'),
+          content: Text('No Bhai Code matched "$key" (may be orphaned).'),
         ),
       );
       return;
@@ -1855,7 +2228,7 @@ class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> 
       builder: (context, snapshot) {
         final dashboards = snapshot.data ?? const [];
         return Container(
-          margin: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+          margin: const EdgeInsets.fromLTRB(0, 2, 0, 6),
           padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
           decoration: BoxDecoration(
             color: const Color(0xFF161616),
@@ -1868,17 +2241,20 @@ class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> 
             children: [
               Row(
                 children: [
-                  const Expanded(
-                    child: Text(
-                      'VAULT DASHBOARDS',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
+                  if (widget.showTitle)
+                    const Expanded(
+                      child: Text(
+                        'VAULT DASHBOARDS',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
                       ),
-                    ),
-                  ),
+                    )
+                  else
+                    const Spacer(),
                   IconButton(
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
@@ -1910,9 +2286,13 @@ class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> 
                       final d = dashboards[index];
                       final key = d['key']!;
                       final buildId = d['build_id'];
+                      final createdAt = d['created_at'] ?? d['updated_at'] ?? '';
                       final expiresAt = d['expires_at'] ?? '';
                       final canOpen = server.isRunning;
                       final ttlLabel = _ttlLabel(expiresAt);
+                      final agents = ref.read(agentServiceProvider).agents;
+                      final associated =
+                          findAgentForDashboardKey(agents, key)?.name ?? '—';
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 2),
                         child: Row(
@@ -1932,11 +2312,7 @@ class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> 
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   Text(
-                                    [
-                                      if (buildId != null && buildId.isNotEmpty)
-                                        'build $buildId',
-                                      'TTL $ttlLabel',
-                                    ].join(' · '),
+                                    'TTL $ttlLabel · $associated',
                                     style: const TextStyle(
                                       color: Color(0xFFB8F5C0),
                                       fontSize: 8,
@@ -1975,96 +2351,187 @@ class _VaultDashboardsBannerState extends ConsumerState<_VaultDashboardsBanner> 
                               ),
                               color: const Color(0xFF1E1E1E),
                               onSelected: (value) async {
-                                final bus = ref.read(telemetryBusProvider);
-                                switch (value) {
-                                  case 'open':
-                                    await _openDashboard(server, key);
-                                  case 'copy':
-                                    await _copyLink(server, key);
-                                  case 'locate':
-                                    await _locateBroCode(key);
-                                  case 'ttl1h':
-                                    await bus.setVaultTtl(
-                                        key, const Duration(hours: 1));
-                                    _refresh();
-                                  case 'ttl24h':
-                                    await bus.setVaultTtl(
-                                        key, const Duration(hours: 24));
-                                    _refresh();
-                                  case 'ttl7d':
-                                    await bus.setVaultTtl(
-                                        key, const Duration(days: 7));
-                                    _refresh();
-                                  case 'ttlForever':
-                                    await bus.setVaultTtl(key, null);
-                                    _refresh();
-                                  case 'exportCsv':
-                                    final csv = await bus.exportTelemetryCsv();
-                                    await bus.writeVaultData(
-                                      'telemetry_export.csv',
-                                      csv,
-                                      mimeType: 'text/csv',
-                                      ttl: const Duration(hours: 24),
-                                    );
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(const SnackBar(
-                                        content: Text(
-                                          'Wrote telemetry_export.csv (24h TTL)',
+                                if (value == 'details') {
+                                  await showDialog<void>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      backgroundColor: const Color(0xFF1A1A1A),
+                                      title: const Text('Dashboard details',
+                                          style: TextStyle(color: Colors.white)),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Key: $key',
+                                              style: const TextStyle(
+                                                  color: Colors.white70,
+                                                  fontSize: 12)),
+                                          Text('Bhai: $associated',
+                                              style: const TextStyle(
+                                                  color: Colors.white70,
+                                                  fontSize: 12)),
+                                          if (buildId != null &&
+                                              buildId.isNotEmpty)
+                                            Text('Build: $buildId',
+                                                style: const TextStyle(
+                                                    color: Colors.white54,
+                                                    fontSize: 11)),
+                                          if (createdAt.isNotEmpty)
+                                            Text('Built: $createdAt',
+                                                style: const TextStyle(
+                                                    color: Colors.white54,
+                                                    fontSize: 11)),
+                                          Text('TTL: $ttlLabel',
+                                              style: const TextStyle(
+                                                  color: Colors.white54,
+                                                  fontSize: 11)),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: canOpen
+                                              ? () {
+                                                  Navigator.pop(ctx);
+                                                  _openDashboard(server, key);
+                                                }
+                                              : null,
+                                          child: const Text('OPEN'),
                                         ),
-                                      ));
-                                    }
-                                  case 'stop':
-                                    await _stopRemove(key);
+                                        TextButton(
+                                          onPressed: () async {
+                                            Navigator.pop(ctx);
+                                            await _copyLink(server, key);
+                                          },
+                                          child: const Text('COPY LINK'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () async {
+                                            Navigator.pop(ctx);
+                                            await _locateBroCode(key);
+                                          },
+                                          child: const Text('LOCATE BHAI'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx),
+                                          child: const Text('CLOSE'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  return;
+                                }
+                                if (value == 'settings') {
+                                  await showDialog<void>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      backgroundColor: const Color(0xFF1A1A1A),
+                                      title: const Text('Dashboard settings',
+                                          style: TextStyle(color: Colors.white)),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          for (final opt in [
+                                            ('1 hour', Duration(hours: 1)),
+                                            ('12 hours', Duration(hours: 12)),
+                                            ('24 hours', Duration(hours: 24)),
+                                            ('7 days', Duration(days: 7)),
+                                          ])
+                                            ListTile(
+                                              title: Text('TTL: ${opt.$1}',
+                                                  style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 13)),
+                                              onTap: () async {
+                                                await ref
+                                                    .read(telemetryBusProvider)
+                                                    .setVaultTtl(key, opt.$2);
+                                                if (ctx.mounted) {
+                                                  Navigator.pop(ctx);
+                                                }
+                                                _refresh();
+                                              },
+                                            ),
+                                          ListTile(
+                                            title: const Text('TTL: forever',
+                                                style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 13)),
+                                            onTap: () async {
+                                              await ref
+                                                  .read(telemetryBusProvider)
+                                                  .setVaultTtl(key, null);
+                                              if (ctx.mounted) {
+                                                Navigator.pop(ctx);
+                                              }
+                                              _refresh();
+                                            },
+                                          ),
+                                          ListTile(
+                                            title: const Text(
+                                                'Export telemetry CSV',
+                                                style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 13)),
+                                            onTap: () async {
+                                              final bus = ref.read(
+                                                  telemetryBusProvider);
+                                              final csv = await bus
+                                                  .exportTelemetryCsv();
+                                              await bus.writeVaultData(
+                                                'telemetry_export.csv',
+                                                csv,
+                                                mimeType: 'text/csv',
+                                                ttl: const Duration(hours: 24),
+                                              );
+                                              if (ctx.mounted) {
+                                                Navigator.pop(ctx);
+                                              }
+                                              if (context.mounted) {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'Wrote telemetry_export.csv (24h TTL)',
+                                                    ),
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                          ),
+                                          ListTile(
+                                            title: const Text('Stop / remove',
+                                                style: TextStyle(
+                                                    color: Colors.redAccent,
+                                                    fontSize: 13)),
+                                            onTap: () async {
+                                              Navigator.pop(ctx);
+                                              await _stopRemove(key);
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx),
+                                          child: const Text('CLOSE'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  return;
                                 }
                               },
-                              itemBuilder: (context) => [
+                              itemBuilder: (context) => const [
                                 PopupMenuItem(
-                                  enabled: canOpen,
-                                  value: 'open',
-                                  child: const Text('Open',
+                                  value: 'details',
+                                  child: Text('Details',
                                       style: TextStyle(color: Colors.white)),
                                 ),
                                 PopupMenuItem(
-                                  enabled: canOpen,
-                                  value: 'copy',
-                                  child: const Text('Copy link',
+                                  value: 'settings',
+                                  child: Text('Settings',
                                       style: TextStyle(color: Colors.white)),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'locate',
-                                  child: Text('Locate Bro Code',
-                                      style: TextStyle(color: Colors.white)),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'ttl1h',
-                                  child: Text('TTL: 1 hour',
-                                      style: TextStyle(color: Colors.white)),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'ttl24h',
-                                  child: Text('TTL: 24 hours',
-                                      style: TextStyle(color: Colors.white)),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'ttl7d',
-                                  child: Text('TTL: 7 days',
-                                      style: TextStyle(color: Colors.white)),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'ttlForever',
-                                  child: Text('TTL: forever',
-                                      style: TextStyle(color: Colors.white)),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'exportCsv',
-                                  child: Text('Export telemetry CSV',
-                                      style: TextStyle(color: Colors.white)),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'stop',
-                                  child: Text('Stop / remove',
-                                      style: TextStyle(color: Colors.redAccent)),
                                 ),
                               ],
                             ),
@@ -2222,18 +2689,19 @@ class _AgentAuthoringSheetState extends ConsumerState<_AgentAuthoringSheet> {
             inputSchema: schema,
             script: script,
             securityClass: AgentSecurityClass.c4Unverified,
+            source: BhaiCodeOrigin.self,
           );
       if (mounted) {
         Navigator.of(context).pop();
         if (scan.passed) {
           verification.requestPromotion(agentName: name, scan: scan);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Agent "$name" registered at C4. Due diligence passed — promote when ready.')),
+            SnackBar(content: Text('"$name" saved to Sandbox. Due diligence passed — promote when ready.')),
           );
         } else {
           verification.requestPromotion(agentName: name, scan: scan);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Agent "$name" registered at C4 with due-diligence flags.')),
+            SnackBar(content: Text('"$name" saved to Sandbox with due-diligence flags.')),
           );
         }
       }
@@ -2255,7 +2723,7 @@ class _AgentAuthoringSheetState extends ConsumerState<_AgentAuthoringSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text("INTRODUCE BRO CODE TO BHAI LOG",
+            const Text("INTRODUCE BHAI CODE TO BHAI LOG",
                 style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 1)),
             const SizedBox(height: 12),
             Row(
@@ -2329,6 +2797,7 @@ class _AgentAuthoringSheetState extends ConsumerState<_AgentAuthoringSheet> {
               style: const TextStyle(color: Colors.white, fontSize: 13),
               decoration: const InputDecoration(labelText: 'Security Class', labelStyle: TextStyle(color: Colors.white54, fontSize: 12)),
               items: AgentSecurityClass.values
+                  .where((c) => c != AgentSecurityClass.c3DueDiligence)
                   .map((c) => DropdownMenuItem(value: c, child: Text(c.label)))
                   .toList(),
               onChanged: (val) { if (val != null) setState(() => _securityClass = val); },
@@ -2372,7 +2841,8 @@ class _AgentAuthoringSheetState extends ConsumerState<_AgentAuthoringSheet> {
 /// Agent detail + lifecycle (run / improve / export / delete) — MS-USER-ECOSYSTEM-ENG2.
 class _AgentDetailSheet extends ConsumerStatefulWidget {
   final AurBhaiAgent agent;
-  const _AgentDetailSheet({required this.agent});
+  final bool fromSandbox;
+  const _AgentDetailSheet({required this.agent, this.fromSandbox = false});
   @override
   ConsumerState<_AgentDetailSheet> createState() => _AgentDetailSheetState();
 }
@@ -2385,7 +2855,7 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
   String? _dashboardUrl;
   DueDiligenceResult? _scan;
   bool _scanLoaded = false;
-  BroCodeMlMeta? _mlMeta;
+  List<Map<String, String>> _relatedDashboards = const [];
 
   @override
   void didChangeDependencies() {
@@ -2393,7 +2863,7 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
     if (!_scanLoaded) {
       _scanLoaded = true;
       _refreshScan();
-      unawaited(_loadMlMeta());
+      unawaited(_loadRelatedDashboards());
     }
   }
 
@@ -2405,34 +2875,38 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
     }
   }
 
-  Future<void> _loadMlMeta() async {
-    if (widget.agent is! JsAgentAdapter) return;
-    final meta = await ref
-        .read(jsAgentRegistryProvider)
-        .readMlMeta(widget.agent.name);
-    if (mounted) setState(() => _mlMeta = meta);
+  Future<void> _loadRelatedDashboards() async {
+    final bus = ref.read(telemetryBusProvider);
+    final entries = await bus.listVaultEntries(mimeType: 'text/html');
+    final name = widget.agent.name.toLowerCase();
+    final related = entries.where((e) {
+      final key = (e['key'] ?? '').toLowerCase();
+      return key.contains(name) ||
+          key.contains('agent:${widget.agent.name}'.toLowerCase());
+    }).toList();
+    if (mounted) setState(() => _relatedDashboards = related);
   }
 
-  Future<void> _toggleUsesModel(bool enabled) async {
+  Future<void> _runDiligence() async {
     if (widget.agent is! JsAgentAdapter) return;
-    final next = BroCodeMlMeta(
-      usesModel: enabled,
-      maturity: enabled ? 'collecting' : 'heuristic_only',
-      labelSchema: _mlMeta?.labelSchema ??
-          const {
-            'labels': ['positive', 'negative'],
-          },
-      capturePolicy: _mlMeta?.capturePolicy ??
-          const {
-            'mode': 'ambient',
-            'fineWindowSeconds': 45,
-          },
-      fineWindow: _mlMeta?.fineWindow ?? const Duration(seconds: 45),
-    );
-    final ok = await ref
+    final scan = ref
+        .read(agentVerificationProvider)
+        .scanScript((widget.agent as JsAgentAdapter).script);
+    final passed = !scan.flagged;
+    await ref
         .read(jsAgentRegistryProvider)
-        .updateMlMeta(widget.agent.name, next);
-    if (ok && mounted) setState(() => _mlMeta = next);
+        .setDiligencePassed(widget.agent.name, passed);
+    if (!mounted) return;
+    setState(() => _scan = scan);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          passed
+              ? 'Due diligence passed — marked on Sandbox card'
+              : 'Due diligence flagged — see findings',
+        ),
+      ),
+    );
   }
 
   Future<void> _promote() async {
@@ -2460,7 +2934,7 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
       setState(() {
         _runWasError = true;
         _runResult =
-            'Promote to C2 Verified before running against the real vault. Use TEST IN SANDBOX or IMPROVE first.';
+            'Promote to Mere Bhai before running against the real vault. Use TEST IN SANDBOX or IMPROVE first.';
         _dashboardKey = null;
         _dashboardUrl = null;
       });
@@ -2490,8 +2964,7 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
         final exec = (widget.agent as JsAgentAdapter).lastExecutionResult;
         isError = exec?.isError ?? false;
         final keys = exec?.vaultHtmlKeysWritten ?? const <String>[];
-        // Sandbox HTML never lives in the sovereign vault / edge server.
-        if (!sandbox && !isError && keys.isNotEmpty) {
+        if (!isError && keys.isNotEmpty) {
           matchedKey = keys.last;
         }
       }
@@ -2502,18 +2975,19 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
         isError = true;
       }
 
+      final url = (!sandbox && matchedKey != null && server.isRunning)
+          ? server.vaultUrl(matchedKey)
+          : null;
+
       setState(() {
-        _runResult = sandbox
-            ? '[SANDBOX] $result'
-            : result;
+        _runResult = sandbox ? '[SANDBOX] $result' : result;
         _runWasError = isError;
         _dashboardKey = matchedKey;
-        _dashboardUrl = (matchedKey != null && server.isRunning)
-            ? server.vaultUrl(matchedKey)
-            : null;
+        _dashboardUrl = url;
       });
-      if (matchedKey != null) {
+      if (!sandbox && matchedKey != null) {
         ref.read(vaultDashboardRefreshProvider).bump();
+        await _loadRelatedDashboards();
       }
     } catch (e) {
       setState(() {
@@ -2539,11 +3013,36 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
   }
 
   Future<void> _delete() async {
+    final label = widget.fromSandbox ? 'Remove from my device' : 'Delete';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: Text(label, style: const TextStyle(color: Colors.white)),
+        content: Text(
+          widget.fromSandbox
+              ? 'Removes your local Sandbox copy of "${widget.agent.name}". Does not delete shared pool / Friend Circle listings.'
+              : 'Permanently remove "${widget.agent.name}" from this device?',
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('CANCEL')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child:
+                Text(label, style: const TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
     await ref.read(jsAgentRegistryProvider).deleteAgent(widget.agent.name);
     if (mounted) {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Agent "${widget.agent.name}" removed')));
+          SnackBar(content: Text('"${widget.agent.name}" removed from device')));
     }
   }
 
@@ -2579,11 +3078,13 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
     return Padding(
       padding: EdgeInsets.fromLTRB(
           16, 16, 16, mq.viewInsets.bottom + mq.padding.bottom + 16),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: mq.size.height * 0.92),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             Row(
               children: [
                 Icon(isJs ? Icons.javascript : Icons.extension,
@@ -2614,6 +3115,13 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
             const SizedBox(height: 8),
             Text(agent.description,
                 style: const TextStyle(color: Colors.white54, fontSize: 12)),
+            if (isJs) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Origin: ${BhaiCodeOrigin.label(agent.source)}',
+                style: const TextStyle(color: Colors.white38, fontSize: 11),
+              ),
+            ],
             if (builtAt != null) ...[
               const SizedBox(height: 6),
               Text(
@@ -2630,48 +3138,40 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.amberAccent,
+                  side: const BorderSide(color: Colors.amberAccent),
+                ),
+                onPressed: _runDiligence,
+                icon: const Icon(Icons.policy, size: 16),
+                label: const Text('RUN DUE DILIGENCE',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              ),
+              if (scan != null && scan.findings.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                DueDiligenceFindingsList(scan: scan),
+              ],
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.greenAccent,
                   side: const BorderSide(color: Colors.greenAccent),
                 ),
                 onPressed: () async {
-                  final license = await showDialog<String>(
-                    context: context,
-                    builder: (ctx) => SimpleDialog(
-                      backgroundColor: const Color(0xFF1A1A1A),
-                      title: const Text('Publish to circle',
-                          style: TextStyle(color: Colors.white)),
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(AppConfig.circlePublishConfirm,
-                              style: const TextStyle(
-                                  color: Colors.white54, fontSize: 12)),
-                        ),
-                        SimpleDialogOption(
-                          onPressed: () => Navigator.pop(ctx, 'remix_free'),
-                          child: const Text('remix_free',
-                              style: TextStyle(color: Colors.greenAccent)),
-                        ),
-                        SimpleDialogOption(
-                          onPressed: () =>
-                              Navigator.pop(ctx, 'lineage_indexed'),
-                          child: const Text('lineage_indexed',
-                              style: TextStyle(color: Colors.greenAccent)),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (license == null || !mounted) return;
+                  final result = await showPublishToCircleDialog(context);
+                  if (result == null || !mounted) return;
                   try {
                     await ref.read(circleRegistryProvider).publishAgent(
                           agent.name,
-                          license: license,
+                          license: result.license,
+                          access: result.access,
                         );
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                          content: Text(
-                              '${agent.name} published to circle ($license)')),
+                        content: Text(
+                          '${agent.name} published to Friend Circle (${result.license})',
+                        ),
+                      ),
                     );
                   } catch (e) {
                     if (!mounted) return;
@@ -2681,53 +3181,13 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
                   }
                 },
                 icon: const Icon(Icons.cloud_upload_outlined, size: 16),
-                label: const Text('PUBLISH TO CIRCLE',
+                label: const Text('PUBLISH TO FRIEND CIRCLE',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'MODEL STUDIO',
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: const Text(
-                        'usesModel (Path L collecting)',
-                        style: TextStyle(color: Colors.white, fontSize: 12),
-                      ),
-                      subtitle: Text(
-                        'maturity: ${_mlMeta?.maturity ?? 'heuristic_only'}',
-                        style: const TextStyle(
-                            color: Colors.white38, fontSize: 10),
-                      ),
-                      value: _mlMeta?.usesModel ?? false,
-                      activeThumbColor: Colors.greenAccent,
-                      onChanged: _toggleUsesModel,
-                    ),
-                  ],
-                ),
               ),
             ],
             const SizedBox(height: 12),
             if (agent.inputSchema.isNotEmpty) ...[
-              const Text("INPUT SCHEMA",
+              const Text("PARAMETERS",
                   style: TextStyle(
                       color: Colors.white54,
                       fontSize: 10,
@@ -2739,6 +3199,42 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
                     style:
                         const TextStyle(color: Colors.white70, fontSize: 11),
                   )),
+              const SizedBox(height: 12),
+            ],
+            if (_relatedDashboards.isNotEmpty) ...[
+              const Text(
+                'DASHBOARDS',
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              ..._relatedDashboards.map((e) {
+                final key = e['key'] ?? '';
+                final server = ref.read(localServerProvider);
+                final url = server.isRunning ? server.vaultUrl(key) : null;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.greenAccent,
+                      side: const BorderSide(color: Colors.greenAccent),
+                    ),
+                    onPressed: url == null
+                        ? null
+                        : () => launchVaultDashboard(context, url),
+                    icon: const Icon(Icons.open_in_browser, size: 16),
+                    label: Text(
+                      key,
+                      style: const TextStyle(fontSize: 11),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                );
+              }),
               const SizedBox(height: 12),
             ],
             if (isJs) ...[
@@ -2868,7 +3364,7 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
                   label: Text(
                     _running
                         ? 'RUNNING'
-                        : (canRun ? 'RUN' : 'RUN (C2 ONLY)'),
+                        : (canRun ? 'RUN' : 'RUN (MERE BHAI ONLY)'),
                     style: const TextStyle(
                         fontSize: 11, fontWeight: FontWeight.bold),
                   ),
@@ -2940,13 +3436,17 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
                     ),
                     onPressed: _delete,
                     icon: const Icon(Icons.delete_outline, size: 16),
-                    label: const Text('DELETE',
-                        style: TextStyle(
+                    label: Text(
+                        widget.fromSandbox
+                            ? 'REMOVE FROM DEVICE'
+                            : 'DELETE',
+                        style: const TextStyle(
                             fontSize: 11, fontWeight: FontWeight.bold)),
                   ),
               ],
             ),
           ],
+        ),
         ),
       ),
     );
@@ -2959,15 +3459,15 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
     String text;
     Color color;
     if (atC2) {
-      text = 'Verified (C2) — RUN enabled.';
+      text = 'Mere Bhai — RUN enabled.';
       color = Colors.greenAccent;
     } else if (flagged) {
       text =
-          'Due diligence: FLAGGED — fix via IMPROVE before promotion. RUN disabled until C2.';
+          'Due diligence: FLAGGED — fix via IMPROVE before promotion. RUN disabled until Mere Bhai.';
       color = Colors.amber;
     } else {
       text =
-          'Due diligence passed. Promote to C2 to enable RUN.';
+          'Due diligence passed. Promote to Mere Bhai to enable RUN.';
       color = Colors.lightBlueAccent;
     }
     return Container(
@@ -3415,7 +3915,7 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
       _contextUsed = 0;
     });
     _appendProgress(
-      'Started fresh IMPROVE session — seeding from vault Bro Code on next Run.',
+      'Started fresh IMPROVE session — seeding from vault Bhai Code on next Run.',
     );
   }
 
@@ -3867,7 +4367,7 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
           SnackBar(
             content: Text(
               scan.passed
-                  ? '${widget.agent.name} updated — due diligence passed. Promote to C2 to enable RUN.'
+                  ? '${widget.agent.name} updated — due diligence passed. Promote to Mere Bhai to enable RUN.'
                   : '${widget.agent.name} updated but still flagged. Review findings and improve again, or force-promote.',
             ),
           ),
@@ -4103,7 +4603,7 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
             ],
             if (_draft != null && _verified) ...[
               const SizedBox(height: 16),
-              const Text('VERIFIED DRAFT',
+              const Text('READY DRAFT',
                   style: TextStyle(
                       color: Colors.greenAccent,
                       fontSize: 10,
@@ -4149,7 +4649,7 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
                 ),
                 onPressed: _busy ? null : _apply,
                 child: Text(
-                  _busy ? 'APPLYING…' : 'APPLY TO VAULT (C4)',
+                  _busy ? 'APPLYING…' : 'APPLY TO VAULT (SABKE BHAI)',
                   style: const TextStyle(
                       fontWeight: FontWeight.bold, fontSize: 12),
                 ),
@@ -4171,7 +4671,7 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
               const SizedBox(height: 8),
               const Text(
                 'Improvement did not succeed yet. Retry continues from the last draft. '
-                'Start fresh reseeds from the vault Bro Code. Or copy a diagnostic JSON.',
+                'Start fresh reseeds from the vault Bhai Code. Or copy a diagnostic JSON.',
                 style: TextStyle(color: Colors.white38, fontSize: 10),
               ),
               const SizedBox(height: 4),
@@ -4212,53 +4712,11 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
                 onPressed: _busy
                     ? null
                     : () async {
-                        final noteCtrl = TextEditingController();
-                        final ok = await showDialog<bool>(
+                        final reporterNote = await showDialog<String>(
                           context: context,
-                          builder: (ctx) => AlertDialog(
-                            backgroundColor: const Color(0xFF1A1A1A),
-                            title: const Text('Send report',
-                                style: TextStyle(color: Colors.white)),
-                            content: SingleChildScrollView(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(AppConfig.issueSendConsent,
-                                      style: const TextStyle(
-                                          color: Colors.white70, fontSize: 12)),
-                                  const SizedBox(height: 12),
-                                  TextField(
-                                    controller: noteCtrl,
-                                    maxLines: 4,
-                                    style: const TextStyle(
-                                        color: Colors.white, fontSize: 13),
-                                    decoration: InputDecoration(
-                                      labelText:
-                                          AppConfig.issueReporterNoteLabel,
-                                      hintText: AppConfig.issueReporterNoteHint,
-                                      labelStyle: const TextStyle(
-                                          color: Colors.white54, fontSize: 12),
-                                      hintStyle: const TextStyle(
-                                          color: Colors.white30, fontSize: 11),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            actions: [
-                              TextButton(
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text('CANCEL')),
-                              TextButton(
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  child: const Text('SEND')),
-                            ],
-                          ),
+                          builder: (ctx) => const _SendReportNoteDialog(),
                         );
-                        final reporterNote = noteCtrl.text;
-                        noteCtrl.dispose();
-                        if (ok != true || !mounted) return;
+                        if (reporterNote == null || !mounted) return;
                         setState(() => _busy = true);
                         try {
                           final report =
@@ -4268,7 +4726,7 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
                               .sendReport(
                                 report: report,
                                 title:
-                                    'Bro Code: ${widget.agent.name} — ${report.failureMessage}',
+                                    'Bhai Code: ${widget.agent.name} — ${report.failureMessage}',
                                 reporterNote: reporterNote,
                               );
                           _appendProgress(
@@ -4329,6 +4787,73 @@ class _ImproveAgentSheetState extends ConsumerState<_ImproveAgentSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Owns [TextEditingController] for the SEND REPORT dialog so dispose runs
+/// only after the route is fully removed (avoids `_dependents.isEmpty`).
+class _SendReportNoteDialog extends StatefulWidget {
+  const _SendReportNoteDialog();
+
+  @override
+  State<_SendReportNoteDialog> createState() => _SendReportNoteDialogState();
+}
+
+class _SendReportNoteDialogState extends State<_SendReportNoteDialog> {
+  late final TextEditingController _noteCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _noteCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1A1A1A),
+      title: const Text('Send report', style: TextStyle(color: Colors.white)),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(AppConfig.issueSendConsent,
+                style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _noteCtrl,
+              maxLines: 4,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: InputDecoration(
+                labelText: AppConfig.issueReporterNoteLabel,
+                hintText: AppConfig.issueReporterNoteHint,
+                labelStyle:
+                    const TextStyle(color: Colors.white54, fontSize: 12),
+                hintStyle:
+                    const TextStyle(color: Colors.white30, fontSize: 11),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('CANCEL'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _noteCtrl.text),
+          child: const Text('SEND'),
+        ),
+      ],
     );
   }
 }

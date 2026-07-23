@@ -41,7 +41,18 @@ Moving beyond the limitations of native OS dictation (Speech-to-Text), which act
     *   **Double Tap (Recording):** Cancels the recording, deletes the audio, and silently returns to idle.
 
 ### 2.4 Bro Code (Bhai log) & Internal Agents
-User-generated codebases are **Bro Code** (collectively **Bhai log**). The word **Agent** is reserved for internal AI workers that build and verify them (Coder, Tester, Deployer).
+**Product language (UI):** units are **Bhai Code**. BHAI LOG tabs:
+
+| Tab | Role |
+|-----|------|
+| **Mere Bhai** | Verified / runnable (C2). Cards show origin: **Yours** (self-authored) vs **From pool** vs **Friend Circle**. |
+| **Sabke Bhai** | **Browse only** — seed catalog (and entry to Friend Circle share). Not “my installs.” Not full ecosystem commons yet (`[MS-BROCODE-COMMONS]` deferred). |
+| **Sandbox** | **Unverified installs (C4/C3)** on this device + test-later queue. Pickup / Create lands here. Default exercise = sandbox run. Promote → Mere. |
+| **FRIEND CIRCLE** | Private GitHub friend registry (refresh/publish/browse). Pickup → Sandbox. |
+| **Core** | Built-in core agents. |
+
+**Diligence:** on-demand / per opened item only — never scan the whole Sabke catalog. Search on Mere/Sabke and Sabke-by-connection classifications remain **deferred**. Code identifiers may still say Bro Code until a rename Eng.
+User-generated codebases are **Bro Code** / **Bhai Code** (collectively **Bhai log**). The word **Agent** is reserved for internal AI workers that build and verify them (Coder, Tester, Deployer).
 
 Bro Code classifications (formerly "Agents"):
 1. **Action Bro Code:** Utility commands on request (e.g. Calculator).
@@ -80,7 +91,7 @@ Not Verified (C4)  →  Due Diligence (C3)  →  Verified (C2)
 ```
 
 1. **Entry — Not Verified (C4):** Every newly created or marketplace-picked Bro Code starts here. **RUN is disabled** in UI and engine until promotion to Verified (C2). Voice/UI authoring creates and registers at C4 after explicit BUILD approval, but does not execute until the user promotes. Zero real-world sensor access until C2.
-2. **Agent Marketplace (Bro Code listings):** The Not Verified (C4) pool doubles as the **Agent Marketplace** — a browsable catalog of community or third-party **Bro Code** units. Picked-up Bro Code enters at C4. Near-term local shell: `[MS-USER-ECOSYSTEM-UX3]` / `[MS-USER-ECOSYSTEM-AGT2]`. Full publish / license / re-share commons: §2.10 / `[MS-BROCODE-COMMONS]`.
+2. **Browse + Sandbox (not Marketplace-as-C4):** **Sabke Bhai** is browse (seed + Friend Circle path). Pickup installs at **C4 into Sandbox** (unverified on device). Near-term: `[MS-USER-ECOSYSTEM-UX3]` / `[MS-USER-ECOSYSTEM-AGT2]`. Full public commons: §2.10 / `[MS-BROCODE-COMMONS]`.
 3. **Due Diligence (C3):** When the user requests promotion, the Bro Code undergoes an automated and/or assisted **malicious-intent check** against the user (data exfiltration patterns, credential harvesting, destructive SQL, etc.). C3 units are restricted to delegated scoping — the user must explicitly invoke them ("Ask [Agent] to..."). **RUN remains disabled** until C2.
     * **Important:** Due diligence is **static policy / malicious-intent scanning** of source text. It does **not** execute the Bro Code. Syntax and runtime errors come from QuickJS `validateScriptSyntax` / RUN. IMPROVE **verify-before-handoff** gates on QuickJS syntax before offering APPLY. A SyntaxError on last RUN and a due-diligence finding can appear together because they are independent checks.
 4. **Verified (C2):** Bro Code that passes due diligence (or is force-promoted with device authentication) gains **RUN enabled**, real sensor access, and background execution privileges. The JS bridge refuses execution for non-C1/C2 units as defense in depth.
@@ -338,7 +349,7 @@ Use Kanban: **Bold (targeted) → *Italic* (in review) → <u>Underline</u> (acc
 *   **User Perspective (UI/UX):**
     *   [x] *`[MS-USER-ECOSYSTEM-UX1]` "Import Agent" / "Introduce to Ecosystem" UI — paste or upload JS source + JSON schema; assign 4-tier security class. [IN REVIEW]*
     *   [ ] ~~`[MS-USER-ECOSYSTEM-UX2]` Voice-driven fast authoring from Command Center — SUPERSEDED by `[MS-CONV-AUTHOR-UX1]`, which specifies the same voice-authoring behavior in fuller (one-shot + Socratic) detail. Tracked there.~~
-    *   [x] *`[MS-USER-ECOSYSTEM-UX3]` Agent Marketplace view — browse and pick up Not Verified (C4) Bro Code from the community pool (near-term local shell; publish/license/re-share commons later via §2.10 / `[MS-BROCODE-COMMONS]`). [IN REVIEW — local MARKETPLACE tab]*
+    *   [x] *`[MS-USER-ECOSYSTEM-UX3]` Sabke = browse; Sandbox = C4/C3 installs + test-later; preview (diligence, test, add to Sandbox). [IN REVIEW]*
 *   **Engineering & Architecture:**
     *   [x] *`[MS-USER-ECOSYSTEM-ENG1]` LLM agent authoring flow — user prompt "Create an agent that..." → BYOK generates JS + metadata → vault → register (distinct from agent execution). [IN REVIEW]*
     *   [x] *`[MS-USER-ECOSYSTEM-ENG2]` Agent lifecycle — list, delete, run, and export vault-stored agent bundles. [IN REVIEW]*
@@ -576,7 +587,7 @@ Use Kanban: **Bold (targeted) → *Italic* (in review) → <u>Underline</u> (acc
 *   **Scope (MVP):** Private GitHub repo as multi-city circle registry. Publish source+schema; CIRCLE tab lists/pickups. No paid acquire, no public commons.
 *   **User Perspective (UI/UX):**
     *   [x] ***`[MS-BROCODE-COMMONS-UX1]`** Publish sheet — license `remix_free` / `lineage_indexed` + confirm egress (source/schema only). [IN REVIEW]*
-    *   [x] ***`[MS-BROCODE-COMMONS-UX2]`** CIRCLE tab browse/pickup installs at C4. [IN REVIEW]*
+    *   [x] ***`[MS-BROCODE-COMMONS-UX2]`** FRIEND CIRCLE browse → preview; pickup installs at C4 → **Sandbox**. [IN REVIEW]*
     *   [ ] ~~`[MS-BROCODE-COMMONS-UX3]` After modify (IMPROVE), re-share creates a new revision; lineage-required parents block erase-ancestry re-license.~~
     *   [ ] ~~`[MS-BROCODE-COMMONS-UX4]` Lineage index view for `lineage_indexed` roots (forks from all sources that registered).~~
 *   **Engineering & Architecture:**
@@ -584,7 +595,7 @@ Use Kanban: **Bold (targeted) → *Italic* (in review) → <u>Underline</u> (acc
     *   [ ] ~~`[MS-BROCODE-COMMONS-ENG2]` Registry client + license conflict enforcement on publish; paid acquire hook (channel TBD).~~
     *   [ ] ~~`[MS-BROCODE-COMMONS-ENG3]` Modification index (fork graph) for `lineage_indexed` publications.~~
 *   **Ecosystem & Agents:**
-    *   [x] ***`[MS-BROCODE-COMMONS-AGT1]`** MARKETPLACE local seed + CIRCLE remote listings; pickup → C4. [IN REVIEW]*
+    *   [x] ***`[MS-BROCODE-COMMONS-AGT1]`** Sabke local seed browse + FRIEND CIRCLE remote; pickup → Sandbox (C4). [IN REVIEW]*
     *   [ ] ~~`[MS-BROCODE-COMMONS-AGT2]` Opt-in attach of Path L model / labeled pack only with separate §2.6 consent (cross-link `[MS-DATA-MARKET]`).~~
 
 ### - [ ] `[MS-OFFLINE-TTS]` MILESTONE: ~~Native Offline Voice Synthesis [DEFERRED]~~

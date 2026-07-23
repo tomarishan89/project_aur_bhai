@@ -8,6 +8,7 @@ import '../agents/agent_base.dart';
 import '../agents/js_agent_adapter.dart';
 import '../pipeline/authoring_trace.dart';
 import 'agent_service.dart';
+import 'bhai_code_origin.dart';
 import 'js_bridge_service.dart';
 import 'model_studio/bro_code_ml_meta.dart';
 import 'telemetry_bus.dart';
@@ -87,6 +88,8 @@ class JsAgentRegistry {
             assets: assets,
             securityClass:
                 AgentSecurityClassX.fromId(schema['securityClass'] as String?),
+            source: BhaiCodeOrigin.normalize(schema['source'] as String?),
+            diligencePassed: schema['diligencePassed'] as bool? ?? false,
             createdAt: createdAt,
             updatedAt: updatedAt,
           ),
@@ -177,6 +180,8 @@ class JsAgentRegistry {
     required Map<String, AgentParameter> inputSchema,
     required String script,
     AgentSecurityClass securityClass = AgentSecurityClass.c4Unverified,
+    String? source,
+    bool? diligencePassed,
     DateTime? createdAt,
     DateTime? updatedAt,
     BroCodeMlMeta? mlMeta,
@@ -193,14 +198,18 @@ class JsAgentRegistry {
     final agentService = _ref.read(agentServiceProvider);
     final now = DateTime.now().toIso8601String();
 
-    // Preserve existing createdAt when overwriting (e.g. refine).
+    // Preserve existing createdAt / source / diligence when overwriting.
     String? existingCreatedAt;
+    String? existingSource;
+    bool? existingDiligence;
     Map<String, dynamic>? priorMl;
     final priorSchema = await telemetry.readVaultData(schemaKeyFor(name));
     if (priorSchema != null) {
       try {
         final decoded = jsonDecode(priorSchema['value']!) as Map<String, dynamic>;
         existingCreatedAt = decoded['createdAt'] as String?;
+        existingSource = decoded['source'] as String?;
+        existingDiligence = decoded['diligencePassed'] as bool?;
         if (decoded['ml'] is Map) {
           priorMl = Map<String, dynamic>.from(decoded['ml'] as Map);
         }
@@ -209,6 +218,10 @@ class JsAgentRegistry {
 
     final created = createdAt?.toIso8601String() ?? existingCreatedAt ?? now;
     final updated = updatedAt?.toIso8601String() ?? now;
+    final resolvedSource = BhaiCodeOrigin.normalize(
+      source ?? existingSource ?? BhaiCodeOrigin.self,
+    );
+    final resolvedDiligence = diligencePassed ?? existingDiligence ?? false;
 
     await telemetry.writeVaultData(
       vaultKeyFor(name),
@@ -219,6 +232,8 @@ class JsAgentRegistry {
       'name': name,
       'description': description,
       'securityClass': securityClass.id,
+      'source': resolvedSource,
+      'diligencePassed': resolvedDiligence,
       'createdAt': created,
       'updatedAt': updated,
       'inputSchema': inputSchema.map(
@@ -245,6 +260,8 @@ class JsAgentRegistry {
       script: script,
       assets: assets,
       securityClass: securityClass,
+      source: resolvedSource,
+      diligencePassed: resolvedDiligence,
       createdAt: DateTime.tryParse(created),
       updatedAt: DateTime.tryParse(updated),
     );
@@ -326,12 +343,50 @@ class JsAgentRegistry {
           script: existing.script,
           assets: existing.assets,
           securityClass: securityClass,
+          source: existing.source,
+          diligencePassed: existing.diligencePassed,
           createdAt: existing.createdAt,
           updatedAt: existing.updatedAt,
         ),
       );
     }
     debugPrint('[JsAgentRegistry] Updated $name security class to ${securityClass.id}');
+    return true;
+  }
+
+  /// Persist on-demand diligence result (does not change security class).
+  Future<bool> setDiligencePassed(String name, bool passed) async {
+    final telemetry = _ref.read(telemetryBusProvider);
+    final schemaEntry = await telemetry.readVaultData(schemaKeyFor(name));
+    if (schemaEntry == null) return false;
+
+    final schema = jsonDecode(schemaEntry['value']!) as Map<String, dynamic>;
+    schema['diligencePassed'] = passed;
+    await telemetry.writeVaultData(
+      schemaKeyFor(name),
+      jsonEncode(schema),
+      mimeType: 'application/json',
+    );
+
+    final agentService = _ref.read(agentServiceProvider);
+    final existing = agentService.findAgent(name);
+    if (existing is JsAgentAdapter) {
+      agentService.registerAgent(
+        JsAgentAdapter(
+          ref: _ref,
+          name: existing.name,
+          description: existing.description,
+          inputSchema: existing.inputSchema,
+          script: existing.script,
+          assets: existing.assets,
+          securityClass: existing.securityClass,
+          source: existing.source,
+          diligencePassed: passed,
+          createdAt: existing.createdAt,
+          updatedAt: existing.updatedAt,
+        ),
+      );
+    }
     return true;
   }
 

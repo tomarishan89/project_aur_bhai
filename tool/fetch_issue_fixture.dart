@@ -6,7 +6,7 @@
 ///   dart run tool/fetch_issue_fixture.dart --agent Locator --latest
 ///   dart run tool/fetch_issue_fixture.dart --latest
 ///
-/// Env: CIRCLE_OWNER, CIRCLE_REPO (default aur-bhai-circle)
+/// Env: CIRCLE_OWNER, CIRCLE_REPO (default aur_bhai_circle)
 library;
 
 import 'dart:convert';
@@ -19,7 +19,7 @@ Future<void> main(List<String> args) async {
       (issueArg == null && agentArg == null);
 
   final owner = Platform.environment['CIRCLE_OWNER'] ?? '';
-  final repo = Platform.environment['CIRCLE_REPO'] ?? 'aur-bhai-circle';
+  final repo = Platform.environment['CIRCLE_REPO'] ?? 'aur_bhai_circle';
   if (owner.isEmpty) {
     stderr.writeln('Set CIRCLE_OWNER (and optional CIRCLE_REPO).');
     exit(2);

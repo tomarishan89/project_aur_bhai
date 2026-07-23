@@ -8,7 +8,7 @@
 ///
 /// Env for --check / --ensure-repo:
 ///   CIRCLE_OWNER   GitHub user or org
-///   CIRCLE_REPO    default aur-bhai-circle
+///   CIRCLE_REPO    default aur_bhai_circle
 ///   CIRCLE_TOKEN   fine-grained PAT (Contents R/W; Issues R/W optional)
 library;
 
@@ -54,7 +54,7 @@ Future<void> main(List<String> args) async {
   final repo =
       Platform.environment['CIRCLE_REPO']?.trim().isNotEmpty == true
           ? Platform.environment['CIRCLE_REPO']!.trim()
-          : 'aur-bhai-circle';
+          : 'aur_bhai_circle';
   final token = Platform.environment['CIRCLE_TOKEN']?.trim() ?? '';
 
   if (owner.isEmpty || token.isEmpty) {
@@ -83,7 +83,7 @@ void _printChecklist() {
 === Friend Bro share — ops checklist ===
 
 1) GitHub (once)
-   - Create private repo: <you>/aur-bhai-circle
+   - Create private repo: <you>/aur_bhai_circle
    - Fine-grained PAT: Contents Read+Write (Issues R/W for SEND REPORT later)
    - Share PAT with friend OR add them as collaborator; keep a revoke SOP
 
