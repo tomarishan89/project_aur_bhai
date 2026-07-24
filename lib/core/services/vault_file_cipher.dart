@@ -75,9 +75,10 @@ class VaultFileCipher {
     final iv = enc.IV.fromSecureRandom(16);
     final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.cbc));
     final encrypted = encrypter.encryptBytes(plain, iv: iv);
-    final mac = Hmac(sha256, keyBytes)
-        .convert([...iv.bytes, ...encrypted.bytes])
-        .bytes;
+    final mac = Hmac(
+      sha256,
+      keyBytes,
+    ).convert([...iv.bytes, ...encrypted.bytes]).bytes;
     final out = BytesBuilder();
     out.add(utf8.encode(_magic));
     out.add(iv.bytes);
@@ -102,8 +103,10 @@ class VaultFileCipher {
     final macStart = sealed.length - 32;
     final cipher = sealed.sublist(offset, macStart);
     final expectedMac = sealed.sublist(macStart);
-    final actualMac =
-        Hmac(sha256, keyBytes).convert([...ivBytes, ...cipher]).bytes;
+    final actualMac = Hmac(
+      sha256,
+      keyBytes,
+    ).convert([...ivBytes, ...cipher]).bytes;
     for (var i = 0; i < 32; i++) {
       if (actualMac[i] != expectedMac[i]) {
         throw StateError('Sealed vault integrity check failed');

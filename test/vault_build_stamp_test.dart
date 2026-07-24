@@ -22,26 +22,28 @@ void main() {
     expect(a, isNot(c));
   });
 
-  test('injectHtmlBuildStamp inserts meta + badge; second inject is idempotent',
-      () {
-    const html = '''
+  test(
+    'injectHtmlBuildStamp inserts meta + badge; second inject is idempotent',
+    () {
+      const html = '''
 <!DOCTYPE html><html><head><title>t</title></head>
 <body><p>hi</p></body></html>
 ''';
-    final once = injectHtmlBuildStamp(html, 'abc12345 · 2026-07-17 12:41');
-    expect(once, contains('name="aur-bhai-build"'));
-    expect(once, contains('content="abc12345 · 2026-07-17 12:41"'));
-    expect(once, contains('id="aur-bhai-build"'));
-    expect(once, contains('build abc12345 · 2026-07-17 12:41'));
-    expect('name="aur-bhai-build"'.allMatches(once).length, 1);
-    expect('id="aur-bhai-build"'.allMatches(once).length, 1);
+      final once = injectHtmlBuildStamp(html, 'abc12345 · 2026-07-17 12:41');
+      expect(once, contains('name="aur-bhai-build"'));
+      expect(once, contains('content="abc12345 · 2026-07-17 12:41"'));
+      expect(once, contains('id="aur-bhai-build"'));
+      expect(once, contains('build abc12345 · 2026-07-17 12:41'));
+      expect('name="aur-bhai-build"'.allMatches(once).length, 1);
+      expect('id="aur-bhai-build"'.allMatches(once).length, 1);
 
-    final twice = injectHtmlBuildStamp(once, 'deadbeef · 2026-07-17 13:00');
-    expect('name="aur-bhai-build"'.allMatches(twice).length, 1);
-    expect('id="aur-bhai-build"'.allMatches(twice).length, 1);
-    expect(twice, contains('deadbeef · 2026-07-17 13:00'));
-    expect(twice, isNot(contains('abc12345')));
-  });
+      final twice = injectHtmlBuildStamp(once, 'deadbeef · 2026-07-17 13:00');
+      expect('name="aur-bhai-build"'.allMatches(twice).length, 1);
+      expect('id="aur-bhai-build"'.allMatches(twice).length, 1);
+      expect(twice, contains('deadbeef · 2026-07-17 13:00'));
+      expect(twice, isNot(contains('abc12345')));
+    },
+  );
 
   test('writeVaultData exposes matching build_id via read and list', () async {
     final bus = TelemetryBusService(
@@ -97,8 +99,7 @@ void main() {
   });
 
   test('stuck v3 DB missing build columns is repaired on initialize', () async {
-    final name =
-        'vault_stuck_v3_${DateTime.now().microsecondsSinceEpoch}.db';
+    final name = 'vault_stuck_v3_${DateTime.now().microsecondsSinceEpoch}.db';
     final path = join(await getDatabasesPath(), name);
 
     // Pretend user_version is already 3 but columns were never added.

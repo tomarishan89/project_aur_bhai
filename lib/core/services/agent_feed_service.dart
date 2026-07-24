@@ -22,31 +22,32 @@ class AgentFeedEntry {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'text': text,
-        'source': source,
-        'createdAt': createdAt.toIso8601String(),
-        'consumed': consumed,
-      };
+    'id': id,
+    'text': text,
+    'source': source,
+    'createdAt': createdAt.toIso8601String(),
+    'consumed': consumed,
+  };
 
   factory AgentFeedEntry.fromJson(Map<String, dynamic> json) {
     return AgentFeedEntry(
       id: json['id'] as String? ?? '',
       text: json['text'] as String? ?? '',
       source: json['source'] as String? ?? 'voice',
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+      createdAt:
+          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
           DateTime.now(),
       consumed: json['consumed'] as bool? ?? false,
     );
   }
 
   AgentFeedEntry copyWith({bool? consumed}) => AgentFeedEntry(
-        id: id,
-        text: text,
-        source: source,
-        createdAt: createdAt,
-        consumed: consumed ?? this.consumed,
-      );
+    id: id,
+    text: text,
+    source: source,
+    createdAt: createdAt,
+    consumed: consumed ?? this.consumed,
+  );
 }
 
 /// Persistent per-agent inbox in the sovereign vault.

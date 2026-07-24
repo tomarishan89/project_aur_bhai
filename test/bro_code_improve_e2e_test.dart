@@ -75,13 +75,12 @@ class ScriptedLlmProvider implements LlmProvider {
     bool jsonMode = false,
     Duration timeout = const Duration(seconds: 20),
     int maxTokens = 4000,
-  }) =>
-      complete(
-        prompt: '',
-        jsonMode: jsonMode,
-        timeout: timeout,
-        maxTokens: maxTokens,
-      );
+  }) => complete(
+    prompt: '',
+    jsonMode: jsonMode,
+    timeout: timeout,
+    maxTokens: maxTokens,
+  );
 
   @override
   Future<String> completeWithAudio({
@@ -89,23 +88,20 @@ class ScriptedLlmProvider implements LlmProvider {
     required File audio,
     bool jsonMode = false,
     Duration timeout = const Duration(seconds: 20),
-  }) =>
-      throw UnsupportedError('scripted-test has no audio');
+  }) => throw UnsupportedError('scripted-test has no audio');
 
   @override
   Future<String> transcribe(
     File audio, {
     Duration timeout = const Duration(seconds: 15),
-  }) =>
-      throw UnsupportedError('scripted-test has no transcribe');
+  }) => throw UnsupportedError('scripted-test has no transcribe');
 
   @override
   Future<List<int>> synthesizeSpeech({
     required String text,
     required String voice,
     Duration timeout = const Duration(seconds: 20),
-  }) =>
-      throw UnsupportedError('scripted-test has no TTS');
+  }) => throw UnsupportedError('scripted-test has no TTS');
 }
 
 BroCodeWorkspace _loadBrokenWorkspace() {
@@ -127,7 +123,8 @@ BroCodeWorkspace _loadBrokenWorkspace() {
     name: 'DevLoopBroken',
     description: 'E2E incomplete Bro Code',
     inputSchema: const {},
-    script: 'async function execute(params) {\n'
+    script:
+        'async function execute(params) {\n'
         '  return "broken"\n'
         '.\n'
         '}\n',
@@ -154,100 +151,107 @@ void main() {
       expect(fixtures.first.improveGoal, isNotNull);
     });
 
-    test('tools write_full improves incomplete Bro Code + records snapshots',
-        () async {
-      final workspace = _loadBrokenWorkspace();
-      final snaps = BroCodeSnapshotStore();
-      snaps.capture(workspace: workspace, action: 'baseline');
+    test(
+      'tools write_full improves incomplete Bro Code + records snapshots',
+      () async {
+        final workspace = _loadBrokenWorkspace();
+        final snaps = BroCodeSnapshotStore();
+        snaps.capture(workspace: workspace, action: 'baseline');
 
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-      final tools = container.read(
-        Provider((ref) => BroCodeAgentTools(ref, workspace)),
-      );
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        final tools = container.read(
+          Provider((ref) => BroCodeAgentTools(ref, workspace)),
+        );
 
-      const fixed = 'async function execute(params) {\n'
-          '  return "fixed";\n'
-          '}\n';
-      final obs = await tools.execute('write_full', {'content': fixed});
-      expect(obs.ok, isTrue);
-      expect(workspace.script, contains('return "fixed"'));
-      expect(workspace.script, isNot(contains('return "broken"')));
+        const fixed =
+            'async function execute(params) {\n'
+            '  return "fixed";\n'
+            '}\n';
+        final obs = await tools.execute('write_full', {'content': fixed});
+        expect(obs.ok, isTrue);
+        expect(workspace.script, contains('return "fixed"'));
+        expect(workspace.script, isNot(contains('return "broken"')));
 
-      snaps.capture(
-        workspace: workspace,
-        action: 'write_full',
-        summary: obs.summary,
-        turn: 1,
-      );
-      expect(snaps.snapshots.length, 2);
-      expect(snaps.head?.parentId, snaps.snapshots.first.id);
-      expect(snaps.head?.script, contains('fixed'));
-    });
+        snaps.capture(
+          workspace: workspace,
+          action: 'write_full',
+          summary: obs.summary,
+          turn: 1,
+        );
+        expect(snaps.snapshots.length, 2);
+        expect(snaps.head?.parentId, snaps.snapshots.first.id);
+        expect(snaps.head?.script, contains('fixed'));
+      },
+    );
 
-    test('broken fixture fails gates; scripted agent improves to verified',
-        () async {
-      if (!_quickJsNativeLibAvailable()) {
-        markTestSkipped('QuickJS native lib not built on this machine');
-        return;
-      }
+    test(
+      'broken fixture fails gates; scripted agent improves to verified',
+      () async {
+        if (!_quickJsNativeLibAvailable()) {
+          markTestSkipped('QuickJS native lib not built on this machine');
+          return;
+        }
 
-      final workspace = _loadBrokenWorkspace();
-      const goal = 'Fix the SyntaxError so execute returns a string.';
+        final workspace = _loadBrokenWorkspace();
+        const goal = 'Fix the SyntaxError so execute returns a string.';
 
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-      final bus = container.read(telemetryBusProvider);
-      await bus.initialize();
-      await bus.openSandbox(reset: true);
-      final bridge = container.read(jsBridgeServiceProvider);
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        final bus = container.read(telemetryBusProvider);
+        await bus.initialize();
+        await bus.openSandbox(reset: true);
+        final bridge = container.read(jsBridgeServiceProvider);
 
-      final before = bridge.validateScriptSyntax(workspace.script);
-      expect(before.ok, isFalse, reason: 'fixture must start broken');
+        final before = bridge.validateScriptSyntax(workspace.script);
+        expect(before.ok, isFalse, reason: 'fixture must start broken');
 
-      final tools = container.read(
-        Provider((ref) => BroCodeAgentTools(ref, workspace)),
-      );
-      final synObs = await tools.execute('validate_syntax', {});
-      expect(synObs.ok, isFalse);
+        final tools = container.read(
+          Provider((ref) => BroCodeAgentTools(ref, workspace)),
+        );
+        final synObs = await tools.execute('validate_syntax', {});
+        expect(synObs.ok, isFalse);
 
-      const fixed = 'async function execute(params) {\n'
-          '  return "fixed";\n'
-          '}\n';
-      final replies = [
-        jsonEncode({
-          'thought': 'overwrite broken script with valid execute',
-          'action': 'write_full',
-          'args': {'content': fixed},
-        }),
-        jsonEncode({
-          'thought': 'gates should be green',
-          'action': 'done',
-          'args': {'notes': 'E2E scripted fix'},
-        }),
-      ];
+        const fixed =
+            'async function execute(params) {\n'
+            '  return "fixed";\n'
+            '}\n';
+        final replies = [
+          jsonEncode({
+            'thought': 'overwrite broken script with valid execute',
+            'action': 'write_full',
+            'args': {'content': fixed},
+          }),
+          jsonEncode({
+            'thought': 'gates should be green',
+            'action': 'done',
+            'args': {'notes': 'E2E scripted fix'},
+          }),
+        ];
 
-      final snaps = BroCodeSnapshotStore();
-      final agent = container.read(broCodeCodingAgentProvider);
-      final result = await agent.improve(
-        workspace: workspace,
-        changeRequest: goal,
-        providerOverride: ScriptedLlmProvider(replies),
-        snapshotStore: snaps,
-        persistSnapshotsToVault: false,
-      );
+        final snaps = BroCodeSnapshotStore();
+        final agent = container.read(broCodeCodingAgentProvider);
+        final result = await agent.improve(
+          workspace: workspace,
+          changeRequest: goal,
+          providerOverride: ScriptedLlmProvider(replies),
+          snapshotStore: snaps,
+          persistSnapshotsToVault: false,
+        );
 
-      expect(result.verified, isTrue, reason: result.message);
-      expect(workspace.script, contains('return "fixed"'));
-      expect(
-        snaps.snapshots.length,
-        greaterThanOrEqualTo(2),
-        reason: 'baseline + post-edit snapshot',
-      );
-      expect(snaps.snapshots.any((s) => s.action == 'write_full'), isTrue);
+        expect(result.verified, isTrue, reason: result.message);
+        expect(workspace.script, contains('return "fixed"'));
+        expect(
+          snaps.snapshots.length,
+          greaterThanOrEqualTo(2),
+          reason: 'baseline + post-edit snapshot',
+        );
+        expect(snaps.snapshots.any((s) => s.action == 'write_full'), isTrue);
 
-      final after = bridge.validateScriptSyntax(workspace.script);
-      expect(after.ok, isTrue);
-    }, timeout: const Timeout(Duration(minutes: 2)));
+        final after = bridge.validateScriptSyntax(workspace.script);
+        expect(after.ok, isTrue);
+      },
+      timeout: const Timeout(Duration(minutes: 2)),
+    );
   });
 }

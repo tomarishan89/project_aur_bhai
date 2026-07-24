@@ -35,28 +35,28 @@ class SandboxQueueItem {
   });
 
   MarketplaceListing toListing() => MarketplaceListing(
-        id: id,
-        name: name,
-        description: description,
-        script: script,
-        inputSchema: inputSchema,
-        license: license,
-        author: author,
-        access: access,
-      );
+    id: id,
+    name: name,
+    description: description,
+    script: script,
+    inputSchema: inputSchema,
+    license: license,
+    author: author,
+    access: access,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'description': description,
-        'script': script,
-        'inputSchema': inputSchema,
-        'license': license,
-        'author': author,
-        'access': access.toJson(),
-        'enqueuedAt': enqueuedAt.toUtc().toIso8601String(),
-        'lastResult': lastResult,
-      };
+    'id': id,
+    'name': name,
+    'description': description,
+    'script': script,
+    'inputSchema': inputSchema,
+    'license': license,
+    'author': author,
+    'access': access.toJson(),
+    'enqueuedAt': enqueuedAt.toUtc().toIso8601String(),
+    'lastResult': lastResult,
+  };
 
   factory SandboxQueueItem.fromJson(Map<String, dynamic> json) {
     return SandboxQueueItem(
@@ -74,7 +74,8 @@ class SandboxQueueItem {
             ? Map<String, dynamic>.from(json['access'] as Map)
             : null,
       ),
-      enqueuedAt: DateTime.tryParse(json['enqueuedAt'] as String? ?? '') ??
+      enqueuedAt:
+          DateTime.tryParse(json['enqueuedAt'] as String? ?? '') ??
           DateTime.now().toUtc(),
       lastResult: json['lastResult'] as String?,
     );
@@ -95,17 +96,17 @@ class SandboxQueueItem {
   }
 
   SandboxQueueItem copyWith({String? lastResult}) => SandboxQueueItem(
-        id: id,
-        name: name,
-        description: description,
-        script: script,
-        inputSchema: inputSchema,
-        license: license,
-        author: author,
-        access: access,
-        enqueuedAt: enqueuedAt,
-        lastResult: lastResult ?? this.lastResult,
-      );
+    id: id,
+    name: name,
+    description: description,
+    script: script,
+    inputSchema: inputSchema,
+    license: license,
+    author: author,
+    access: access,
+    enqueuedAt: enqueuedAt,
+    lastResult: lastResult ?? this.lastResult,
+  );
 }
 
 /// Persisted Sandbox "test later" queue.
@@ -126,9 +127,7 @@ class SandboxQueueService extends ChangeNotifier {
       try {
         final list = jsonDecode(raw) as List;
         for (final e in list.whereType<Map>()) {
-          _items.add(
-            SandboxQueueItem.fromJson(Map<String, dynamic>.from(e)),
-          );
+          _items.add(SandboxQueueItem.fromJson(Map<String, dynamic>.from(e)));
         }
       } catch (e) {
         debugPrint('[SandboxQueue] load error: $e');
@@ -169,8 +168,7 @@ class SandboxQueueService extends ChangeNotifier {
   }
 }
 
-final sandboxQueueProvider =
-    ChangeNotifierProvider<SandboxQueueService>((ref) {
+final sandboxQueueProvider = ChangeNotifierProvider<SandboxQueueService>((ref) {
   final q = SandboxQueueService();
   unawaited(q.load());
   return q;

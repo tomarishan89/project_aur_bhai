@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -105,45 +104,55 @@ void main() {
         '```',
       );
       expect(action['action'], 'write_full');
-      expect((action['args'] as Map)['content'], contains('async function execute'));
+      expect(
+        (action['args'] as Map)['content'],
+        contains('async function execute'),
+      );
     });
 
-    test('empty write_full marks skipIdenticalFailure and hints apply_edit', () async {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-      final toolsProvider = Provider(
-        (ref) => BroCodeAgentTools(
-          ref,
-          BroCodeWorkspace(
-            name: 'Locator',
-            description: 'd',
-            inputSchema: const {},
-            script: 'async function execute(params) { return "x"; }\n',
-            assets: const {'Locator.html': '<!DOCTYPE html><html></html>'},
+    test(
+      'empty write_full marks skipIdenticalFailure and hints apply_edit',
+      () async {
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        final toolsProvider = Provider(
+          (ref) => BroCodeAgentTools(
+            ref,
+            BroCodeWorkspace(
+              name: 'Locator',
+              description: 'd',
+              inputSchema: const {},
+              script: 'async function execute(params) { return "x"; }\n',
+              assets: const {'Locator.html': '<!DOCTYPE html><html></html>'},
+            ),
           ),
-        ),
-      );
-      final tools = container.read(toolsProvider);
-      final obs = await tools.execute('write_full', {});
-      expect(obs.ok, isFalse);
-      expect(obs.summary, 'Missing content / scriptBase64');
-      expect(obs.data?['skipIdenticalFailure'], isTrue);
-      expect(obs.data?['refundTurn'], isTrue);
-      expect(obs.nextHint?.toLowerCase(), contains('apply_edit'));
-    });
+        );
+        final tools = container.read(toolsProvider);
+        final obs = await tools.execute('write_full', {});
+        expect(obs.ok, isFalse);
+        expect(obs.summary, 'Missing content / scriptBase64');
+        expect(obs.data?['skipIdenticalFailure'], isTrue);
+        expect(obs.data?['refundTurn'], isTrue);
+        expect(obs.nextHint?.toLowerCase(), contains('apply_edit'));
+      },
+    );
 
     test('write_full budget is split between script and assets', () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
-      final tools = container.read(Provider((ref) => BroCodeAgentTools(
-        ref,
-        BroCodeWorkspace(
-          name: 'Demo',
-          description: '',
-          inputSchema: const {},
-          script: '',
+      final tools = container.read(
+        Provider(
+          (ref) => BroCodeAgentTools(
+            ref,
+            BroCodeWorkspace(
+              name: 'Demo',
+              description: '',
+              inputSchema: const {},
+              script: '',
+            ),
+          ),
         ),
-      )));
+      );
 
       // Exhaust script budget
       for (var i = 0; i < BroCodeAgentTools.maxWriteFullScriptPerRun; i++) {
@@ -155,25 +164,30 @@ void main() {
       expect(overScript.summary, contains('script budget exhausted'));
 
       // Asset budget still available
-      final assetObs = await tools.execute(
-        'write_full',
-        {'asset': 'a.html', 'content': 'html'},
-      );
+      final assetObs = await tools.execute('write_full', {
+        'asset': 'a.html',
+        'content': 'html',
+      });
       expect(assetObs.ok, isTrue);
       expect(tools.workspace.assets['a.html'], 'html');
     });
 
-    test('write_full rejects embedded HTML execute rewrite under preferAssetExtraction', () async {
-      final script = 'async function execute() {\n  const html = `<!DOCTYPE html>...`;\n}';
-      
-      // We manually simulate the logic of the preferAssetExtraction rejection
-      final preferAssetExtraction = true;
-      final rejected = preferAssetExtraction &&
-          (script.contains('<!DOCTYPE') || script.length > 2000);
-          
-      expect(rejected, isTrue);
-    });
-    
+    test(
+      'write_full rejects embedded HTML execute rewrite under preferAssetExtraction',
+      () async {
+        final script =
+            'async function execute() {\n  const html = `<!DOCTYPE html>...`;\n}';
+
+        // We manually simulate the logic of the preferAssetExtraction rejection
+        final preferAssetExtraction = true;
+        final rejected =
+            preferAssetExtraction &&
+            (script.contains('<!DOCTYPE') || script.length > 2000);
+
+        expect(rejected, isTrue);
+      },
+    );
+
     test('auto-thin path: host auto-thins execute after HTML asset write', () {
       const script = r'''
 async function execute(params) {
@@ -193,13 +207,14 @@ async function execute(params) {
 
       final looksLikeNested =
           BroCodeCodingAgent.looksLikeNestedHtmlTemplateSyntaxFailure(
-        script: script,
-        syntaxObservation: syntaxObs,
-      );
+            script: script,
+            syntaxObservation: syntaxObs,
+          );
       expect(looksLikeNested, isTrue);
 
       const targetAsset = 'dashboard.html';
-      final thinScript = '''
+      final thinScript =
+          '''
 async function execute(params) {
   const html = System.assets["$targetAsset"];
   if (html) {
@@ -230,14 +245,8 @@ async function execute(params) {
       AgentBridgeSpec.bridgeSpecForLlm.toUpperCase(),
       contains('DATA VOLUME'),
     );
-    expect(
-      AgentBridgeSpec.bridgeSpecForLlm.toUpperCase(),
-      contains('LIMIT'),
-    );
-    expect(
-      AgentBridgeSpec.slotFillingHint.toLowerCase(),
-      contains('paginate'),
-    );
+    expect(AgentBridgeSpec.bridgeSpecForLlm.toUpperCase(), contains('LIMIT'));
+    expect(AgentBridgeSpec.slotFillingHint.toLowerCase(), contains('paginate'));
   });
 
   test('due diligence ignores browser APIs inside escaped HTML template', () {
@@ -255,9 +264,10 @@ async function execute(params) {
     expect(scan.passed, isTrue, reason: scan.findings.join('; '));
   });
 
-  test('due diligence does not turn malformed dashboard syntax into DOM finding',
-      () {
-    const malformed = r'''
+  test(
+    'due diligence does not turn malformed dashboard syntax into DOM finding',
+    () {
+      const malformed = r'''
 async function execute(params) {
   const html = `<!DOCTYPE html><html><script>
     const row = `<div>\${document.title}</div>`;
@@ -266,13 +276,16 @@ async function execute(params) {
   return html;
 }
 ''';
-    final scan = AgentVerificationService().scanScript(malformed);
-    expect(scan.passed, isTrue, reason: scan.findings.join('; '));
-  });
+      final scan = AgentVerificationService().scanScript(malformed);
+      expect(scan.passed, isTrue, reason: scan.findings.join('; '));
+    },
+  );
 
-  test('due diligence ignores unescaped SQL backticks inside HTML dashboard', () {
-    // Real IMPROVE failure mode: nested ` for SQL inside outer HTML template.
-    const script = r'''
+  test(
+    'due diligence ignores unescaped SQL backticks inside HTML dashboard',
+    () {
+      // Real IMPROVE failure mode: nested ` for SQL inside outer HTML template.
+      const script = r'''
 async function execute(params) {
   const html = `<!DOCTYPE html><html><body>
   <script>
@@ -293,9 +306,10 @@ async function execute(params) {
   return 'ok';
 }
 ''';
-    final scan = AgentVerificationService().scanScript(script);
-    expect(scan.passed, isTrue, reason: scan.findings.join('; '));
-  });
+      final scan = AgentVerificationService().scanScript(script);
+      expect(scan.passed, isTrue, reason: scan.findings.join('; '));
+    },
+  );
 
   test('due diligence ignores fetch inside service-worker vault template', () {
     const script = r'''
@@ -333,10 +347,16 @@ async function execute(params) {
       const messy = 'async function execute() {\r\n  return 1;  \r\n}';
       final result = BroCodeStyleChecker.format(messy);
       expect(result.changed, isTrue);
-      expect(result.formattedScript, 'async function execute() {\n  return 1;\n}\n');
+      expect(
+        result.formattedScript,
+        'async function execute() {\n  return 1;\n}\n',
+      );
       expect(result.findings.any((f) => f.code == 'CRLF'), isTrue);
       expect(result.findings.any((f) => f.code == 'TRAILING_WS'), isTrue);
-      expect(BroCodeStyleChecker.format(result.formattedScript).changed, isFalse);
+      expect(
+        BroCodeStyleChecker.format(result.formattedScript).changed,
+        isFalse,
+      );
     });
 
     test('style flags mixed indent and console.log outside HTML', () {
@@ -398,7 +418,10 @@ async function execute(params) {
       expect(obs.tool, 'apply_format');
       expect(tools.formatOkAfterLastMutate, isTrue);
       expect(tools.syntaxOkAfterLastMutate, isTrue);
-      expect(BroCodeStyleChecker.format(tools.workspace.script).changed, isFalse);
+      expect(
+        BroCodeStyleChecker.format(tools.workspace.script).changed,
+        isFalse,
+      );
     });
 
     test('ensureFormat on already-clean script keeps formatOk', () {
@@ -454,83 +477,88 @@ async function execute(params) {
   });
 
   group('done gates include format, style, and policy', () {
-    test('canDeclareDone is false until format, style, and policy flags are set', () {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-      final toolsProvider = Provider(
-        (ref) => BroCodeAgentTools(
-          ref,
-          BroCodeWorkspace(
-            name: 'Demo',
-            description: 'd',
-            inputSchema: const {},
-            script: 'async function execute() { return 1; }\n',
+    test(
+      'canDeclareDone is false until format, style, and policy flags are set',
+      () {
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        final toolsProvider = Provider(
+          (ref) => BroCodeAgentTools(
+            ref,
+            BroCodeWorkspace(
+              name: 'Demo',
+              description: 'd',
+              inputSchema: const {},
+              script: 'async function execute() { return 1; }\n',
+            ),
           ),
-        ),
-      );
-      final tools = container.read(toolsProvider);
-      expect(tools.canDeclareDone, isFalse);
-      tools.syntaxOkAfterLastMutate = true;
-      tools.sandboxOkAfterLastMutate = true;
-      expect(tools.canDeclareDone, isFalse);
-      tools.formatOkAfterLastMutate = true;
-      expect(tools.canDeclareDone, isFalse);
-      tools.styleOkAfterLastMutate = true;
-      expect(tools.canDeclareDone, isFalse);
-      tools.policyOkAfterLastMutate = true;
-      // goalOk defaults true until a mutate clears it.
-      expect(tools.canDeclareDone, isTrue);
-      tools.goalOkAfterLastMutate = false;
-      expect(tools.canDeclareDone, isFalse);
-      tools.goalOkAfterLastMutate = true;
-      expect(tools.canDeclareDone, isTrue);
-    });
+        );
+        final tools = container.read(toolsProvider);
+        expect(tools.canDeclareDone, isFalse);
+        tools.syntaxOkAfterLastMutate = true;
+        tools.sandboxOkAfterLastMutate = true;
+        expect(tools.canDeclareDone, isFalse);
+        tools.formatOkAfterLastMutate = true;
+        expect(tools.canDeclareDone, isFalse);
+        tools.styleOkAfterLastMutate = true;
+        expect(tools.canDeclareDone, isFalse);
+        tools.policyOkAfterLastMutate = true;
+        // goalOk defaults true until a mutate clears it.
+        expect(tools.canDeclareDone, isTrue);
+        tools.goalOkAfterLastMutate = false;
+        expect(tools.canDeclareDone, isFalse);
+        tools.goalOkAfterLastMutate = true;
+        expect(tools.canDeclareDone, isTrue);
+      },
+    );
   });
 
   group('policy gate', () {
-    test('policyOkAfterLastMutate is required for done and set by scan_policy',
-        () async {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-      final toolsProvider = Provider(
-        (ref) => BroCodeAgentTools(
-          ref,
-          BroCodeWorkspace(
-            name: 'Demo',
-            description: 'd',
-            inputSchema: const {},
-            script: '''
+    test(
+      'policyOkAfterLastMutate is required for done and set by scan_policy',
+      () async {
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        final toolsProvider = Provider(
+          (ref) => BroCodeAgentTools(
+            ref,
+            BroCodeWorkspace(
+              name: 'Demo',
+              description: 'd',
+              inputSchema: const {},
+              script: '''
 async function execute(params) {
   document.title = "x";
   return "ok";
 }
 ''',
+            ),
           ),
-        ),
-      );
-      final tools = container.read(toolsProvider);
-      tools.syntaxOkAfterLastMutate = true;
-      tools.sandboxOkAfterLastMutate = true;
-      tools.formatOkAfterLastMutate = true;
-      tools.styleOkAfterLastMutate = true;
-      expect(tools.canDeclareDone, isFalse);
+        );
+        final tools = container.read(toolsProvider);
+        tools.syntaxOkAfterLastMutate = true;
+        tools.sandboxOkAfterLastMutate = true;
+        tools.formatOkAfterLastMutate = true;
+        tools.styleOkAfterLastMutate = true;
+        expect(tools.canDeclareDone, isFalse);
 
-      final obs = await tools.execute('scan_policy', {});
-      expect(obs.ok, isFalse);
-      expect(tools.policyOkAfterLastMutate, isFalse);
-      expect(tools.canDeclareDone, isFalse);
+        final obs = await tools.execute('scan_policy', {});
+        expect(obs.ok, isFalse);
+        expect(tools.policyOkAfterLastMutate, isFalse);
+        expect(tools.canDeclareDone, isFalse);
 
-      // Clean script: policy should pass.
-      tools.workspace.script = '''
+        // Clean script: policy should pass.
+        tools.workspace.script = '''
 async function execute(params) {
   System.log("ok");
   return "ok";
 }
 ''';
-      final clean = await tools.execute('scan_policy', {});
-      expect(clean.ok, isTrue, reason: clean.detail);
-      expect(tools.policyOkAfterLastMutate, isTrue);
-    });
+        final clean = await tools.execute('scan_policy', {});
+        expect(clean.ok, isTrue, reason: clean.detail);
+        expect(tools.policyOkAfterLastMutate, isTrue);
+      },
+    );
   });
 
   group('stuck-loop fingerprint', () {
@@ -571,17 +599,17 @@ async function execute(params) {
 
   group('IMPROVE session trim + fresh', () {
     BroCodeImproveAttempt _attempt(int n) => BroCodeImproveAttempt(
-          attemptNumber: n,
-          completedAt: DateTime.utc(2026, 7, 16, n),
-          changeRequest: 'change $n',
-          verified: false,
-          outcomeMessage: 'fail $n',
-          turnsUsed: 1,
-          estimatedTokensUsed: 10,
-          agentActivity: const [],
-          scriptBefore: 'before$n',
-          scriptAfter: 'after$n',
-        );
+      attemptNumber: n,
+      completedAt: DateTime.utc(2026, 7, 16, n),
+      changeRequest: 'change $n',
+      verified: false,
+      outcomeMessage: 'fail $n',
+      turnsUsed: 1,
+      estimatedTokensUsed: 10,
+      agentActivity: const [],
+      scriptBefore: 'before$n',
+      scriptAfter: 'after$n',
+    );
 
     test('addAttempt trims oldest beyond maxPersistedAttempts', () {
       final session = BroCodeImproveSession(
@@ -589,10 +617,17 @@ async function execute(params) {
         startedAt: DateTime.utc(2026, 7, 15),
       );
       var lastDropped = 0;
-      for (var i = 1; i <= BroCodeImproveSession.maxPersistedAttempts + 2; i++) {
+      for (
+        var i = 1;
+        i <= BroCodeImproveSession.maxPersistedAttempts + 2;
+        i++
+      ) {
         lastDropped = session.addAttempt(_attempt(i));
       }
-      expect(session.attempts.length, BroCodeImproveSession.maxPersistedAttempts);
+      expect(
+        session.attempts.length,
+        BroCodeImproveSession.maxPersistedAttempts,
+      );
       expect(lastDropped, greaterThan(0));
       expect(session.attempts.first.attemptNumber, 3);
       expect(session.attempts.last.attemptNumber, 7);
@@ -622,7 +657,10 @@ async function execute(params) {
         oversized.attempts.add(_attempt(i));
       }
       final loaded = BroCodeImproveSession.fromJson(oversized.toJson());
-      expect(loaded.attempts.length, BroCodeImproveSession.maxPersistedAttempts);
+      expect(
+        loaded.attempts.length,
+        BroCodeImproveSession.maxPersistedAttempts,
+      );
     });
   });
 
@@ -696,7 +734,11 @@ async function execute(params) {
         detail: '• [TRAILING_WS] L2: Trailing whitespace.',
         data: {
           'findings': [
-            {'code': 'TRAILING_WS', 'message': 'Trailing whitespace.', 'line': 2},
+            {
+              'code': 'TRAILING_WS',
+              'message': 'Trailing whitespace.',
+              'line': 2,
+            },
           ],
         },
       );
@@ -836,9 +878,7 @@ async function execute(params) {
       expect(BroCodePlatformIntegrity.isHalfThinScript(script), isTrue);
       final result = BroCodePlatformIntegrity.check(
         script: script,
-        assets: {
-          'dash.html': '<!DOCTYPE html><html><body>ok</body></html>',
-        },
+        assets: {'dash.html': '<!DOCTYPE html><html><body>ok</body></html>'},
       );
       expect(result.ok, isFalse);
       expect(result.halfThinScript, isTrue);
@@ -867,10 +907,9 @@ async function execute(params) {
 
     test('case-insensitive asset resolve', () {
       expect(
-        BroCodePlatformIntegrity.resolveAssetKey(
-          {'Locator.html': 'x'},
-          'locator.html',
-        ),
+        BroCodePlatformIntegrity.resolveAssetKey({
+          'Locator.html': 'x',
+        }, 'locator.html'),
         'Locator.html',
       );
     });
@@ -878,27 +917,29 @@ async function execute(params) {
     test('host thin repair clears orphan via tools', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
-      final tools = container.read(Provider(
-        (ref) => BroCodeAgentTools(
-          ref,
-          BroCodeWorkspace(
-            name: 'AnyAgent',
-            description: 'd',
-            inputSchema: const {},
-            script: '''
+      final tools = container.read(
+        Provider(
+          (ref) => BroCodeAgentTools(
+            ref,
+            BroCodeWorkspace(
+              name: 'AnyAgent',
+              description: 'd',
+              inputSchema: const {},
+              script: '''
 async function execute(params) {
   const html = `<!DOCTYPE html><html><body>embedded</body></html>`;
   await System.writeVault('old.html', html, 'text/html');
   return 'ok';
 }
 ''',
-            assets: {
-              'dash.html':
-                  '<!DOCTYPE html><html><body>from asset</body></html>',
-            },
+              assets: {
+                'dash.html':
+                    '<!DOCTYPE html><html><body>from asset</body></html>',
+              },
+            ),
           ),
         ),
-      ));
+      );
       final before = tools.checkPlatformIntegrity();
       expect(before.ok, isFalse);
       final repair = tools.applyThinPublishRepair(htmlAssetId: 'dash.html');
@@ -1080,7 +1121,11 @@ async function execute(params) {
         script: script,
         assets: {'locator.html': orphanAsset},
       );
-      expect(result.ok, isFalse, reason: 'orphan asset must not green the gate');
+      expect(
+        result.ok,
+        isFalse,
+        reason: 'orphan asset must not green the gate',
+      );
       expect(
         result.findings.any(
           (f) =>
@@ -1092,14 +1137,16 @@ async function execute(params) {
       );
     });
 
-    test('accepts from/to datetime when published via System.assets writeVault', () {
-      const thin = '''
+    test(
+      'accepts from/to datetime when published via System.assets writeVault',
+      () {
+        const thin = '''
 async function execute(params) {
   await System.writeVault('Locator.html', System.assets['Locator.html'], 'text/html');
   return 'ok';
 }
 ''';
-      const htmlAsset = '''
+        const htmlAsset = '''
 <!DOCTYPE html><html><head><title>Locator</title></head><body>
 <label>From: <input type="datetime-local" id="fromTime"></label>
 <label>To: <input type="datetime-local" id="toTime"></label>
@@ -1114,14 +1161,15 @@ async function execute(params) {
 </script>
 </body></html>
 ''';
-      final result = BroCodeDashboardGoalChecker.checkAgainstChangeRequest(
-        changeRequest:
-            'Instead of a slider, give me from datetime and to datetime inputs.',
-        script: thin,
-        assets: {'Locator.html': htmlAsset},
-      );
-      expect(result.ok, isTrue, reason: result.findings.join('\n'));
-    });
+        final result = BroCodeDashboardGoalChecker.checkAgainstChangeRequest(
+          changeRequest:
+              'Instead of a slider, give me from datetime and to datetime inputs.',
+          script: thin,
+          assets: {'Locator.html': htmlAsset},
+        );
+        expect(result.ok, isTrue, reason: result.findings.join('\n'));
+      },
+    );
 
     test('renderability rejects unguarded Leaflet and SW without asset', () {
       const html = '''
@@ -1215,7 +1263,8 @@ async function execute(params) {
 }
 ''';
       final result = BroCodeDashboardGoalChecker.checkAgainstChangeRequest(
-        changeRequest: 'Give me a slider to control time range of selected coordinates',
+        changeRequest:
+            'Give me a slider to control time range of selected coordinates',
         script: script,
       );
       expect(result.ok, isFalse);

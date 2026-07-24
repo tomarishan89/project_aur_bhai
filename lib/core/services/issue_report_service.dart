@@ -58,14 +58,14 @@ class IssueReport {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'githubIssueNumber': githubIssueNumber,
-        'title': title,
-        'status': status.name,
-        'statusNote': statusNote,
-        'createdAt': createdAt.toIso8601String(),
-        'agentName': agentName,
-      };
+    'id': id,
+    'githubIssueNumber': githubIssueNumber,
+    'title': title,
+    'status': status.name,
+    'statusNote': statusNote,
+    'createdAt': createdAt.toIso8601String(),
+    'agentName': agentName,
+  };
 
   factory IssueReport.fromJson(Map<String, dynamic> json) {
     return IssueReport(
@@ -77,16 +77,14 @@ class IssueReport {
         orElse: () => IssueReportStatus.received,
       ),
       statusNote: json['statusNote'] as String?,
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+      createdAt:
+          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
           DateTime.now(),
       agentName: json['agentName'] as String?,
     );
   }
 
-  IssueReport copyWith({
-    IssueReportStatus? status,
-    String? statusNote,
-  }) =>
+  IssueReport copyWith({IssueReportStatus? status, String? statusNote}) =>
       IssueReport(
         id: id,
         githubIssueNumber: githubIssueNumber,
@@ -101,10 +99,11 @@ class IssueReport {
 /// User-consented fixture → GitHub Issue → local status (MVP-S12).
 class IssueReportService extends ChangeNotifier {
   IssueReportService(this._ref, {SecureSecretStore? secretStore})
-      : _secrets = secretStore ??
-            (Platform.environment.containsKey('FLUTTER_TEST')
-                ? MemorySecureSecretStore()
-                : FlutterSecureSecretStore());
+    : _secrets =
+          secretStore ??
+          (Platform.environment.containsKey('FLUTTER_TEST')
+              ? MemorySecureSecretStore()
+              : FlutterSecureSecretStore());
 
   final Ref _ref;
   final SecureSecretStore _secrets;
@@ -156,10 +155,10 @@ class IssueReportService extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     final owner = prefs.getString(AppConfig.circlePrefsOwnerKey) ?? '';
-    final repo = prefs.getString(AppConfig.circlePrefsRepoKey) ??
+    final repo =
+        prefs.getString(AppConfig.circlePrefsRepoKey) ??
         AppConfig.circleDefaultRepo;
-    final token =
-        await _secrets.read(AppConfig.circlePrefsTokenKey) ?? '';
+    final token = await _secrets.read(AppConfig.circlePrefsTokenKey) ?? '';
 
     final bundle = BroCodeFixtureReport.reportToBundleJson(report.toJson());
     final agentName = report.workspace.name;
@@ -199,15 +198,15 @@ class IssueReportService extends ChangeNotifier {
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
-        'title': note.isEmpty
-            ? title
-            : '[$agentName] $issueTitle',
+        'title': note.isEmpty ? title : '[$agentName] $issueTitle',
         'body': body.toString(),
         'labels': ['aur-bhai-report', 'received'],
       }),
     );
     if (res.statusCode != 201) {
-      throw Exception('Create issue failed: HTTP ${res.statusCode} ${res.body}');
+      throw Exception(
+        'Create issue failed: HTTP ${res.statusCode} ${res.body}',
+      );
     }
     final created = jsonDecode(res.body) as Map<String, dynamic>;
     final number = created['number'] as int?;
@@ -233,10 +232,10 @@ class IssueReportService extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     final owner = prefs.getString(AppConfig.circlePrefsOwnerKey) ?? '';
-    final repo = prefs.getString(AppConfig.circlePrefsRepoKey) ??
+    final repo =
+        prefs.getString(AppConfig.circlePrefsRepoKey) ??
         AppConfig.circleDefaultRepo;
-    final token =
-        await _secrets.read(AppConfig.circlePrefsTokenKey) ?? '';
+    final token = await _secrets.read(AppConfig.circlePrefsTokenKey) ?? '';
 
     for (var i = 0; i < _reports.length; i++) {
       final r = _reports[i];
@@ -256,7 +255,8 @@ class IssueReportService extends ChangeNotifier {
         );
         if (res.statusCode != 200) continue;
         final body = jsonDecode(res.body) as Map<String, dynamic>;
-        final labels = (body['labels'] as List?)
+        final labels =
+            (body['labels'] as List?)
                 ?.map((e) => (e is Map ? e['name'] : e)?.toString() ?? '')
                 .toList() ??
             const <String>[];
@@ -287,8 +287,9 @@ class IssueReportService extends ChangeNotifier {
   }
 }
 
-final issueReportServiceProvider =
-    ChangeNotifierProvider<IssueReportService>((ref) {
+final issueReportServiceProvider = ChangeNotifierProvider<IssueReportService>((
+  ref,
+) {
   final svc = IssueReportService(ref);
   unawaited(svc.load());
   return svc;

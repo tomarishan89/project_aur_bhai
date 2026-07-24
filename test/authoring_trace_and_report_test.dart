@@ -25,7 +25,10 @@ void main() {
       buildOutcome: 'built',
     ).sanitized();
     expect(trace.truncated, isTrue);
-    expect(trace.turns.length, lessThanOrEqualTo(AppConfig.authoringTraceMaxTurns));
+    expect(
+      trace.turns.length,
+      lessThanOrEqualTo(AppConfig.authoringTraceMaxTurns),
+    );
     expect(trace.turns.first.text, contains('***'));
     expect(trace.turns.first.text, isNot(contains('sk-secret')));
   });
@@ -45,9 +48,7 @@ void main() {
       failureMessage: 'x',
       authoringTrace: AuthoringTrace(
         agentName: 'Demo',
-        turns: [
-          AuthoringTurn(role: 'user', text: 'Build a counter', at: at),
-        ],
+        turns: [AuthoringTurn(role: 'user', text: 'Build a counter', at: at)],
         buildOutcome: 'built',
       ),
     );

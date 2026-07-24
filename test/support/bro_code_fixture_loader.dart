@@ -19,17 +19,13 @@ class BroCodeFixture {
     this.assets = const {},
   });
 
-  bool? get expectSyntaxOk =>
-      fixtureExpectations['expectSyntaxOk'] as bool?;
+  bool? get expectSyntaxOk => fixtureExpectations['expectSyntaxOk'] as bool?;
 
-  bool? get expectSandboxOk =>
-      fixtureExpectations['expectSandboxOk'] as bool?;
+  bool? get expectSandboxOk => fixtureExpectations['expectSandboxOk'] as bool?;
 
-  bool? get expectFormatOk =>
-      fixtureExpectations['expectFormatOk'] as bool?;
+  bool? get expectFormatOk => fixtureExpectations['expectFormatOk'] as bool?;
 
-  bool? get expectStyleOk =>
-      fixtureExpectations['expectStyleOk'] as bool?;
+  bool? get expectStyleOk => fixtureExpectations['expectStyleOk'] as bool?;
 
   List<String> get expectHtmlKeys {
     final raw = fixtureExpectations['expectHtmlKeys'];
@@ -40,8 +36,7 @@ class BroCodeFixture {
         .toList();
   }
 
-  bool? get expectNoCanvas =>
-      fixtureExpectations['expectNoCanvas'] as bool?;
+  bool? get expectNoCanvas => fixtureExpectations['expectNoCanvas'] as bool?;
 
   bool? get expectLeafletMap =>
       fixtureExpectations['expectLeafletMap'] as bool?;
@@ -51,8 +46,7 @@ class BroCodeFixture {
   bool? get expectNoDanglingDom =>
       fixtureExpectations['expectNoDanglingDom'] as bool?;
 
-  String? get improveGoal =>
-      fixtureExpectations['improveGoal'] as String?;
+  String? get improveGoal => fixtureExpectations['improveGoal'] as String?;
 
   /// Optional multi-attempt session payload from reportVersion 2 exports.
   Map<String, dynamic>? get session {
@@ -75,8 +69,7 @@ class BroCodeFixture {
       try {
         final inner = jsonDecode(raw['content'] as String);
         if (inner is Map && inner['broCode'] is Map) {
-          final normalized =
-              _reportToBundle(Map<String, dynamic>.from(inner));
+          final normalized = _reportToBundle(Map<String, dynamic>.from(inner));
           return BroCodeFixture._fromBundleMap(file.path, normalized);
         }
       } on FormatException {

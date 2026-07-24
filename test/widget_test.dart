@@ -14,12 +14,10 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('Ambient Hub builds with Command Center + nav', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const ProviderScope(
-        child: ProjectAurBhaiApp(),
-      ),
-    );
+  testWidgets('Ambient Hub builds with Command Center + nav', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const ProviderScope(child: ProjectAurBhaiApp()));
     // One frame only: the central indicator runs an infinite breathing animation,
     // so pumpAndSettle would never converge.
     await tester.pump();

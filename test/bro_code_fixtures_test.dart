@@ -44,10 +44,12 @@ void main() {
     });
 
     if (fixtures.isEmpty) {
-      test('no *.bundle.json yet — add locator.bundle.json from COPY DIAGNOSTIC JSON',
-          () {
-        // Passes until first fixture is committed.
-      });
+      test(
+        'no *.bundle.json yet — add locator.bundle.json from COPY DIAGNOSTIC JSON',
+        () {
+          // Passes until first fixture is committed.
+        },
+      );
       return;
     }
 
@@ -80,8 +82,11 @@ void main() {
           final syntax = bridge!.validateScriptSyntax(fix.script);
           final expected = fix.expectSyntaxOk;
           if (expected != null) {
-            expect(syntax.ok, expected,
-                reason: syntax.message ?? 'syntax check');
+            expect(
+              syntax.ok,
+              expected,
+              reason: syntax.message ?? 'syntax check',
+            );
           } else {
             // Default: repro fixtures often fail syntax until fixed.
             expect(syntax.ok || !syntax.ok, isTrue);
@@ -122,10 +127,7 @@ void main() {
               fix.fileName.contains('20260715.2358')) {
             expect((attempts as List).length, greaterThanOrEqualTo(3));
             expect((changeRequests as List).length, greaterThanOrEqualTo(1));
-            expect(
-              fix.improveGoal,
-              contains('last 24 hours'),
-            );
+            expect(fix.improveGoal, contains('last 24 hours'));
           }
         });
 
@@ -202,16 +204,23 @@ void main() {
           );
 
           final tags = fix.fixtureExpectations['tags'];
-          final tagList = tags is List ? tags.map((e) => e.toString()).toList() : <String>[];
+          final tagList = tags is List
+              ? tags.map((e) => e.toString()).toList()
+              : <String>[];
 
           if (fix.expectNoDanglingDom == true) {
-            final dangling = [
-              ...BroCodeDashboardGoalChecker.extractHtmlDocuments(fix.script),
-              ...BroCodeDashboardGoalChecker.extractHtmlFromAssets(fix.assets),
-            ].expand((html) {
-              final d = BroCodeDashboardGoalChecker.checkDanglingDom(html);
-              return d.findings;
-            }).toList();
+            final dangling =
+                [
+                  ...BroCodeDashboardGoalChecker.extractHtmlDocuments(
+                    fix.script,
+                  ),
+                  ...BroCodeDashboardGoalChecker.extractHtmlFromAssets(
+                    fix.assets,
+                  ),
+                ].expand((html) {
+                  final d = BroCodeDashboardGoalChecker.checkDanglingDom(html);
+                  return d.findings;
+                }).toList();
             expect(dangling, isEmpty, reason: dangling.join('; '));
           }
 

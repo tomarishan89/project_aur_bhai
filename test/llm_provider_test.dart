@@ -22,11 +22,17 @@ void main() {
 
     test('forProviderId returns correct concrete types', () {
       expect(
-        LlmProviderFactory.forProviderId(GeminiProvider.providerId, _dummyConfig),
+        LlmProviderFactory.forProviderId(
+          GeminiProvider.providerId,
+          _dummyConfig,
+        ),
         isA<GeminiProvider>(),
       );
       expect(
-        LlmProviderFactory.forProviderId(OpenAiProvider.chatGptId, _dummyConfig),
+        LlmProviderFactory.forProviderId(
+          OpenAiProvider.chatGptId,
+          _dummyConfig,
+        ),
         isA<OpenAiProvider>(),
       );
       expect(
@@ -34,7 +40,10 @@ void main() {
         isA<OpenAiProvider>(),
       );
       expect(
-        LlmProviderFactory.forProviderId(AnthropicProvider.providerId, _dummyConfig),
+        LlmProviderFactory.forProviderId(
+          AnthropicProvider.providerId,
+          _dummyConfig,
+        ),
         isA<AnthropicProvider>(),
       );
     });
@@ -62,10 +71,22 @@ void main() {
     });
 
     test('requiresCustomUrl only for Custom OpenAI', () {
-      expect(LlmProviderFactory.requiresCustomUrl(GeminiProvider.providerId), false);
-      expect(LlmProviderFactory.requiresCustomUrl(OpenAiProvider.chatGptId), false);
-      expect(LlmProviderFactory.requiresCustomUrl(AnthropicProvider.providerId), false);
-      expect(LlmProviderFactory.requiresCustomUrl(OpenAiProvider.customId), true);
+      expect(
+        LlmProviderFactory.requiresCustomUrl(GeminiProvider.providerId),
+        false,
+      );
+      expect(
+        LlmProviderFactory.requiresCustomUrl(OpenAiProvider.chatGptId),
+        false,
+      );
+      expect(
+        LlmProviderFactory.requiresCustomUrl(AnthropicProvider.providerId),
+        false,
+      );
+      expect(
+        LlmProviderFactory.requiresCustomUrl(OpenAiProvider.customId),
+        true,
+      );
     });
   });
 
@@ -112,10 +133,8 @@ void main() {
     test('Anthropic completeWithAudio throws', () {
       final p = AnthropicProvider(_dummyConfig);
       expect(
-        () => p.completeWithAudio(
-          prompt: 'test',
-          audio: File('nonexistent.m4a'),
-        ),
+        () =>
+            p.completeWithAudio(prompt: 'test', audio: File('nonexistent.m4a')),
         throwsA(isA<UnsupportedError>()),
       );
     });

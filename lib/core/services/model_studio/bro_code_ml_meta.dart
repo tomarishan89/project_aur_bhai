@@ -17,12 +17,12 @@ class BroCodeMlMeta {
   });
 
   Map<String, dynamic> toJson() => {
-        'usesModel': usesModel,
-        'maturity': maturity,
-        'labelSchema': labelSchema,
-        'capturePolicy': capturePolicy,
-        if (fineWindow != null) 'fineWindowSeconds': fineWindow!.inSeconds,
-      };
+    'usesModel': usesModel,
+    'maturity': maturity,
+    'labelSchema': labelSchema,
+    'capturePolicy': capturePolicy,
+    if (fineWindow != null) 'fineWindowSeconds': fineWindow!.inSeconds,
+  };
 
   factory BroCodeMlMeta.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const BroCodeMlMeta();

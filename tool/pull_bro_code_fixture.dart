@@ -27,7 +27,9 @@ void main(List<String> args) async {
 
   final fixturesDir = Directory('test/fixtures/bro_code');
   if (!fixturesDir.existsSync()) {
-    stderr.writeln('Missing ${fixturesDir.path} — run from the Flutter project root.');
+    stderr.writeln(
+      'Missing ${fixturesDir.path} — run from the Flutter project root.',
+    );
     exit(1);
   }
 
@@ -39,7 +41,9 @@ void main(List<String> args) async {
 
   serial ??= await _pickDeviceSerial(adb);
   if (serial == null) {
-    stderr.writeln('No adb device found. Plug in the phone and enable USB debugging.');
+    stderr.writeln(
+      'No adb device found. Plug in the phone and enable USB debugging.',
+    );
     exit(1);
   }
   stdout.writeln('Using device: $serial');
@@ -50,22 +54,18 @@ void main(List<String> args) async {
   // Note: `adb exec-out run-as cat missing` often exits 0 and puts the error
   // on stdout — treat that as a miss.
   String? deviceFileName;
-  final nameResult = await Process.run(adb, adbArgs([
-    'exec-out',
-    'run-as',
-    pkg,
-    'cat',
-    '$remoteDir/LATEST.name.txt',
-  ]));
+  final nameResult = await Process.run(
+    adb,
+    adbArgs(['exec-out', 'run-as', pkg, 'cat', '$remoteDir/LATEST.name.txt']),
+  );
   if (nameResult.exitCode == 0) {
     final raw = (nameResult.stdout as String).trim();
-    final looksMissing = raw.contains('No such file') ||
+    final looksMissing =
+        raw.contains('No such file') ||
         raw.contains('Permission denied') ||
         raw.contains('cat:') ||
         raw.contains('\n');
-    if (raw.isNotEmpty &&
-        !looksMissing &&
-        raw.endsWith('.bundle.json')) {
+    if (raw.isNotEmpty && !looksMissing && raw.endsWith('.bundle.json')) {
       deviceFileName = raw;
     }
   }
@@ -73,13 +73,10 @@ void main(List<String> args) async {
   // Fallback: list captures and pick the newest timestamped *.bundle.json
   // (skips LATEST.bundle.json itself).
   if (deviceFileName == null) {
-    final ls = await Process.run(adb, adbArgs([
-      'exec-out',
-      'run-as',
-      pkg,
-      'ls',
-      remoteDir,
-    ]));
+    final ls = await Process.run(
+      adb,
+      adbArgs(['exec-out', 'run-as', pkg, 'ls', remoteDir]),
+    );
     if (ls.exitCode != 0) {
       stderr.writeln(
         'No captures on device yet.\n'
@@ -89,12 +86,15 @@ void main(List<String> args) async {
       exit(1);
     }
     // Android `ls` often prints multiple names per line (columns).
-    final names = (ls.stdout as String)
-        .split(RegExp(r'\s+'))
-        .map((e) => e.trim())
-        .where((e) => e.endsWith('.bundle.json') && e != 'LATEST.bundle.json')
-        .toList()
-      ..sort();
+    final names =
+        (ls.stdout as String)
+            .split(RegExp(r'\s+'))
+            .map((e) => e.trim())
+            .where(
+              (e) => e.endsWith('.bundle.json') && e != 'LATEST.bundle.json',
+            )
+            .toList()
+          ..sort();
     if (names.isEmpty) {
       stderr.writeln(
         'bro_code_fixtures/ is empty on device. Tap CAPTURE FIXTURE first.',
@@ -124,13 +124,10 @@ void main(List<String> args) async {
   String? lastErr;
   for (final remote in remoteCandidates) {
     stdout.writeln('Trying $remote …');
-    final pull = await Process.start(adb, adbArgs([
-      'exec-out',
-      'run-as',
-      pkg,
-      'cat',
-      remote,
-    ]));
+    final pull = await Process.start(
+      adb,
+      adbArgs(['exec-out', 'run-as', pkg, 'cat', remote]),
+    );
     final sink = dest.openWrite();
     await pull.stdout.pipe(sink);
     lastErr = await pull.stderr.transform(SystemEncoding().decoder).join();
@@ -182,11 +179,9 @@ Future<String?> _pickDeviceSerial(String adb) async {
 }
 
 Future<String?> _which(String cmd) async {
-  final result = await Process.run(
-    Platform.isWindows ? 'where' : 'which',
-    [cmd],
-    runInShell: true,
-  );
+  final result = await Process.run(Platform.isWindows ? 'where' : 'which', [
+    cmd,
+  ], runInShell: true);
   if (result.exitCode != 0) return null;
   final lines = (result.stdout as String)
       .split(RegExp(r'\r?\n'))

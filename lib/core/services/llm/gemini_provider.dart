@@ -44,23 +44,25 @@ class GeminiProvider extends LlmProvider {
     final url = Uri.parse(
       'https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}',
     );
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'contents': [
-          {
-            'parts': [
-              {'text': prompt},
+    final response = await http
+        .post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'contents': [
+              {
+                'parts': [
+                  {'text': prompt},
+                ],
+              },
             ],
-          },
-        ],
-        'generationConfig': {
-          'maxOutputTokens': maxTokens,
-          if (jsonMode) 'responseMimeType': 'application/json',
-        },
-      }),
-    ).timeout(timeout);
+            'generationConfig': {
+              'maxOutputTokens': maxTokens,
+              if (jsonMode) 'responseMimeType': 'application/json',
+            },
+          }),
+        )
+        .timeout(timeout);
 
     if (response.statusCode != 200) {
       throw Exception('Gemini status ${response.statusCode}');
@@ -78,7 +80,9 @@ class GeminiProvider extends LlmProvider {
   }) async {
     final contents = <Map<String, dynamic>>[];
     for (final m in messages) {
-      final role = (m.role == 'assistant' || m.role == 'model') ? 'model' : 'user';
+      final role = (m.role == 'assistant' || m.role == 'model')
+          ? 'model'
+          : 'user';
       contents.add({
         'role': role,
         'parts': [
@@ -89,17 +93,19 @@ class GeminiProvider extends LlmProvider {
     final url = Uri.parse(
       'https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}',
     );
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'contents': contents,
-        'generationConfig': {
-          'maxOutputTokens': maxTokens,
-          if (jsonMode) 'responseMimeType': 'application/json',
-        },
-      }),
-    ).timeout(timeout);
+    final response = await http
+        .post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'contents': contents,
+            'generationConfig': {
+              'maxOutputTokens': maxTokens,
+              if (jsonMode) 'responseMimeType': 'application/json',
+            },
+          }),
+        )
+        .timeout(timeout);
 
     if (response.statusCode != 200) {
       throw Exception('Gemini status ${response.statusCode}');
@@ -121,27 +127,29 @@ class GeminiProvider extends LlmProvider {
     final url = Uri.parse(
       'https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}',
     );
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'contents': [
-          {
-            'parts': [
-              {'text': prompt},
+    final response = await http
+        .post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'contents': [
               {
-                'inlineData': {
-                  'mimeType': 'audio/mp4',
-                  'data': base64Audio,
-                },
+                'parts': [
+                  {'text': prompt},
+                  {
+                    'inlineData': {
+                      'mimeType': 'audio/mp4',
+                      'data': base64Audio,
+                    },
+                  },
+                ],
               },
             ],
-          },
-        ],
-        if (jsonMode)
-          'generationConfig': {'responseMimeType': 'application/json'},
-      }),
-    ).timeout(timeout);
+            if (jsonMode)
+              'generationConfig': {'responseMimeType': 'application/json'},
+          }),
+        )
+        .timeout(timeout);
 
     if (response.statusCode != 200) {
       throw Exception('Gemini audio status ${response.statusCode}');

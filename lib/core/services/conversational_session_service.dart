@@ -36,12 +36,13 @@ class ConversationalSessionService extends ChangeNotifier {
   bool get isActive => _kind != SessionKind.none;
 
   AppSpec get appSpec => _appSpec;
+
   /// Back-compat alias.
   AuthoringSpec get authorSpec => AuthoringSpec(
-        purpose: _appSpec.purpose.value,
-        triggers: _appSpec.invocationPrompt.value,
-        name: _appSpec.name.value,
-      );
+    purpose: _appSpec.purpose.value,
+    triggers: _appSpec.invocationPrompt.value,
+    name: _appSpec.name.value,
+  );
 
   List<AppSpecSlot> get lastEchoedSlots => List.unmodifiable(_lastEchoedSlots);
 
@@ -66,8 +67,7 @@ class ConversationalSessionService extends ChangeNotifier {
   String? _authorProvider;
   String? _authorModelId;
 
-  List<AuthoringTurn> get authoringTurns =>
-      List.unmodifiable(_authoringTurns);
+  List<AuthoringTurn> get authoringTurns => List.unmodifiable(_authoringTurns);
 
   void setAuthorModel({String? provider, String? modelId}) {
     _authorProvider = provider;
@@ -82,15 +82,17 @@ class ConversationalSessionService extends ChangeNotifier {
     if (_kind != SessionKind.author) return;
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
-    _authoringTurns.add(AuthoringTurn(
-      role: role,
-      text: trimmed,
-      at: DateTime.now().toUtc(),
-      phase: phase ?? _phase.name,
-      provider: _authorProvider,
-      modelId: _authorModelId,
-      llmSlot: 'author',
-    ));
+    _authoringTurns.add(
+      AuthoringTurn(
+        role: role,
+        text: trimmed,
+        at: DateTime.now().toUtc(),
+        phase: phase ?? _phase.name,
+        provider: _authorProvider,
+        modelId: _authorModelId,
+        llmSlot: 'author',
+      ),
+    );
   }
 
   AuthoringTrace buildAuthoringTrace({
@@ -169,7 +171,8 @@ class ConversationalSessionService extends ChangeNotifier {
       if (t.contains(p)) return SessionResponseIntent.affirm;
     }
     for (final w in affirm) {
-      if (hasWord(w) || t.startsWith('$w ')) return SessionResponseIntent.affirm;
+      if (hasWord(w) || t.startsWith('$w '))
+        return SessionResponseIntent.affirm;
     }
 
     const amend = [
@@ -253,8 +256,9 @@ class ConversationalSessionService extends ChangeNotifier {
     _kind = SessionKind.refine;
     _phase = SessionPhase.eliciting;
     _refineTarget = agentName;
-    _refineIssue =
-        initialPayload?.trim().isNotEmpty == true ? initialPayload!.trim() : null;
+    _refineIssue = initialPayload?.trim().isNotEmpty == true
+        ? initialPayload!.trim()
+        : null;
     _appSpec = AppSpec();
     _lastEchoedSlots = [];
     _pendingPatchDescription = null;
@@ -284,7 +288,8 @@ class ConversationalSessionService extends ChangeNotifier {
     String? objectedField,
   }) {
     if (_lastEchoedSlots.isEmpty) return;
-    final objected = localIntent == SessionResponseIntent.amend ||
+    final objected =
+        localIntent == SessionResponseIntent.amend ||
         localIntent == SessionResponseIntent.deny;
     if (objected) {
       if (objectedField != null) {
@@ -446,8 +451,8 @@ class ConversationalSessionService extends ChangeNotifier {
 
 final conversationalSessionProvider =
     ChangeNotifierProvider<ConversationalSessionService>((ref) {
-  return ConversationalSessionService();
-});
+      return ConversationalSessionService();
+    });
 
 /// Lightweight scan result held on the session for the authoring panel.
 class DueDiligenceSnapshot {

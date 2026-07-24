@@ -38,11 +38,11 @@ class ParameterBinding {
   });
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'type': type,
-        'description': description,
-        if (exampleInPrompt != null) 'exampleInPrompt': exampleInPrompt,
-      };
+    'name': name,
+    'type': type,
+    'description': description,
+    if (exampleInPrompt != null) 'exampleInPrompt': exampleInPrompt,
+  };
 
   factory ParameterBinding.fromJson(Map<String, dynamic> json) {
     return ParameterBinding(
@@ -54,10 +54,10 @@ class ParameterBinding {
   }
 
   Map<String, dynamic> toInputSchemaField() => {
-        'type': type,
-        'description': description,
-        'required': true,
-      };
+    'type': type,
+    'description': description,
+    'required': true,
+  };
 }
 
 /// External platform action (X, Facebook, Instagram, YouTube, Threads, webhook).
@@ -77,12 +77,12 @@ class ExternalIntegration {
   });
 
   Map<String, dynamic> toJson() => {
-        'platform': platform,
-        'action': action,
-        if (constraints != null) 'constraints': constraints,
-        if (mediaType != null) 'mediaType': mediaType,
-        'requiresByokKey': requiresByokKey,
-      };
+    'platform': platform,
+    'action': action,
+    if (constraints != null) 'constraints': constraints,
+    if (mediaType != null) 'mediaType': mediaType,
+    'requiresByokKey': requiresByokKey,
+  };
 
   factory ExternalIntegration.fromJson(Map<String, dynamic> json) {
     return ExternalIntegration(
@@ -122,10 +122,10 @@ class SpecField {
   }
 
   Map<String, dynamic> toJson() => {
-        'value': value,
-        'status': status.name,
-        'confidence': confidence.name,
-      };
+    'value': value,
+    'status': status.name,
+    'confidence': confidence.name,
+  };
 
   factory SpecField.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const SpecField();
@@ -189,19 +189,19 @@ class AppSpec {
     SpecField? exampleSuccess,
     SpecField? edgeCases,
     List<ExternalIntegration>? externalIntegrations,
-  })  : purpose = purpose ?? const SpecField(),
-        name = name ?? const SpecField(),
-        invocationPrompt = invocationPrompt ?? const SpecField(),
-        parameters = parameters ?? [],
-        behaviorResponse = behaviorResponse ?? const SpecField(),
-        dataSources = dataSources ?? const SpecField(),
-        outputs = outputs ?? const SpecField(),
-        triggersBeyondVoice = triggersBeyondVoice ?? const SpecField(),
-        sensorsPermissions = sensorsPermissions ?? const SpecField(),
-        externalKeys = externalKeys ?? const SpecField(),
-        exampleSuccess = exampleSuccess ?? const SpecField(),
-        edgeCases = edgeCases ?? const SpecField(),
-        externalIntegrations = externalIntegrations ?? [];
+  }) : purpose = purpose ?? const SpecField(),
+       name = name ?? const SpecField(),
+       invocationPrompt = invocationPrompt ?? const SpecField(),
+       parameters = parameters ?? [],
+       behaviorResponse = behaviorResponse ?? const SpecField(),
+       dataSources = dataSources ?? const SpecField(),
+       outputs = outputs ?? const SpecField(),
+       triggersBeyondVoice = triggersBeyondVoice ?? const SpecField(),
+       sensorsPermissions = sensorsPermissions ?? const SpecField(),
+       externalKeys = externalKeys ?? const SpecField(),
+       exampleSuccess = exampleSuccess ?? const SpecField(),
+       edgeCases = edgeCases ?? const SpecField(),
+       externalIntegrations = externalIntegrations ?? [];
 
   SpecField fieldFor(AppSpecSlot slot) {
     switch (slot) {
@@ -434,14 +434,16 @@ class AppSpec {
     if (purpose.hasValue) parts.add('Purpose: ${purpose.value}');
     if (name.hasValue) {
       parts.add(
-          'Display name: ${name.value} (registry key: ${normalizedRegistryName()})');
+        'Display name: ${name.value} (registry key: ${normalizedRegistryName()})',
+      );
     }
     if (invocationPrompt.hasValue) {
       parts.add('User invocation phrase: ${invocationPrompt.value}');
     }
     if (parameters.isNotEmpty) {
       parts.add(
-          'Parameters to extract from invocation: ${parameters.map((p) => '${p.name} (${p.type}): ${p.description}').join('; ')}');
+        'Parameters to extract from invocation: ${parameters.map((p) => '${p.name} (${p.type}): ${p.description}').join('; ')}',
+      );
     }
     if (behaviorResponse.hasValue) {
       parts.add('Behavior and spoken response: ${behaviorResponse.value}');
@@ -456,7 +458,8 @@ class AppSpec {
     }
     if (externalIntegrations.isNotEmpty) {
       parts.add(
-          'External integrations: ${externalIntegrations.map((e) => '${e.platform}: ${e.action}${e.constraints != null ? ' (${e.constraints})' : ''}').join('; ')}');
+        'External integrations: ${externalIntegrations.map((e) => '${e.platform}: ${e.action}${e.constraints != null ? ' (${e.constraints})' : ''}').join('; ')}',
+      );
     }
     if (exampleSuccess.hasValue) {
       parts.add('Success example: ${exampleSuccess.value}');
@@ -473,8 +476,7 @@ class AppSpec {
       parts.add('You will say: ${invocationPrompt.value}.');
     }
     if (parameters.isNotEmpty) {
-      parts.add(
-          'Parameters: ${parameters.map((p) => p.name).join(', ')}.');
+      parts.add('Parameters: ${parameters.map((p) => p.name).join(', ')}.');
     }
     if (behaviorResponse.hasValue) {
       parts.add('It will respond: ${behaviorResponse.value}.');
@@ -483,7 +485,8 @@ class AppSpec {
     if (outputs.hasValue) parts.add('Outputs: ${outputs.value}.');
     if (externalIntegrations.isNotEmpty) {
       parts.add(
-          'External: ${externalIntegrations.map((e) => e.platform).join(', ')}.');
+        'External: ${externalIntegrations.map((e) => e.platform).join(', ')}.',
+      );
     }
     return parts.join(' ');
   }
@@ -577,8 +580,7 @@ class AppSpec {
 
     void addScalar(String label, SpecField field) {
       if (!field.hasValue) return;
-      final suffix =
-          field.status == SlotStatus.proposed ? ' (suggested)' : '';
+      final suffix = field.status == SlotStatus.proposed ? ' (suggested)' : '';
       lines.add('$label: ${field.value}$suffix.');
     }
 
@@ -609,28 +611,31 @@ class AppSpec {
   }
 
   Map<String, dynamic> toJson() => {
-        'purpose': purpose.toJson(),
-        'name': name.toJson(),
-        'invocationPrompt': invocationPrompt.toJson(),
-        'parameters': parameters.map((p) => p.toJson()).toList(),
-        'behaviorResponse': behaviorResponse.toJson(),
-        'dataSources': dataSources.toJson(),
-        'outputs': outputs.toJson(),
-        'triggersBeyondVoice': triggersBeyondVoice.toJson(),
-        'sensorsPermissions': sensorsPermissions.toJson(),
-        'externalKeys': externalKeys.toJson(),
-        'exampleSuccess': exampleSuccess.toJson(),
-        'edgeCases': edgeCases.toJson(),
-        'externalIntegrations':
-            externalIntegrations.map((e) => e.toJson()).toList(),
-      };
+    'purpose': purpose.toJson(),
+    'name': name.toJson(),
+    'invocationPrompt': invocationPrompt.toJson(),
+    'parameters': parameters.map((p) => p.toJson()).toList(),
+    'behaviorResponse': behaviorResponse.toJson(),
+    'dataSources': dataSources.toJson(),
+    'outputs': outputs.toJson(),
+    'triggersBeyondVoice': triggersBeyondVoice.toJson(),
+    'sensorsPermissions': sensorsPermissions.toJson(),
+    'externalKeys': externalKeys.toJson(),
+    'exampleSuccess': exampleSuccess.toJson(),
+    'edgeCases': edgeCases.toJson(),
+    'externalIntegrations': externalIntegrations
+        .map((e) => e.toJson())
+        .toList(),
+  };
 
   factory AppSpec.fromJson(Map<String, dynamic> json) {
     final params = <ParameterBinding>[];
     if (json['parameters'] is List) {
       for (final item in json['parameters'] as List) {
         if (item is Map) {
-          params.add(ParameterBinding.fromJson(Map<String, dynamic>.from(item)));
+          params.add(
+            ParameterBinding.fromJson(Map<String, dynamic>.from(item)),
+          );
         }
       }
     }
@@ -639,41 +644,68 @@ class AppSpec {
       for (final item in json['externalIntegrations'] as List) {
         if (item is Map) {
           integrations.add(
-              ExternalIntegration.fromJson(Map<String, dynamic>.from(item)));
+            ExternalIntegration.fromJson(Map<String, dynamic>.from(item)),
+          );
         }
       }
     }
     return AppSpec(
       purpose: SpecField.fromJson(
-          json['purpose'] is Map ? Map<String, dynamic>.from(json['purpose'] as Map) : null),
+        json['purpose'] is Map
+            ? Map<String, dynamic>.from(json['purpose'] as Map)
+            : null,
+      ),
       name: SpecField.fromJson(
-          json['name'] is Map ? Map<String, dynamic>.from(json['name'] as Map) : null),
-      invocationPrompt: SpecField.fromJson(json['invocationPrompt'] is Map
-          ? Map<String, dynamic>.from(json['invocationPrompt'] as Map)
-          : null),
+        json['name'] is Map
+            ? Map<String, dynamic>.from(json['name'] as Map)
+            : null,
+      ),
+      invocationPrompt: SpecField.fromJson(
+        json['invocationPrompt'] is Map
+            ? Map<String, dynamic>.from(json['invocationPrompt'] as Map)
+            : null,
+      ),
       parameters: params,
-      behaviorResponse: SpecField.fromJson(json['behaviorResponse'] is Map
-          ? Map<String, dynamic>.from(json['behaviorResponse'] as Map)
-          : null),
-      dataSources: SpecField.fromJson(json['dataSources'] is Map
-          ? Map<String, dynamic>.from(json['dataSources'] as Map)
-          : null),
+      behaviorResponse: SpecField.fromJson(
+        json['behaviorResponse'] is Map
+            ? Map<String, dynamic>.from(json['behaviorResponse'] as Map)
+            : null,
+      ),
+      dataSources: SpecField.fromJson(
+        json['dataSources'] is Map
+            ? Map<String, dynamic>.from(json['dataSources'] as Map)
+            : null,
+      ),
       outputs: SpecField.fromJson(
-          json['outputs'] is Map ? Map<String, dynamic>.from(json['outputs'] as Map) : null),
-      triggersBeyondVoice: SpecField.fromJson(json['triggersBeyondVoice'] is Map
-          ? Map<String, dynamic>.from(json['triggersBeyondVoice'] as Map)
-          : null),
-      sensorsPermissions: SpecField.fromJson(json['sensorsPermissions'] is Map
-          ? Map<String, dynamic>.from(json['sensorsPermissions'] as Map)
-          : null),
-      externalKeys: SpecField.fromJson(json['externalKeys'] is Map
-          ? Map<String, dynamic>.from(json['externalKeys'] as Map)
-          : null),
-      exampleSuccess: SpecField.fromJson(json['exampleSuccess'] is Map
-          ? Map<String, dynamic>.from(json['exampleSuccess'] as Map)
-          : null),
+        json['outputs'] is Map
+            ? Map<String, dynamic>.from(json['outputs'] as Map)
+            : null,
+      ),
+      triggersBeyondVoice: SpecField.fromJson(
+        json['triggersBeyondVoice'] is Map
+            ? Map<String, dynamic>.from(json['triggersBeyondVoice'] as Map)
+            : null,
+      ),
+      sensorsPermissions: SpecField.fromJson(
+        json['sensorsPermissions'] is Map
+            ? Map<String, dynamic>.from(json['sensorsPermissions'] as Map)
+            : null,
+      ),
+      externalKeys: SpecField.fromJson(
+        json['externalKeys'] is Map
+            ? Map<String, dynamic>.from(json['externalKeys'] as Map)
+            : null,
+      ),
+      exampleSuccess: SpecField.fromJson(
+        json['exampleSuccess'] is Map
+            ? Map<String, dynamic>.from(json['exampleSuccess'] as Map)
+            : null,
+      ),
       edgeCases: SpecField.fromJson(
-          json['edgeCases'] is Map ? Map<String, dynamic>.from(json['edgeCases'] as Map) : null),
+        json['edgeCases'] is Map
+            ? Map<String, dynamic>.from(json['edgeCases'] as Map)
+            : null,
+      ),
       externalIntegrations: integrations,
     );
   }
@@ -693,7 +725,8 @@ class AppSpec {
     }
 
     for (final slot in AppSpecSlot.values) {
-      if (slot == AppSpecSlot.parameters || slot == AppSpecSlot.externalIntegrations) {
+      if (slot == AppSpecSlot.parameters ||
+          slot == AppSpecSlot.externalIntegrations) {
         continue;
       }
       mergeField(slot);
@@ -747,17 +780,29 @@ class AuthoringSpec {
   final AppSpec _inner;
 
   AuthoringSpec({String? purpose, String? triggers, String? name})
-      : _inner = AppSpec(
-          purpose: purpose != null
-              ? SpecField(value: purpose, status: SlotStatus.confirmed, confidence: SlotConfidence.stated)
-              : const SpecField(),
-          invocationPrompt: triggers != null
-              ? SpecField(value: triggers, status: SlotStatus.confirmed, confidence: SlotConfidence.stated)
-              : const SpecField(),
-          name: name != null
-              ? SpecField(value: name, status: SlotStatus.confirmed, confidence: SlotConfidence.stated)
-              : const SpecField(),
-        );
+    : _inner = AppSpec(
+        purpose: purpose != null
+            ? SpecField(
+                value: purpose,
+                status: SlotStatus.confirmed,
+                confidence: SlotConfidence.stated,
+              )
+            : const SpecField(),
+        invocationPrompt: triggers != null
+            ? SpecField(
+                value: triggers,
+                status: SlotStatus.confirmed,
+                confidence: SlotConfidence.stated,
+              )
+            : const SpecField(),
+        name: name != null
+            ? SpecField(
+                value: name,
+                status: SlotStatus.confirmed,
+                confidence: SlotConfidence.stated,
+              )
+            : const SpecField(),
+      );
 
   AppSpec get asAppSpec => _inner;
 

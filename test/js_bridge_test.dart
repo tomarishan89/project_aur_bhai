@@ -64,14 +64,18 @@ void main() {
 
       final calculator = agentService.findAgent('Calculator');
       expect(calculator, isA<JsAgentAdapter>());
-      expect((calculator as JsAgentAdapter).securityClass,
-          AgentSecurityClass.c2Verified);
+      expect(
+        (calculator as JsAgentAdapter).securityClass,
+        AgentSecurityClass.c2Verified,
+      );
       expect(calculator.script, contains('Math.pow'));
 
       final coach = agentService.findAgent('DrivingCoach');
       expect(coach, isA<JsAgentAdapter>());
-      expect((coach as JsAgentAdapter).securityClass,
-          AgentSecurityClass.c2Verified);
+      expect(
+        (coach as JsAgentAdapter).securityClass,
+        AgentSecurityClass.c2Verified,
+      );
     });
 
     test('MS-USER-ECOSYSTEM lifecycle: save, list, export, delete', () async {
@@ -133,57 +137,71 @@ void main() {
       container.dispose();
     });
 
-    test('System.querySQL returns telemetry row count', () async {
-      final bus = container.read(telemetryBusProvider);
-      await bus.addRecord(
-        latitude: 28.61,
-        longitude: 77.20,
-        accelerometerZ: 9.8,
-        compassDirection: 90.0,
-      );
+    test(
+      'System.querySQL returns telemetry row count',
+      () async {
+        final bus = container.read(telemetryBusProvider);
+        await bus.addRecord(
+          latitude: 28.61,
+          longitude: 77.20,
+          accelerometerZ: 9.8,
+          compassDirection: 90.0,
+        );
 
-      final bridge = container.read(jsBridgeServiceProvider);
-      final result = await bridge.executeAgentScript(
-        agentName: 'QueryProbe',
-        script: '''
+        final bridge = container.read(jsBridgeServiceProvider);
+        final result = await bridge.executeAgentScript(
+          agentName: 'QueryProbe',
+          script: '''
 async function execute(params) {
   const rows = await System.querySQL('SELECT COUNT(*) AS count FROM telemetry');
   return 'count:' + rows[0].count;
 }
 ''',
-        parameters: const {},
-      );
+          parameters: const {},
+        );
 
-      expect(result.message, contains('count:'));
-    }, skip: quickJsAvailable ? false : 'QuickJS native library not built (cmake required on Windows)');
+        expect(result.message, contains('count:'));
+      },
+      skip: quickJsAvailable
+          ? false
+          : 'QuickJS native library not built (cmake required on Windows)',
+    );
 
-    test('System.writeVault persists to sovereign_vault', () async {
-      final bridge = container.read(jsBridgeServiceProvider);
-      final bus = container.read(telemetryBusProvider);
+    test(
+      'System.writeVault persists to sovereign_vault',
+      () async {
+        final bridge = container.read(jsBridgeServiceProvider);
+        final bus = container.read(telemetryBusProvider);
 
-      final result = await bridge.executeAgentScript(
-        agentName: 'VaultProbe',
-        script: '''
+        final result = await bridge.executeAgentScript(
+          agentName: 'VaultProbe',
+          script: '''
 async function execute(params) {
   await System.writeVault('js_bridge:test', 'hello-from-js', 'text/plain');
   return 'written';
 }
 ''',
-        parameters: const {},
-      );
+          parameters: const {},
+        );
 
-      expect(result.message, 'written');
-      final entry = await bus.readVaultData('js_bridge:test');
-      expect(entry?['value'], 'hello-from-js');
-    }, skip: quickJsAvailable ? false : 'QuickJS native library not built (cmake required on Windows)');
+        expect(result.message, 'written');
+        final entry = await bus.readVaultData('js_bridge:test');
+        expect(entry?['value'], 'hello-from-js');
+      },
+      skip: quickJsAvailable
+          ? false
+          : 'QuickJS native library not built (cmake required on Windows)',
+    );
 
-    test('System.assets injects sidecars for thin orchestrators', () async {
-      final bridge = container.read(jsBridgeServiceProvider);
-      final bus = container.read(telemetryBusProvider);
+    test(
+      'System.assets injects sidecars for thin orchestrators',
+      () async {
+        final bridge = container.read(jsBridgeServiceProvider);
+        final bus = container.read(telemetryBusProvider);
 
-      final result = await bridge.executeAgentScript(
-        agentName: 'AssetProbe',
-        script: '''
+        final result = await bridge.executeAgentScript(
+          agentName: 'AssetProbe',
+          script: '''
 async function execute(params) {
   const html = System.assets['dash.html'];
   if (!html) throw new Error('missing asset');
@@ -191,93 +209,123 @@ async function execute(params) {
   return 'asset-ok:' + html.length;
 }
 ''',
-        parameters: const {},
-        sandboxMode: true,
-        assets: const {
-          'dash.html':
-              '<!DOCTYPE html><html><body><div id="c">hi</div></body></html>',
-        },
-      );
-
-      expect(result.isError, isFalse, reason: result.message);
-      expect(result.message, contains('asset-ok:'));
-      expect(result.vaultHtmlKeysWritten, contains('dash.html'));
-      final entry = await bus.readVaultData('dash.html');
-      // Sandbox vault is closed after execute; still assert keys from result.
-      expect(entry, isNull);
-    }, skip: quickJsAvailable ? false : 'QuickJS native library not built (cmake required on Windows)');
-
-    test('vault agent executes TelemetryCounter script', () async {
-      final registry = container.read(jsAgentRegistryProvider);
-      await registry.seedDemoAgentIfMissing();
-      await registry.loadAndRegisterAgents();
-
-      final agentService = container.read(agentServiceProvider);
-      final agent = agentService.findAgent('TelemetryCounter');
-      expect(agent, isNotNull);
-
-      final spoken = await agent!.execute(const {});
-      expect(spoken, contains('TelemetryCounter agent says'));
-    }, skip: quickJsAvailable ? false : 'QuickJS native library not built (cmake required on Windows)');
-
-    test('MS-CORE-JS-MIGRATION: JS Calculator handles the ^ power operator', () async {
-      final registry = container.read(jsAgentRegistryProvider);
-      await registry.seedCoreAgentsIfMissing();
-      await registry.loadAndRegisterAgents();
-
-      final agent =
-          container.read(agentServiceProvider).findAgent('Calculator');
-      expect(agent, isNotNull);
-
-      final power = await agent!.execute(const {'expression': '2^3'});
-      expect(power, contains('8'));
-
-      final mixed = await agent.execute(const {'expression': '2 + 3 * 4'});
-      expect(mixed, contains('14'));
-
-      final parens = await agent.execute(const {'expression': '(2 + 3) ^ 2'});
-      expect(parens, contains('25'));
-    }, skip: quickJsAvailable ? false : 'QuickJS native library not built (cmake required on Windows)');
-
-    test('MS-CORE-JS-MIGRATION: JS DrivingCoach predicts from telemetry', () async {
-      final bus = container.read(telemetryBusProvider);
-      for (var n = 0; n < 8; n++) {
-        await bus.addRecord(
-          latitude: 28.61,
-          longitude: 77.20,
-          accelerometerZ: 9.8 + (n % 3) * 0.1,
-          compassDirection: 90.0,
+          parameters: const {},
+          sandboxMode: true,
+          assets: const {
+            'dash.html':
+                '<!DOCTYPE html><html><body><div id="c">hi</div></body></html>',
+          },
         );
-      }
 
-      final registry = container.read(jsAgentRegistryProvider);
-      await registry.seedCoreAgentsIfMissing();
-      await registry.loadAndRegisterAgents();
+        expect(result.isError, isFalse, reason: result.message);
+        expect(result.message, contains('asset-ok:'));
+        expect(result.vaultHtmlKeysWritten, contains('dash.html'));
+        final entry = await bus.readVaultData('dash.html');
+        // Sandbox vault is closed after execute; still assert keys from result.
+        expect(entry, isNull);
+      },
+      skip: quickJsAvailable
+          ? false
+          : 'QuickJS native library not built (cmake required on Windows)',
+    );
 
-      final agent =
-          container.read(agentServiceProvider).findAgent('DrivingCoach');
-      expect(agent, isNotNull);
+    test(
+      'vault agent executes TelemetryCounter script',
+      () async {
+        final registry = container.read(jsAgentRegistryProvider);
+        await registry.seedDemoAgentIfMissing();
+        await registry.loadAndRegisterAgents();
 
-      final spoken = await agent!.execute(const {'recordCount': 8});
-      expect(spoken, contains('My model predicts you are currently'));
-    }, skip: quickJsAvailable ? false : 'QuickJS native library not built (cmake required on Windows)');
-    test('async agent returns spoken string not promise index', () async {
-      final bridge = container.read(jsBridgeServiceProvider);
-      final result = await bridge.executeAgentScript(
-        agentName: 'FiveIntoSix',
-        script: '''
+        final agentService = container.read(agentServiceProvider);
+        final agent = agentService.findAgent('TelemetryCounter');
+        expect(agent, isNotNull);
+
+        final spoken = await agent!.execute(const {});
+        expect(spoken, contains('TelemetryCounter agent says'));
+      },
+      skip: quickJsAvailable
+          ? false
+          : 'QuickJS native library not built (cmake required on Windows)',
+    );
+
+    test(
+      'MS-CORE-JS-MIGRATION: JS Calculator handles the ^ power operator',
+      () async {
+        final registry = container.read(jsAgentRegistryProvider);
+        await registry.seedCoreAgentsIfMissing();
+        await registry.loadAndRegisterAgents();
+
+        final agent = container
+            .read(agentServiceProvider)
+            .findAgent('Calculator');
+        expect(agent, isNotNull);
+
+        final power = await agent!.execute(const {'expression': '2^3'});
+        expect(power, contains('8'));
+
+        final mixed = await agent.execute(const {'expression': '2 + 3 * 4'});
+        expect(mixed, contains('14'));
+
+        final parens = await agent.execute(const {'expression': '(2 + 3) ^ 2'});
+        expect(parens, contains('25'));
+      },
+      skip: quickJsAvailable
+          ? false
+          : 'QuickJS native library not built (cmake required on Windows)',
+    );
+
+    test(
+      'MS-CORE-JS-MIGRATION: JS DrivingCoach predicts from telemetry',
+      () async {
+        final bus = container.read(telemetryBusProvider);
+        for (var n = 0; n < 8; n++) {
+          await bus.addRecord(
+            latitude: 28.61,
+            longitude: 77.20,
+            accelerometerZ: 9.8 + (n % 3) * 0.1,
+            compassDirection: 90.0,
+          );
+        }
+
+        final registry = container.read(jsAgentRegistryProvider);
+        await registry.seedCoreAgentsIfMissing();
+        await registry.loadAndRegisterAgents();
+
+        final agent = container
+            .read(agentServiceProvider)
+            .findAgent('DrivingCoach');
+        expect(agent, isNotNull);
+
+        final spoken = await agent!.execute(const {'recordCount': 8});
+        expect(spoken, contains('My model predicts you are currently'));
+      },
+      skip: quickJsAvailable
+          ? false
+          : 'QuickJS native library not built (cmake required on Windows)',
+    );
+    test(
+      'async agent returns spoken string not promise index',
+      () async {
+        final bridge = container.read(jsBridgeServiceProvider);
+        final result = await bridge.executeAgentScript(
+          agentName: 'FiveIntoSix',
+          script: '''
 async function execute(params) {
   System.log('Executing FiveIntoSix calculation');
   const result = 5 * 6;
   return 'Five times six is ' + result + '.';
 }
 ''',
-        parameters: const {},
-      );
+          parameters: const {},
+        );
 
-      expect(result.message, isNot('0'));
-      expect(result.message, contains('30'));
-      expect(result.message, contains('Five times six'));
-    }, skip: quickJsAvailable ? false : 'QuickJS native library not built (cmake required on Windows)');
+        expect(result.message, isNot('0'));
+        expect(result.message, contains('30'));
+        expect(result.message, contains('Five times six'));
+      },
+      skip: quickJsAvailable
+          ? false
+          : 'QuickJS native library not built (cmake required on Windows)',
+    );
   });
 }

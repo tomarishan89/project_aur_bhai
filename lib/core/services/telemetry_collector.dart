@@ -33,13 +33,13 @@ class TelemetryCollector extends ChangeNotifier {
     Stream<AccelerometerEvent> Function()? accelerometerEvents,
     bool? forceMobilePlatform,
     this.onSovereignSample,
-  })  : _bus = bus,
-        _requestLocationPermission =
-            requestLocationPermission ?? _defaultRequestLocationPermission,
-        _readPosition = readPosition ?? _defaultReadPosition,
-        _accelerometerEvents =
-            accelerometerEvents ?? _defaultAccelerometerEvents,
-        _forceMobilePlatform = forceMobilePlatform;
+  }) : _bus = bus,
+       _requestLocationPermission =
+           requestLocationPermission ?? _defaultRequestLocationPermission,
+       _readPosition = readPosition ?? _defaultReadPosition,
+       _accelerometerEvents =
+           accelerometerEvents ?? _defaultAccelerometerEvents,
+       _forceMobilePlatform = forceMobilePlatform;
 
   final TelemetryBusService _bus;
   final Duration sampleInterval;
@@ -55,7 +55,8 @@ class TelemetryCollector extends ChangeNotifier {
     double longitude,
     double accelerometerZ,
     double compassDirection,
-  )? onSovereignSample;
+  )?
+  onSovereignSample;
 
   Timer? _timer;
   StreamSubscription<AccelerometerEvent>? _accelSub;
@@ -209,7 +210,10 @@ class TelemetryCollector extends ChangeNotifier {
   void _onSampleFailure(String err) {
     _failureStreak++;
     _lastError = err;
-    final baseMs = sampleInterval.inMilliseconds.clamp(50, maxBackoff.inMilliseconds);
+    final baseMs = sampleInterval.inMilliseconds.clamp(
+      50,
+      maxBackoff.inMilliseconds,
+    );
     final mult = 1 << (_failureStreak.clamp(1, 5) - 1);
     final ms = (baseMs * mult).clamp(baseMs, maxBackoff.inMilliseconds);
     _currentBackoff = Duration(milliseconds: ms);

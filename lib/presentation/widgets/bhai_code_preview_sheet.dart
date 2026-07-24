@@ -79,8 +79,9 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
       setState(() => _scan = null);
       return;
     }
-    final scan =
-        ref.read(agentVerificationProvider).scanScript(widget.listing.script);
+    final scan = ref
+        .read(agentVerificationProvider)
+        .scanScript(widget.listing.script);
     if (!mounted) return;
     setState(() => _scan = scan);
   }
@@ -90,8 +91,9 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
     final scan = _scan;
     if (scan == null) return Colors.white38;
     if (scan.flagged) return Colors.redAccent;
-    final warnings =
-        scan.findings.where((f) => f.severity == 'warning').isNotEmpty;
+    final warnings = scan.findings
+        .where((f) => f.severity == 'warning')
+        .isNotEmpty;
     if (warnings) return Colors.amberAccent;
     return Colors.greenAccent;
   }
@@ -103,8 +105,9 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
     final scan = _scan;
     if (scan == null) return 'Scanning…';
     if (scan.flagged) return 'Due diligence: RED — flagged';
-    final warnings =
-        scan.findings.where((f) => f.severity == 'warning').isNotEmpty;
+    final warnings = scan.findings
+        .where((f) => f.severity == 'warning')
+        .isNotEmpty;
     if (warnings) return 'Due diligence: AMBER — caution';
     return 'Due diligence: GREEN — passed';
   }
@@ -116,19 +119,22 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
       if (hit) lines.add(label);
     }
 
-    add('Vault read/write (System.writeVault / readVault)',
-        script.contains('writeVault') || script.contains('readVault'));
+    add(
+      'Vault read/write (System.writeVault / readVault)',
+      script.contains('writeVault') || script.contains('readVault'),
+    );
     add('SQL (System.querySQL)', script.contains('querySQL'));
-    add('Inbox (System.readInbox / consumeInbox)',
-        script.contains('readInbox') || script.contains('consumeInbox'));
-    add('Network / HTTP',
-        RegExp(r'https?://|fetch\(|XMLHttpRequest').hasMatch(script));
-    add('DOM / document',
-        RegExp(r'\bdocument\.|\bwindow\.').hasMatch(script));
+    add(
+      'Inbox (System.readInbox / consumeInbox)',
+      script.contains('readInbox') || script.contains('consumeInbox'),
+    );
+    add(
+      'Network / HTTP',
+      RegExp(r'https?://|fetch\(|XMLHttpRequest').hasMatch(script),
+    );
+    add('DOM / document', RegExp(r'\bdocument\.|\bwindow\.').hasMatch(script));
     if (widget.listing.inputSchema.isNotEmpty) {
-      lines.add(
-        'Inputs: ${widget.listing.inputSchema.keys.join(", ")}',
-      );
+      lines.add('Inputs: ${widget.listing.inputSchema.keys.join(", ")}');
     }
     if (lines.isEmpty) {
       lines.add('No vault/network APIs detected in static scan.');
@@ -222,9 +228,9 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Pick up failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Pick up failed: $e')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -234,7 +240,9 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
   Widget build(BuildContext context) {
     final listing = widget.listing;
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    final author = listing.author.trim().isEmpty ? 'local pool' : listing.author;
+    final author = listing.author.trim().isEmpty
+        ? 'local pool'
+        : listing.author;
     final desc = listing.description.trim().isEmpty
         ? 'No description'
         : listing.description;
@@ -270,8 +278,10 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
               ),
             ),
             const SizedBox(height: 4),
-            Text(desc,
-                style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            Text(
+              desc,
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
             const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.all(10),
@@ -300,8 +310,10 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
                       if (listing.access.allowDiligence)
                         TextButton(
                           onPressed: _busy ? null : _runScan,
-                          child: const Text('RE-SCAN',
-                              style: TextStyle(fontSize: 11)),
+                          child: const Text(
+                            'RE-SCAN',
+                            style: TextStyle(fontSize: 11),
+                          ),
                         ),
                     ],
                   ),
@@ -334,12 +346,15 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('· ',
-                        style: TextStyle(color: Colors.white54)),
+                    const Text('· ', style: TextStyle(color: Colors.white54)),
                     Expanded(
-                      child: Text(line,
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 12)),
+                      child: Text(
+                        line,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -371,7 +386,9 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
                 decoration: BoxDecoration(
                   color: const Color(0xFF0E1A12),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: Colors.greenAccent.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Text(
                   _sandboxResult!,
@@ -402,8 +419,10 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.science, size: 16),
-                    label: const Text('TEST NOW',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'TEST NOW',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 if (listing.access.allowSandboxTest)
                   OutlinedButton.icon(
@@ -423,8 +442,10 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
                     ),
                     onPressed: _busy ? null : _pickup,
                     icon: const Icon(Icons.download, size: 16),
-                    label: const Text('ADD TO SANDBOX',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'ADD TO SANDBOX',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
               ],
             ),
@@ -449,12 +470,14 @@ Future<void> openInstalledBhaiPreview(
   };
   String desc = agent.description;
   try {
-    final bundle =
-        await ref.read(jsAgentRegistryProvider).exportAgentBundle(agent.name);
+    final bundle = await ref
+        .read(jsAgentRegistryProvider)
+        .exportAgentBundle(agent.name);
     if (bundle != null) {
       script = bundle['script'] as String? ?? script;
-      final schemaMap =
-          Map<String, dynamic>.from((bundle['schema'] as Map?) ?? {});
+      final schemaMap = Map<String, dynamic>.from(
+        (bundle['schema'] as Map?) ?? {},
+      );
       desc = schemaMap['description'] as String? ?? desc;
       schema = Map<String, dynamic>.from(
         (schemaMap['inputSchema'] as Map?) ?? schema,
@@ -471,18 +494,11 @@ Future<void> openInstalledBhaiPreview(
     inputSchema: schema,
     author: 'installed',
   );
-  await BhaiCodePreviewSheet.open(
-    context,
-    listing: listing,
-    showPickup: false,
-  );
+  await BhaiCodePreviewSheet.open(context, listing: listing, showPickup: false);
 }
 
 /// Helper used by Friend Circle pickup path.
-Future<bool> pickupCircleListing(
-  WidgetRef ref,
-  CircleListing listing,
-) async {
+Future<bool> pickupCircleListing(WidgetRef ref, CircleListing listing) async {
   final ok = await ref.read(circleRegistryProvider).pickup(listing);
   await ref.read(jsAgentRegistryProvider).loadAndRegisterAgents();
   return ok;

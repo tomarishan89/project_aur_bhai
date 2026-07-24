@@ -18,7 +18,10 @@ class LlmProviderFactory {
   ];
 
   /// Builds a concrete [LlmProvider] from the active [ByokService] config.
-  static LlmProvider forConfig(ByokService byok, {LlmSlot slot = LlmSlot.defaultSlot}) {
+  static LlmProvider forConfig(
+    ByokService byok, {
+    LlmSlot slot = LlmSlot.defaultSlot,
+  }) {
     final slotCfg = byok.configForSlot(slot);
     final config = LlmProviderConfig(
       apiKey: slotCfg.apiKey,
@@ -29,7 +32,10 @@ class LlmProviderFactory {
   }
 
   /// Builds a provider by its Settings dropdown id (useful for UI defaults).
-  static LlmProvider forProviderId(String providerId, LlmProviderConfig config) {
+  static LlmProvider forProviderId(
+    String providerId,
+    LlmProviderConfig config,
+  ) {
     switch (providerId) {
       case GeminiProvider.providerId:
         return GeminiProvider(config);

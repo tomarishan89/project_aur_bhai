@@ -23,13 +23,8 @@ bool _quickJsNativeLibAvailable() {
 
 String _dashboardWithDownload(String baseScript) {
   return baseScript
-      .replaceFirst(
-        '<header>',
-        '<header><button id="dl">Download CSV</button>',
-      )
-      .replaceFirst(
-        '  refresh();',
-        r'''  async function downloadCsv() {
+      .replaceFirst('<header>', '<header><button id="dl">Download CSV</button>')
+      .replaceFirst('  refresh();', r'''  async function downloadCsv() {
     const rows = await query('SELECT * FROM telemetry ORDER BY timestamp DESC LIMIT 500');
     if (!rows.length) return;
     const keys = Object.keys(rows[0]);
@@ -44,8 +39,7 @@ String _dashboardWithDownload(String baseScript) {
     URL.revokeObjectURL(a.href);
   }
   document.getElementById('dl').onclick = downloadCsv;
-  refresh();''',
-      );
+  refresh();''');
 }
 
 /// Dashboard Agent Readiness — Goals 1 & 2 (automated path).
@@ -84,71 +78,82 @@ void main() {
       container.dispose();
     });
 
-    test('Path B: import TelemetryDashboard.js, RUN writes live chart HTML to vault',
-        () async {
-      final registry = container.read(jsAgentRegistryProvider);
-      await registry.saveAndRegisterAgent(
-        name: 'TelemetryDashboard',
-        description: 'Live telemetry charts from vault',
-        inputSchema: const {},
-        script: dashboardScript,
-        securityClass: AgentSecurityClass.c2Verified,
-      );
+    test(
+      'Path B: import TelemetryDashboard.js, RUN writes live chart HTML to vault',
+      () async {
+        final registry = container.read(jsAgentRegistryProvider);
+        await registry.saveAndRegisterAgent(
+          name: 'TelemetryDashboard',
+          description: 'Live telemetry charts from vault',
+          inputSchema: const {},
+          script: dashboardScript,
+          securityClass: AgentSecurityClass.c2Verified,
+        );
 
-      final agent =
-          container.read(agentServiceProvider).findAgent('TelemetryDashboard');
-      expect(agent, isNotNull);
-      expect((agent as JsAgentAdapter).canExecute, isTrue);
+        final agent = container
+            .read(agentServiceProvider)
+            .findAgent('TelemetryDashboard');
+        expect(agent, isNotNull);
+        expect((agent as JsAgentAdapter).canExecute, isTrue);
 
-      final spoken = await agent.execute(const {});
-      expect(spoken.toLowerCase(), contains('dashboard'));
-      expect(agent.lastExecutionResult?.vaultHtmlKeysWritten, isNotEmpty);
+        final spoken = await agent.execute(const {});
+        expect(spoken.toLowerCase(), contains('dashboard'));
+        expect(agent.lastExecutionResult?.vaultHtmlKeysWritten, isNotEmpty);
 
-      final vault = await container.read(telemetryBusProvider).readVaultData(
-            'telemetry_dashboard.html',
-          );
-      expect(vault, isNotNull);
-      expect(vault!['mime_type'], 'text/html');
-      expect(vault['value'], contains('id="chart"'));
-      expect(vault['value'], contains('/api/query'));
-      expect(vault['value'], contains('setInterval'));
-    }, skip: quickJsAvailable ? false : 'QuickJS native library not built');
+        final vault = await container
+            .read(telemetryBusProvider)
+            .readVaultData('telemetry_dashboard.html');
+        expect(vault, isNotNull);
+        expect(vault!['mime_type'], 'text/html');
+        expect(vault['value'], contains('id="chart"'));
+        expect(vault['value'], contains('/api/query'));
+        expect(vault['value'], contains('setInterval'));
+      },
+      skip: quickJsAvailable ? false : 'QuickJS native library not built',
+    );
 
-    test('dashboard HTML is served at /vault/ and /api/query returns telemetry',
-        () async {
-      final bridge = container.read(jsBridgeServiceProvider);
-      await bridge.executeAgentScript(
-        agentName: 'TelemetryDashboard',
-        script: dashboardScript,
-        parameters: const {},
-      );
+    test(
+      'dashboard HTML is served at /vault/ and /api/query returns telemetry',
+      () async {
+        final bridge = container.read(jsBridgeServiceProvider);
+        await bridge.executeAgentScript(
+          agentName: 'TelemetryDashboard',
+          script: dashboardScript,
+          parameters: const {},
+        );
 
-      final base = server.localhostAddress;
-      final client = HttpClient();
+        final base = server.localhostAddress;
+        final client = HttpClient();
 
-      final vaultReq = await client.getUrl(
-        Uri.parse('$base/vault/telemetry_dashboard.html'),
-      );
-      final vaultRes = await vaultReq.close();
-      expect(vaultRes.statusCode, 200);
-      final html = await vaultRes.transform(utf8.decoder).join();
-      expect(html, contains('PROJECT AUR BHAI'));
-      expect(html, contains('canvas'));
+        final vaultReq = await client.getUrl(
+          Uri.parse('$base/vault/telemetry_dashboard.html'),
+        );
+        final vaultRes = await vaultReq.close();
+        expect(vaultRes.statusCode, 200);
+        final html = await vaultRes.transform(utf8.decoder).join();
+        expect(html, contains('PROJECT AUR BHAI'));
+        expect(html, contains('canvas'));
 
-      final queryReq = await client.postUrl(Uri.parse('$base/api/query'));
-      queryReq.headers.contentType = ContentType.json;
-      queryReq.write(jsonEncode({
-        'sql': 'SELECT COUNT(*) AS c FROM telemetry',
-      }));
-      final queryRes = await queryReq.close();
-      expect(queryRes.statusCode, 200);
-      final queryJson = jsonDecode(await queryRes.transform(utf8.decoder).join())
-          as Map<String, dynamic>;
-      expect(queryJson['success'], isTrue);
-      expect((queryJson['data'] as List).first['c'], greaterThanOrEqualTo(10));
+        final queryReq = await client.postUrl(Uri.parse('$base/api/query'));
+        queryReq.headers.contentType = ContentType.json;
+        queryReq.write(
+          jsonEncode({'sql': 'SELECT COUNT(*) AS c FROM telemetry'}),
+        );
+        final queryRes = await queryReq.close();
+        expect(queryRes.statusCode, 200);
+        final queryJson =
+            jsonDecode(await queryRes.transform(utf8.decoder).join())
+                as Map<String, dynamic>;
+        expect(queryJson['success'], isTrue);
+        expect(
+          (queryJson['data'] as List).first['c'],
+          greaterThanOrEqualTo(10),
+        );
 
-      client.close();
-    }, skip: quickJsAvailable ? false : 'QuickJS native library not built');
+        client.close();
+      },
+      skip: quickJsAvailable ? false : 'QuickJS native library not built',
+    );
 
     test('vaultUrl builds reachable dashboard path', () async {
       await server.refreshLanIp();
@@ -177,32 +182,36 @@ void main() {
       expect(withDownload, contains('createObjectURL'));
     });
 
-    test('refined script with Download CSV passes due diligence and writes HTML',
-        () async {
-      final withDownload = _dashboardWithDownload(dashboardScript);
-      expect(withDownload, contains('Download CSV'));
+    test(
+      'refined script with Download CSV passes due diligence and writes HTML',
+      () async {
+        final withDownload = _dashboardWithDownload(dashboardScript);
+        expect(withDownload, contains('Download CSV'));
 
-      final verification = AgentVerificationService();
-      final scan = verification.scanScript(withDownload);
-      expect(scan.passed, isTrue, reason: scan.findings.join(', '));
+        final verification = AgentVerificationService();
+        final scan = verification.scanScript(withDownload);
+        expect(scan.passed, isTrue, reason: scan.findings.join(', '));
 
-      final registry = container.read(jsAgentRegistryProvider);
-      await registry.refineAndReregister(
-        name: 'TelemetryDashboard',
-        script: withDownload,
-        description: 'Dashboard with CSV export',
-      );
+        final registry = container.read(jsAgentRegistryProvider);
+        await registry.refineAndReregister(
+          name: 'TelemetryDashboard',
+          script: withDownload,
+          description: 'Dashboard with CSV export',
+        );
 
-      final agent =
-          container.read(agentServiceProvider).findAgent('TelemetryDashboard');
-      await agent!.execute(const {});
+        final agent = container
+            .read(agentServiceProvider)
+            .findAgent('TelemetryDashboard');
+        await agent!.execute(const {});
 
-      final html = (await container.read(telemetryBusProvider).readVaultData(
-            'telemetry_dashboard.html',
-          ))!['value']!;
-      expect(html, contains('Download CSV'));
-      expect(html, contains('createObjectURL'));
-      expect(html, contains('text/csv'));
-    }, skip: quickJsAvailable ? false : 'QuickJS native library not built');
+        final html = (await container
+            .read(telemetryBusProvider)
+            .readVaultData('telemetry_dashboard.html'))!['value']!;
+        expect(html, contains('Download CSV'));
+        expect(html, contains('createObjectURL'));
+        expect(html, contains('text/csv'));
+      },
+      skip: quickJsAvailable ? false : 'QuickJS native library not built',
+    );
   });
 }

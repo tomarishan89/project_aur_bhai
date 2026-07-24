@@ -7,8 +7,9 @@ bool isVaultDashboardUrl(String url) {
   if (uri.scheme != 'http' && uri.scheme != 'https') return false;
   if (uri.host.isEmpty) return false;
 
-  final segments =
-      uri.pathSegments.where((s) => s.isNotEmpty).toList(growable: false);
+  final segments = uri.pathSegments
+      .where((s) => s.isNotEmpty)
+      .toList(growable: false);
   if (segments.length < 2) return false;
   if (segments.first != 'vault') return false;
 

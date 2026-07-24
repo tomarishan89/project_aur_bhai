@@ -32,7 +32,9 @@ String scriptFromDraftJson(Map<String, dynamic> decoded) {
   }
   final script = decoded['script'] as String?;
   if (script != null && script.isNotEmpty) return script;
-  throw Exception('Model did not return a script (expected scriptBase64 or script).');
+  throw Exception(
+    'Model did not return a script (expected scriptBase64 or script).',
+  );
 }
 
 /// User-facing message when patch JSON cannot be parsed.
@@ -90,13 +92,7 @@ class AuthoredAgentDraft {
 }
 
 /// Verb-first intent the Core routes on (MS-CORE-INTENT).
-enum AgentIntent {
-  execute,
-  feed,
-  author,
-  refine,
-  direct,
-}
+enum AgentIntent { execute, feed, author, refine, direct }
 
 AgentIntent _intentFromString(String? raw) {
   switch (raw?.trim().toLowerCase()) {
@@ -168,21 +164,21 @@ class TurnParsedResponse {
   });
 
   LlmParsedResponse toLegacy() => LlmParsedResponse(
-        intent: intent,
-        targetAgent: targetAgent,
-        parameters: parameters,
-        payload: payload,
-        directResponse: directResponse,
-        transcription: transcription,
-        reasoning: reasoning,
-      );
+    intent: intent,
+    targetAgent: targetAgent,
+    parameters: parameters,
+    payload: payload,
+    directResponse: directResponse,
+    transcription: transcription,
+    reasoning: reasoning,
+  );
 
   factory TurnParsedResponse.fallback(String message) => TurnParsedResponse(
-        intent: AgentIntent.direct,
-        transcription: message,
-        confirmation: message,
-        directResponse: message,
-      );
+    intent: AgentIntent.direct,
+    transcription: message,
+    confirmation: message,
+    directResponse: message,
+  );
 }
 
 class LlmParsedResponse {
@@ -204,11 +200,15 @@ class LlmParsedResponse {
     this.reasoning,
   });
 
-  bool get isPluginCommand => intent == AgentIntent.execute && targetAgent != null;
+  bool get isPluginCommand =>
+      intent == AgentIntent.execute && targetAgent != null;
   String? get pluginName => targetAgent;
 
   factory LlmParsedResponse.fallback(String phrase) {
-    return LlmParsedResponse(intent: AgentIntent.direct, directResponse: phrase);
+    return LlmParsedResponse(
+      intent: AgentIntent.direct,
+      directResponse: phrase,
+    );
   }
 }
 
@@ -217,10 +217,7 @@ class LlmService {
   LlmService(this._ref);
 
   LlmProvider _provider({LlmSlot slot = LlmSlot.defaultSlot}) =>
-      LlmProviderFactory.forConfig(
-        _ref.read(byokServiceProvider),
-        slot: slot,
-      );
+      LlmProviderFactory.forConfig(_ref.read(byokServiceProvider), slot: slot);
 
   Future<bool> generateAndSaveResponseAudio(
     String responseWord,
@@ -235,7 +232,9 @@ class LlmService {
     }
 
     final provider = _provider(slot: LlmSlot.tts);
-    debugPrint('[LlmService] TTS slot=${LlmSlot.tts.id} provider=${provider.id}');
+    debugPrint(
+      '[LlmService] TTS slot=${LlmSlot.tts.id} provider=${provider.id}',
+    );
     if (!provider.supportsTts) {
       debugPrint('TTS not natively supported for ${provider.id}.');
       return false;
@@ -267,8 +266,7 @@ class LlmService {
     bool authorSessionActive = false,
   }) async {
     final byok = _ref.read(byokServiceProvider);
-    final slot =
-        audioFilePath != null ? LlmSlot.language : LlmSlot.intent;
+    final slot = audioFilePath != null ? LlmSlot.language : LlmSlot.intent;
 
     if (!byok.hasKeyForSlot(slot)) {
       return TurnParsedResponse.fallback(
@@ -371,7 +369,8 @@ Classify the user's utterance into EXACTLY ONE intent:
 - "direct": anything else (chit-chat, capability questions, silence).
 If audio/prompt is empty or noise, use intent "direct" with confirmation "I didn't hear anything."''';
 
-  String _appSpecTemplateInstructions() => '''
+  String _appSpecTemplateInstructions() =>
+      '''
 When intent is "author" OR an authoring session is active, fill the App Spec template.
 Each scalar field uses: {"value": string|null, "status": "empty"|"proposed"|"confirmed", "confidence": "stated"|"inferred"|"unknown"}.
 Slot sequence (ask next missing in order; skip conditional slots when irrelevant):
@@ -489,7 +488,8 @@ ${_turnJsonContract()}
     AppSpec? spec;
     if (decoded['spec'] is Map) {
       spec = AppSpec.fromJson(
-          Map<String, dynamic>.from(decoded['spec'] as Map));
+        Map<String, dynamic>.from(decoded['spec'] as Map),
+      );
     }
 
     final questions = <ClarifyingQuestion>[];
@@ -497,7 +497,8 @@ ${_turnJsonContract()}
       for (final q in decoded['clarifyingQuestions'] as List) {
         if (q is Map) {
           questions.add(
-              ClarifyingQuestion.fromJson(Map<String, dynamic>.from(q)));
+            ClarifyingQuestion.fromJson(Map<String, dynamic>.from(q)),
+          );
         }
       }
     }
@@ -543,7 +544,8 @@ ${_turnJsonContract()}
       );
     }
 
-    final systemPrompt = '''
+    final systemPrompt =
+        '''
 You are the Agent Authoring compiler for 'Project Aur Bhai', a mobile agentic OS.
 Respond in English only.
 The user will describe an agent they want. You MUST output a single JavaScript agent.
@@ -591,8 +593,8 @@ Respond ONLY in RAW JSON (no markdown fences):
 
     return AuthoredAgentDraft(
       name: name,
-      description: (decoded['description'] as String?)?.trim() ??
-          'AI-authored agent.',
+      description:
+          (decoded['description'] as String?)?.trim() ?? 'AI-authored agent.',
       inputSchema: decoded['inputSchema'] is Map
           ? Map<String, dynamic>.from(decoded['inputSchema'] as Map)
           : <String, dynamic>{},
@@ -650,8 +652,9 @@ Respond ONLY in RAW JSON: {"answer": "..."}
 
     void progress(String message) => onProgress?.call(message);
     final bridge = _ref.read(jsBridgeServiceProvider);
-    final schemaJson =
-        currentInputSchema != null ? jsonEncode(currentInputSchema) : '{}';
+    final schemaJson = currentInputSchema != null
+        ? jsonEncode(currentInputSchema)
+        : '{}';
 
     final contextBlocks = StringBuffer();
     if (lastRunError != null && lastRunError.trim().isNotEmpty) {
@@ -673,7 +676,8 @@ Respond ONLY in RAW JSON: {"answer": "..."}
       'IMPROVE slot=${LlmSlot.improve.id} provider=${improveProvider.id}',
     );
 
-    final prompt = '''
+    final prompt =
+        '''
 You are the Coder Agent for Project Aur Bhai.
 Update the Bro Code (Javascript) to satisfy the change request.
 Respond in English only. Prefer thin execute() + System.assets for HTML/PWA;
@@ -732,11 +736,13 @@ Respond ONLY in RAW JSON: thin scriptBase64 and/or assets / edits — not HTML-i
         lastFailure = e;
         progress('Parse error: ${e.message}');
         if (turn >= kMaxRefineModelTurns) break;
-        messages.add(LlmChatMessage(
-          role: 'user',
-          content:
-              'Invalid JSON (${e.message}). Return ONLY valid JSON with thin scriptBase64 and/or assets.',
-        ));
+        messages.add(
+          LlmChatMessage(
+            role: 'user',
+            content:
+                'Invalid JSON (${e.message}). Return ONLY valid JSON with thin scriptBase64 and/or assets.',
+          ),
+        );
         continue;
       }
 
@@ -747,31 +753,38 @@ Respond ONLY in RAW JSON: thin scriptBase64 and/or assets / edits — not HTML-i
         lastFailure = e;
         progress('Missing scriptBase64: $e');
         if (turn >= kMaxRefineModelTurns) break;
-        messages.add(const LlmChatMessage(
-          role: 'user',
-          content:
-              'Missing scriptBase64. Return thin execute() as scriptBase64; put large HTML in assets.',
-        ));
+        messages.add(
+          const LlmChatMessage(
+            role: 'user',
+            content:
+                'Missing scriptBase64. Return thin execute() as scriptBase64; put large HTML in assets.',
+          ),
+        );
         continue;
       }
 
       final syntax = bridge.validateScriptSyntax(script);
       if (!syntax.ok) {
-        lastFailure = Exception(syntax.message ?? 'QuickJS syntax check failed');
+        lastFailure = Exception(
+          syntax.message ?? 'QuickJS syntax check failed',
+        );
         progress('Syntax check failed: ${syntax.message}');
         if (turn >= kMaxRefineModelTurns) break;
-        messages.add(LlmChatMessage(
-          role: 'user',
-          content:
-              'QuickJS rejected the script: ${syntax.message}. Return corrected scriptBase64.',
-        ));
+        messages.add(
+          LlmChatMessage(
+            role: 'user',
+            content:
+                'QuickJS rejected the script: ${syntax.message}. Return corrected scriptBase64.',
+          ),
+        );
         continue;
       }
 
       progress('Coder Agent: QuickJS syntax OK');
       return AuthoredAgentDraft(
         name: broCodeName,
-        description: (decoded['description'] as String?)?.trim() ??
+        description:
+            (decoded['description'] as String?)?.trim() ??
             currentDescription ??
             'Refined Bro Code.',
         inputSchema: decoded['inputSchema'] is Map
@@ -812,8 +825,10 @@ Respond ONLY in RAW JSON: thin scriptBase64 and/or assets / edits — not HTML-i
 
     // --- Local-first SyntaxError fix (no LLM) ---
     final bridge = _ref.read(jsBridgeServiceProvider);
-    final localCandidates =
-        localSyntaxFixCandidates(currentScript, lastRunError);
+    final localCandidates = localSyntaxFixCandidates(
+      currentScript,
+      lastRunError,
+    );
     if (localCandidates.isNotEmpty) {
       progress('Trying local SyntaxError fix…');
       for (final candidate in localCandidates) {
@@ -899,7 +914,9 @@ Respond ONLY in RAW JSON: thin scriptBase64 and/or assets / edits — not HTML-i
       contextBlocks.writeln('LAST RUN ERROR:\n$lastRunError\n');
     }
     if (dueDiligenceFindings.isNotEmpty) {
-      contextBlocks.writeln('DUE DILIGENCE FINDINGS (policy scan — does not execute):');
+      contextBlocks.writeln(
+        'DUE DILIGENCE FINDINGS (policy scan — does not execute):',
+      );
       for (final f in dueDiligenceFindings) {
         contextBlocks.writeln('• $f');
       }
@@ -918,7 +935,8 @@ Respond ONLY in RAW JSON: thin scriptBase64 and/or assets / edits — not HTML-i
     }
 
     final errorLoc = parseScriptErrorLocation(lastRunError);
-    final useExcerpt = errorLoc != null &&
+    final useExcerpt =
+        errorLoc != null &&
         (lastRunError?.toLowerCase().contains('syntax') ?? false);
     final scriptBlock = useExcerpt
         ? '''
@@ -932,7 +950,8 @@ CURRENT SCRIPT:
 $currentScript
 ''';
 
-    final initialUserPrompt = '''
+    final initialUserPrompt =
+        '''
 You are applying a surgical patch to Bro Code for Project Aur Bhai.
 Prefer edits on listed assets for HTML/PWA; thin scriptBase64 only when execute() must change. Respond in English only.
 Bro Code name: $agentName
@@ -954,11 +973,13 @@ Respond ONLY in RAW JSON with either scriptBase64 OR edits[] (Base64 snippets).
       LlmChatMessage(role: 'user', content: initialUserPrompt),
     ];
     if (chatSeed != null && chatSeed.isNotEmpty) {
-      messages.add(const LlmChatMessage(
-        role: 'model',
-        content:
-            '{"notes":"previous attempt did not produce a valid verified patch"}',
-      ));
+      messages.add(
+        const LlmChatMessage(
+          role: 'model',
+          content:
+              '{"notes":"previous attempt did not produce a valid verified patch"}',
+        ),
+      );
       messages.addAll(chatSeed);
     }
 
@@ -998,17 +1019,18 @@ Respond ONLY in RAW JSON with either scriptBase64 OR edits[] (Base64 snippets).
         decoded = jsonDecode(_cleanJsonString(raw)) as Map<String, dynamic>;
       } on FormatException catch (e) {
         lastFailure = e;
-        progress(
-          'Parse error: ${e.message}. Raw: ${truncateForLog(raw)}',
-        );
+        progress('Parse error: ${e.message}. Raw: ${truncateForLog(raw)}');
         if (turn >= kMaxRefineModelTurns) break;
-        messages.add(LlmChatMessage(
-          role: 'user',
-          content: '''
+        messages.add(
+          LlmChatMessage(
+            role: 'user',
+            content:
+                '''
 Your previous reply was invalid JSON (${e.message}).
 Return scriptBase64 of the FULL Bro Code, or edits with oldStringBase64/newStringBase64.
 ''',
-        ));
+          ),
+        );
         continue;
       }
 
@@ -1022,9 +1044,7 @@ Return scriptBase64 of the FULL Bro Code, or edits with oldStringBase64/newStrin
         } else {
           final edits = parseScriptEdits(decoded);
           if (edits == null) {
-            throw const FormatException(
-              'Expected scriptBase64 or edits[].',
-            );
+            throw const FormatException('Expected scriptBase64 or edits[].');
           }
           final grouped = groupEditsByAsset(edits);
           final mainEdits = grouped[null] ?? const <ScriptEdit>[];
@@ -1038,9 +1058,7 @@ Return scriptBase64 of the FULL Bro Code, or edits with oldStringBase64/newStrin
             if (assetId == null) continue;
             final existing = currentAssets[assetId];
             if (existing == null) {
-              throw FormatException(
-                'Edit targets unknown asset "$assetId".',
-              );
+              throw FormatException('Edit targets unknown asset "$assetId".');
             }
             assetUpdates[assetId] = applyScriptEdits(existing, entry.value);
           }
@@ -1049,36 +1067,45 @@ Return scriptBase64 of the FULL Bro Code, or edits with oldStringBase64/newStrin
         lastFailure = e;
         progress('Apply failed: ${scriptEditFailureMessage(e)}');
         if (turn >= kMaxRefineModelTurns) break;
-        messages.add(LlmChatMessage(
-          role: 'user',
-          content: '''
+        messages.add(
+          LlmChatMessage(
+            role: 'user',
+            content:
+                '''
 Apply failed: ${scriptEditFailureMessage(e)}
 Return scriptBase64 of the complete Bro Code (preferred).
 ''',
-        ));
+          ),
+        );
         continue;
       }
 
       progress('QuickJS syntax check…');
       final syntax = bridge.validateScriptSyntax(script);
       if (!syntax.ok) {
-        lastFailure = Exception(syntax.message ?? 'QuickJS syntax check failed');
+        lastFailure = Exception(
+          syntax.message ?? 'QuickJS syntax check failed',
+        );
         progress('Syntax check failed: ${syntax.message}');
         if (turn >= kMaxRefineModelTurns) break;
-        messages.add(LlmChatMessage(
-          role: 'user',
-          content: '''
+        messages.add(
+          LlmChatMessage(
+            role: 'user',
+            content:
+                '''
 QuickJS rejected the script: ${syntax.message}
 Return corrected scriptBase64 for the full Bro Code.
 ''',
-        ));
+          ),
+        );
         continue;
       }
 
       progress('Verified: QuickJS syntax OK — Bro Code ready');
       return AuthoredAgentDraft(
         name: agentName,
-        description: (decoded['description'] as String?)?.trim() ??
+        description:
+            (decoded['description'] as String?)?.trim() ??
             currentDescription ??
             'Refined Bro Code.',
         inputSchema: decoded['inputSchema'] is Map

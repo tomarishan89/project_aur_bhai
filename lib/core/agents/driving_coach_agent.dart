@@ -14,13 +14,15 @@ class DrivingCoachAgent extends AurBhaiAgent {
   String get name => "DrivingCoach";
 
   @override
-  String get description => "Analyzes recent sensor telemetry from the SQLite vault to predict user movement state (Idle, Walking, Driving).";
+  String get description =>
+      "Analyzes recent sensor telemetry from the SQLite vault to predict user movement state (Idle, Walking, Driving).";
 
   @override
   Map<String, AgentParameter> get inputSchema => {
     'recordCount': const AgentParameter(
       type: 'number',
-      description: 'The number of recent telemetry records to analyze (e.g. 10 or 50). Extract this from words like "recent", "last 10", etc. Default is 20 if omitted.',
+      description:
+          'The number of recent telemetry records to analyze (e.g. 10 or 50). Extract this from words like "recent", "last 10", etc. Default is 20 if omitted.',
       required: false,
     ),
   };
@@ -28,7 +30,7 @@ class DrivingCoachAgent extends AurBhaiAgent {
   @override
   Future<String> execute(Map<String, dynamic> parameters) async {
     final telemetryBus = ref.read(telemetryBusProvider);
-    
+
     // Parse arguments
     int recordCount = 20;
     if (parameters['recordCount'] != null) {
@@ -38,10 +40,10 @@ class DrivingCoachAgent extends AurBhaiAgent {
         recordCount = int.tryParse(parameters['recordCount']) ?? 20;
       }
     }
-    
+
     // Query local SQLite Vault
     final records = await telemetryBus.getRecentRecords(recordCount);
-    
+
     if (records.isEmpty) {
       return "I cannot analyze your movement. The SQLite telemetry vault is currently empty.";
     }
@@ -56,7 +58,7 @@ class DrivingCoachAgent extends AurBhaiAgent {
       sum += r.accelerometerZ;
     }
     double mean = sum / records.length;
-    
+
     double varianceSum = 0.0;
     for (var r in records) {
       varianceSum += pow(r.accelerometerZ - mean, 2);

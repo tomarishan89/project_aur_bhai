@@ -33,27 +33,26 @@ class BroCodeWorkspaceSnapshot {
   BroCodeWorkspace toWorkspace({
     required String description,
     required Map<String, dynamic> inputSchema,
-  }) =>
-      BroCodeWorkspace(
-        name: broCodeName,
-        description: description,
-        inputSchema: inputSchema,
-        script: script,
-        assets: Map<String, String>.from(assets),
-      );
+  }) => BroCodeWorkspace(
+    name: broCodeName,
+    description: description,
+    inputSchema: inputSchema,
+    script: script,
+    assets: Map<String, String>.from(assets),
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        if (parentId != null) 'parentId': parentId,
-        'broCodeName': broCodeName,
-        'createdAt': createdAt.toIso8601String(),
-        'script': script,
-        'assets': assets,
-        'turn': turn,
-        'action': action,
-        'summary': summary,
-        'gatesGreen': gatesGreen,
-      };
+    'id': id,
+    if (parentId != null) 'parentId': parentId,
+    'broCodeName': broCodeName,
+    'createdAt': createdAt.toIso8601String(),
+    'script': script,
+    'assets': assets,
+    'turn': turn,
+    'action': action,
+    'summary': summary,
+    'gatesGreen': gatesGreen,
+  };
 
   factory BroCodeWorkspaceSnapshot.fromJson(Map<String, dynamic> json) {
     final assetsRaw = json['assets'];
@@ -65,7 +64,8 @@ class BroCodeWorkspaceSnapshot {
       id: json['id'] as String? ?? '',
       parentId: json['parentId'] as String?,
       broCodeName: json['broCodeName'] as String? ?? '',
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+      createdAt:
+          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
       script: json['script'] as String? ?? '',
       assets: assets,
@@ -91,8 +91,7 @@ class BroCodeSnapshotStore {
   final List<BroCodeWorkspaceSnapshot> _snapshots = [];
   String? _headId;
 
-  List<BroCodeWorkspaceSnapshot> get snapshots =>
-      List.unmodifiable(_snapshots);
+  List<BroCodeWorkspaceSnapshot> get snapshots => List.unmodifiable(_snapshots);
 
   String? get headId => _headId;
 
@@ -114,7 +113,8 @@ class BroCodeSnapshotStore {
     String? id,
   }) {
     final snap = BroCodeWorkspaceSnapshot(
-      id: id ??
+      id:
+          id ??
           'snap-${DateTime.now().microsecondsSinceEpoch}-'
               '${_snapshots.length + 1}',
       parentId: _headId,
@@ -167,9 +167,9 @@ class BroCodeSnapshotStore {
       'brocode-snap-index:$broCodeName';
 
   Map<String, dynamic> toJson() => {
-        'headId': _headId,
-        'snapshots': _snapshots.map((s) => s.toJson()).toList(),
-      };
+    'headId': _headId,
+    'snapshots': _snapshots.map((s) => s.toJson()).toList(),
+  };
 
   void loadFromJson(Map<String, dynamic> json) {
     clear();
@@ -178,9 +178,7 @@ class BroCodeSnapshotStore {
       for (final item in list) {
         if (item is Map) {
           _snapshots.add(
-            BroCodeWorkspaceSnapshot.fromJson(
-              Map<String, dynamic>.from(item),
-            ),
+            BroCodeWorkspaceSnapshot.fromJson(Map<String, dynamic>.from(item)),
           );
         }
       }

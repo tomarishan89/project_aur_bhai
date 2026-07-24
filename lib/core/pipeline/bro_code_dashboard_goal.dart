@@ -30,10 +30,7 @@ class BroCodeDashboardGoalChecker {
     }
     if (docs.isEmpty) {
       // Fallback: any large chunk that looks like an HTML page.
-      final loose = RegExp(
-        r'<html[\s\S]*?</html\s*>',
-        caseSensitive: false,
-      );
+      final loose = RegExp(r'<html[\s\S]*?</html\s*>', caseSensitive: false);
       for (final m in loose.allMatches(script)) {
         docs.add(_unescapeJsStringFragment(m.group(0)!));
       }
@@ -86,7 +83,8 @@ class BroCodeDashboardGoalChecker {
       final valueExpr = _readJsArgument(script, m.end);
       if (valueExpr == null) continue;
 
-      final keyLooksHtml = key.toLowerCase().endsWith('.html') ||
+      final keyLooksHtml =
+          key.toLowerCase().endsWith('.html') ||
           key.toLowerCase().endsWith('.htm');
 
       final resolved = _resolveWriteVaultValue(
@@ -203,7 +201,10 @@ class BroCodeDashboardGoalChecker {
           i++;
           continue;
         }
-        if (quote == '`' && c == r'$' && i + 1 < source.length && source[i + 1] == '{') {
+        if (quote == '`' &&
+            c == r'$' &&
+            i + 1 < source.length &&
+            source[i + 1] == '{') {
           depthTemplateExpr++;
           buf.write('{');
           i += 2;
@@ -312,10 +313,7 @@ class BroCodeDashboardGoalChecker {
   /// Collect element ids declared in HTML markup (id="…" / id='…').
   static Set<String> declaredElementIds(String html) {
     final ids = <String>{};
-    final re = RegExp(
-      r'''\bid\s*=\s*["']([^"']+)["']''',
-      caseSensitive: false,
-    );
+    final re = RegExp(r'''\bid\s*=\s*["']([^"']+)["']''', caseSensitive: false);
     for (final m in re.allMatches(html)) {
       ids.add(m.group(1)!);
     }
@@ -325,9 +323,7 @@ class BroCodeDashboardGoalChecker {
   /// Ids referenced via getElementById('…') / getElementById("…").
   static Set<String> referencedElementIds(String html) {
     final ids = <String>{};
-    final re = RegExp(
-      r'''getElementById\s*\(\s*['"]([^'"]+)['"]\s*\)''',
-    );
+    final re = RegExp(r'''getElementById\s*\(\s*['"]([^'"]+)['"]\s*\)''');
     for (final m in re.allMatches(html)) {
       ids.add(m.group(1)!);
     }
@@ -380,7 +376,8 @@ class BroCodeDashboardGoalChecker {
   static bool wantsFromToDatetime(String changeRequest) {
     final r = changeRequest.toLowerCase();
     if (r.contains('datetime-local')) return true;
-    final hasDatetime = r.contains('datetime') ||
+    final hasDatetime =
+        r.contains('datetime') ||
         r.contains('date/time') ||
         r.contains('date-time') ||
         (r.contains('date') && r.contains('time') && r.contains('from'));
@@ -428,7 +425,10 @@ class BroCodeDashboardGoalChecker {
   }
 
   /// Mobile / installable PWA signals for vault dashboards.
-  static BroCodeDashboardGoalResult checkPwa(String html, {Map<String, String>? assets}) {
+  static BroCodeDashboardGoalResult checkPwa(
+    String html, {
+    Map<String, String>? assets,
+  }) {
     final findings = <String>[];
     final h = html.toLowerCase();
 
@@ -441,7 +441,8 @@ class BroCodeDashboardGoalChecker {
     if (!h.contains('rel="manifest"') && !h.contains("rel='manifest'")) {
       findings.add('PWA: missing <link rel="manifest" …>.');
     }
-    if (!h.contains('serviceworker') && !h.contains('navigator.serviceworker')) {
+    if (!h.contains('serviceworker') &&
+        !h.contains('navigator.serviceworker')) {
       findings.add('PWA: missing service worker registration.');
     }
     if (!RegExp(
@@ -459,7 +460,8 @@ class BroCodeDashboardGoalChecker {
 
     if (assets != null) {
       final hasManifest = assets.keys.any(
-        (k) => k.toLowerCase().endsWith('manifest.json') ||
+        (k) =>
+            k.toLowerCase().endsWith('manifest.json') ||
             k.toLowerCase().contains('manifest'),
       );
       final hasSw = assets.keys.any(
@@ -517,7 +519,9 @@ class BroCodeDashboardGoalChecker {
         final kl = k.toLowerCase();
         if (!(kl.endsWith('.html') || kl.endsWith('.htm'))) return false;
         final content = assets[k]!;
-        return !published.any((p) => p == content || p.trim() == content.trim());
+        return !published.any(
+          (p) => p == content || p.trim() == content.trim(),
+        );
       }).toList();
       if (orphanHtmlAssets.isNotEmpty &&
           _changeTouchesDashboard(changeRequest)) {
@@ -525,7 +529,9 @@ class BroCodeDashboardGoalChecker {
         // surface a dedicated finding when datetime/slider asked and only orphan has it.
         if (wantsFromToDatetime(changeRequest) &&
             !docs.any(hasFromToDatetimeControls) &&
-            orphanHtmlAssets.any((k) => hasFromToDatetimeControls(assets[k]!))) {
+            orphanHtmlAssets.any(
+              (k) => hasFromToDatetimeControls(assets[k]!),
+            )) {
           findings.add(
             'From/to datetime controls exist only in unused asset(s) '
             '(${orphanHtmlAssets.join(', ')}), not in HTML that '
@@ -557,17 +563,20 @@ class BroCodeDashboardGoalChecker {
       final render = checkRenderableDashboardHtml(html, assets: assets);
       if (!render.ok) findings.addAll(render.findings);
 
-      final removeChart = req.contains('remove') &&
+      final removeChart =
+          req.contains('remove') &&
           (req.contains('chart') ||
               req.contains('graph') ||
               req.contains('canvas') ||
               req.contains('device map'));
-      final addMap = req.contains('map') &&
+      final addMap =
+          req.contains('map') &&
           (req.contains('leaflet') ||
               req.contains('google') ||
               req.contains('replace') ||
               req.contains('add'));
-      final wantPwa = req.contains('pwa') ||
+      final wantPwa =
+          req.contains('pwa') ||
           req.contains('progressive web') ||
           req.contains('installable') ||
           req.contains('desktop dashboard');
@@ -581,8 +590,7 @@ class BroCodeDashboardGoalChecker {
         }
       }
 
-      if (addMap ||
-          (req.contains('leaflet') || req.contains('google map'))) {
+      if (addMap || (req.contains('leaflet') || req.contains('google map'))) {
         final hasLeaflet = looksLikeLeafletMap(html);
         final hasGoogle = looksLikeGoogleMaps(html);
         if (!hasLeaflet && !hasGoogle) {
@@ -620,10 +628,7 @@ class BroCodeDashboardGoalChecker {
       }
     }
 
-    return BroCodeDashboardGoalResult(
-      ok: findings.isEmpty,
-      findings: findings,
-    );
+    return BroCodeDashboardGoalResult(ok: findings.isEmpty, findings: findings);
   }
 
   /// Collect HTML documents from sidecar assets (`*.html` / text that looks like HTML).
@@ -679,8 +684,9 @@ class BroCodeDashboardGoalChecker {
       );
     }
 
-    final usesLeafletApi =
-        RegExp(r'\bL\.(map|tileLayer|marker|polyline)\b').hasMatch(t);
+    final usesLeafletApi = RegExp(
+      r'\bL\.(map|tileLayer|marker|polyline)\b',
+    ).hasMatch(t);
     final guardsLeaflet = RegExp(
       r'''typeof\s+L\s*(!==?|===?)\s*['"]undefined['"]|if\s*\(\s*typeof\s+L\b''',
     ).hasMatch(t);
@@ -720,16 +726,15 @@ class BroCodeDashboardGoalChecker {
     final unbounded = checkUnboundedTelemetryQueries(html);
     if (!unbounded.ok) findings.addAll(unbounded.findings);
 
-    return BroCodeDashboardGoalResult(
-      ok: findings.isEmpty,
-      findings: findings,
-    );
+    return BroCodeDashboardGoalResult(ok: findings.isEmpty, findings: findings);
   }
 
   /// Fails row-returning telemetry SELECTs that omit LIMIT (heavy dashboards).
   ///
   /// Aggregates (COUNT/SUM/AVG/MIN/MAX without selecting raw rows) are allowed.
-  static BroCodeDashboardGoalResult checkUnboundedTelemetryQueries(String html) {
+  static BroCodeDashboardGoalResult checkUnboundedTelemetryQueries(
+    String html,
+  ) {
     final findings = <String>[];
     final sqlLiterals = <String>[];
 
@@ -765,16 +770,12 @@ class BroCodeDashboardGoalChecker {
       );
     }
 
-    return BroCodeDashboardGoalResult(
-      ok: findings.isEmpty,
-      findings: findings,
-    );
+    return BroCodeDashboardGoalResult(ok: findings.isEmpty, findings: findings);
   }
 
   static bool _isTelemetrySelect(String sql) {
     final s = sql.toLowerCase();
-    return s.contains('select') &&
-        RegExp(r'\bfrom\s+telemetry\b').hasMatch(s);
+    return s.contains('select') && RegExp(r'\bfrom\s+telemetry\b').hasMatch(s);
   }
 
   /// COUNT/SUM/… only — no raw column list that would dump every row.

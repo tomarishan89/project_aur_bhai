@@ -28,23 +28,24 @@ class BroCall {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'agentName': agentName,
-        'title': title,
-        'body': body,
-        'speakText': speakText,
-        'createdAt': createdAt.toIso8601String(),
-      };
+    'id': id,
+    'agentName': agentName,
+    'title': title,
+    'body': body,
+    'speakText': speakText,
+    'createdAt': createdAt.toIso8601String(),
+  };
 
   factory BroCall.fromJson(Map<String, dynamic> json) => BroCall(
-        id: json['id'] as String? ?? '',
-        agentName: json['agentName'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        body: json['body'] as String? ?? '',
-        speakText: json['speakText'] as String? ?? '',
-        createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
-            DateTime.now().toUtc(),
-      );
+    id: json['id'] as String? ?? '',
+    agentName: json['agentName'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    body: json['body'] as String? ?? '',
+    speakText: json['speakText'] as String? ?? '',
+    createdAt:
+        DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+        DateTime.now().toUtc(),
+  );
 }
 
 /// Host-mediated Bro Code calls (S17). No silent cloud.
@@ -56,6 +57,7 @@ class BroCallService extends ChangeNotifier {
   final List<BroCall> _pending = [];
   bool _ready = false;
   void Function(BroCall call)? onDeliverPayload;
+
   /// Optional TTS cue when a call is queued (host sets to speak “Aur Bhai”).
   void Function(BroCall call)? onCallQueued;
 
@@ -83,9 +85,10 @@ class BroCallService extends ChangeNotifier {
           unawaited(acknowledgeAndDeliver());
         },
       );
-      final androidPlugin =
-          _notifications.resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin = _notifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       await androidPlugin?.createNotificationChannel(
         const AndroidNotificationChannel(
           AppConfig.broCallChannelId,
@@ -217,7 +220,6 @@ class BroCallService extends ChangeNotifier {
   }
 }
 
-final broCallServiceProvider =
-    ChangeNotifierProvider<BroCallService>((ref) {
+final broCallServiceProvider = ChangeNotifierProvider<BroCallService>((ref) {
   return BroCallService();
 });

@@ -74,8 +74,10 @@ class BroCodeCodingAgent {
     void Function(String message)? onProgress,
     void Function(int usedTokens, int budgetTokens)? onContextUpdate,
     String? priorFailureContext,
+
     /// Test / scripted IMPROVE: skip live BYOK when set.
     LlmProvider? providerOverride,
+
     /// Optional in-memory snapshot log (Git-lite). Created if null.
     BroCodeSnapshotStore? snapshotStore,
     bool persistSnapshotsToVault = true,
@@ -132,15 +134,16 @@ class BroCodeCodingAgent {
     String? lastFailureFingerprint;
     var identicalFailureCount = 0;
 
-    AuthoredAgentDraft workingDraft({String notes = 'Unverified working copy.'}) =>
-        AuthoredAgentDraft(
-          name: workspace.name,
-          description: workspace.description,
-          inputSchema: workspace.inputSchema,
-          script: workspace.script,
-          notes: notes,
-          assetUpdates: Map<String, String>.from(workspace.assets),
-        );
+    AuthoredAgentDraft workingDraft({
+      String notes = 'Unverified working copy.',
+    }) => AuthoredAgentDraft(
+      name: workspace.name,
+      description: workspace.description,
+      inputSchema: workspace.inputSchema,
+      script: workspace.script,
+      notes: notes,
+      assetUpdates: Map<String, String>.from(workspace.assets),
+    );
 
     /// Gates that failed after the latest verify (for near-green guidance).
     List<String> redGates() {
@@ -277,7 +280,8 @@ class BroCodeCodingAgent {
       LlmChatMessage(role: 'user', content: '$system\n\n$userGoal'),
     ];
 
-    final provider = providerOverride ??
+    final provider =
+        providerOverride ??
         LlmProviderFactory.forConfig(
           _ref.read(byokServiceProvider),
           slot: LlmSlot.improve,
@@ -314,8 +318,7 @@ class BroCodeCodingAgent {
       if (!observation.ok) {
         // Empty recovered write_full payloads must not burn the stuck-loop budget;
         // the model needs room to retry with apply_edit / valid Base64.
-        final skipIdentical =
-            observation.data?['skipIdenticalFailure'] == true;
+        final skipIdentical = observation.data?['skipIdenticalFailure'] == true;
         if (!skipIdentical) {
           final fp = failureFingerprint(observation);
           if (fp == lastFailureFingerprint) {
@@ -333,7 +336,8 @@ class BroCodeCodingAgent {
       if (red.isEmpty || red.length > 2) return;
       // Integrity wiring failures are host-repairable — do not force apply_edit thrash.
       if (red.contains('platform integrity')) return;
-      final thrashOnly = tools.syntaxOkAfterLastMutate &&
+      final thrashOnly =
+          tools.syntaxOkAfterLastMutate &&
           red.every(
             (g) => g == 'policy' || g == 'style' || g == 'dashboard goals',
           );
@@ -371,7 +375,8 @@ class BroCodeCodingAgent {
       }
       // Auto-repair when integrity is red and syntax is already broken or
       // goals fail solely because publish path is wrong — avoid 12-turn thrash.
-      final shouldRepair = result.halfThinScript ||
+      final shouldRepair =
+          result.halfThinScript ||
           result.orphanAssetIds.isNotEmpty ||
           !tools.syntaxOkAfterLastMutate;
       if (!shouldRepair) return false;
@@ -426,10 +431,10 @@ class BroCodeCodingAgent {
             'System.writeVault(key, System.assets["$htmlId"], "text/html").',
         nextHint: preferAssetExtraction
             ? 'REQUIRED: write_full with {"asset":"$htmlId","content":"<full HTML>"} '
-                'then thin execute via apply_edit/write_full on the script only. '
-                'Monolith apply_edit is rejected until assets hold the HTML.'
+                  'then thin execute via apply_edit/write_full on the script only. '
+                  'Monolith apply_edit is rejected until assets hold the HTML.'
             : 'Prefer write_full {"asset":"$htmlId","content":"…"} (or scriptBase64) '
-                'for the dashboard HTML; thin execute with System.assets.',
+                  'for the dashboard HTML; thin execute with System.assets.',
         data: {
           'nestedHtmlTemplate': true,
           'preferAssetExtraction': preferAssetExtraction,
@@ -544,12 +549,12 @@ class BroCodeCodingAgent {
         );
       }
       if (estimatedTokens > (budget * 0.92).floor()) {
-        progress('Stopped: estimated context near budget (~${_fmtK(estimatedTokens)})');
+        progress(
+          'Stopped: estimated context near budget (~${_fmtK(estimatedTokens)})',
+        );
         return finish(
           verified: false,
-          message: remainingFindingsMessage(
-            'Context budget nearly full.',
-          ),
+          message: remainingFindingsMessage('Context budget nearly full.'),
           draft: workingDraft(notes: 'Unverified — context budget.'),
         );
       }
@@ -580,11 +585,13 @@ class BroCodeCodingAgent {
         progress('Model timed out on turn $turns');
         // Timeouts are not productive — refund the turn slot.
         turns--;
-        messages.add(const LlmChatMessage(
-          role: 'user',
-          content:
-              'Observation: previous model call timed out. Reply with one JSON action only.',
-        ));
+        messages.add(
+          const LlmChatMessage(
+            role: 'user',
+            content:
+                'Observation: previous model call timed out. Reply with one JSON action only.',
+          ),
+        );
         continue;
       } catch (e) {
         heartbeat.cancel();
@@ -621,9 +628,9 @@ class BroCodeCodingAgent {
           role: 'user',
           content: preferApplyEditOnly
               ? 'Invalid JSON (${e.message}). Return ONLY apply_edit JSON: '
-                  '{"thought":"...","action":"apply_edit","args":{"old":"...","new":"..."}}'
+                    '{"thought":"...","action":"apply_edit","args":{"old":"...","new":"..."}}'
               : 'Invalid JSON (${e.message}). Return ONLY one JSON object: '
-                  '{"thought":"...","action":"apply_edit|write_full|read_script|done","args":{}}',
+                    '{"thought":"...","action":"apply_edit|write_full|read_script|done","args":{}}',
         );
         messages.add(repair);
         estimatedTokens += estimateTokensFromString(repair.content);
@@ -633,7 +640,9 @@ class BroCodeCodingAgent {
 
       final thought = (decoded['thought'] as String?)?.trim();
       if (thought != null && thought.isNotEmpty) {
-        progress('Thought: ${thought.length > 160 ? '${thought.substring(0, 160)}…' : thought}');
+        progress(
+          'Thought: ${thought.length > 160 ? '${thought.substring(0, 160)}…' : thought}',
+        );
       }
 
       final action = (decoded['action'] as String?)?.trim().toLowerCase() ?? '';
@@ -644,7 +653,8 @@ class BroCodeCodingAgent {
 
       final recoveredEmptyThought =
           thought == 'Recovered action from non-JSON model response.';
-      final writeFullHasPayload = args['content'] != null ||
+      final writeFullHasPayload =
+          args['content'] != null ||
           args['script'] != null ||
           (args['scriptBase64'] as String?)?.trim().isNotEmpty == true ||
           (args['contentBase64'] as String?)?.trim().isNotEmpty == true;
@@ -678,12 +688,13 @@ class BroCodeCodingAgent {
 
       if (action == 'write_full' &&
           preferAssetExtraction &&
-          (args['asset'] == null ||
-              (args['asset'] as String).trim().isEmpty) &&
+          (args['asset'] == null || (args['asset'] as String).trim().isEmpty) &&
           (args['content'] != null &&
               ((args['content'] as String).contains('<!DOCTYPE') ||
                   (args['content'] as String).length > 2000))) {
-        progress('Rejected write_full: prefer asset extraction requires thin script');
+        progress(
+          'Rejected write_full: prefer asset extraction requires thin script',
+        );
         turns--;
         obs = ToolObservation(
           ok: false,
@@ -696,10 +707,7 @@ class BroCodeCodingAgent {
           nextHint:
               'Write the HTML to an asset first using write_full with "asset": "<name>.html". '
               'Then write a thin execute script that uses System.assets.',
-          data: const {
-            'skipIdenticalFailure': true,
-            'refundTurn': true,
-          },
+          data: const {'skipIdenticalFailure': true, 'refundTurn': true},
         );
         await ingestObs(obs);
         continue;
@@ -718,9 +726,7 @@ class BroCodeCodingAgent {
                   !tools.canDeclareDone &&
                   redGates().every(
                     (g) =>
-                        g == 'policy' ||
-                        g == 'style' ||
-                        g == 'dashboard goals',
+                        g == 'policy' || g == 'style' || g == 'dashboard goals',
                   )))) {
         progress('Rejected write_full: near-green — use apply_edit');
         turns--;
@@ -765,10 +771,10 @@ class BroCodeCodingAgent {
               'or args.contentBase64. Empty/recovered calls with no payload are rejected.',
           nextHint: preferApplyEditOnly
               ? 'apply_edit ONLY: {"thought":"…","action":"apply_edit",'
-                  '"args":{"old":"<unique snippet>","new":"<replacement>"}}. '
-                  'Do not call write_full again without a payload.'
+                    '"args":{"old":"<unique snippet>","new":"<replacement>"}}. '
+                    'Do not call write_full again without a payload.'
               : 'Return valid JSON write_full with scriptBase64, or prefer apply_edit. '
-                  'Do not dump raw HTML/JS outside JSON.',
+                    'Do not dump raw HTML/JS outside JSON.',
           data: const {
             'emptyWriteFull': true,
             'skipIdenticalFailure': true,
@@ -825,7 +831,8 @@ class BroCodeCodingAgent {
           continue;
         }
 
-        final notes = (args['notes'] as String?)?.trim() ??
+        final notes =
+            (args['notes'] as String?)?.trim() ??
             thought ??
             'Coding agent verified in sandbox.';
         progress(
@@ -854,10 +861,12 @@ class BroCodeCodingAgent {
       if (action.isEmpty) {
         progress('Empty action — prompting model again');
         turns--;
-        messages.add(const LlmChatMessage(
-          role: 'user',
-          content: 'Missing action. Return a JSON action object.',
-        ));
+        messages.add(
+          const LlmChatMessage(
+            role: 'user',
+            content: 'Missing action. Return a JSON action object.',
+          ),
+        );
         continue;
       }
 
@@ -877,24 +886,30 @@ class BroCodeCodingAgent {
             targetAsset.endsWith('.html') &&
             looksLikeNestedHtmlTemplateSyntaxFailure(
               script: tools.workspace.script,
-              syntaxObservation: lastSyntaxError ??
+              syntaxObservation:
+                  lastSyntaxError ??
                   ToolObservation(
-                      ok: false, tool: 'validate_syntax', summary: 'unknown'),
+                    ok: false,
+                    tool: 'validate_syntax',
+                    summary: 'unknown',
+                  ),
             )) {
           progress('Host auto-thin execute script after $targetAsset write');
           tools.workspace.script =
               BroCodePlatformIntegrity.buildThinPublishExecute(
-            htmlAssetId: targetAsset,
-            vaultKey: targetAsset,
-            assets: tools.workspace.assets,
-          );
+                htmlAssetId: targetAsset,
+                vaultKey: targetAsset,
+                assets: tools.workspace.assets,
+              );
 
-          await ingestObs(ToolObservation(
-            ok: true,
-            tool: 'host_auto_thin_execute',
-            summary: 'Auto-thinned execute script to use $targetAsset',
-            detail: 'Execute script thinned by host (platform integrity).',
-          ));
+          await ingestObs(
+            ToolObservation(
+              ok: true,
+              tool: 'host_auto_thin_execute',
+              summary: 'Auto-thinned execute script to use $targetAsset',
+              detail: 'Execute script thinned by host (platform integrity).',
+            ),
+          );
 
           final postThinSyntax = await tools.execute('validate_syntax', {});
           await ingestObs(postThinSyntax);
@@ -970,11 +985,13 @@ class BroCodeCodingAgent {
     messages
       ..clear()
       ..add(head)
-      ..add(const LlmChatMessage(
-        role: 'user',
-        content:
-            'Observation: earlier turns compacted to save context. Continue from the recent observations.',
-      ))
+      ..add(
+        const LlmChatMessage(
+          role: 'user',
+          content:
+              'Observation: earlier turns compacted to save context. Continue from the recent observations.',
+        ),
+      )
       ..addAll(tail);
   }
 
@@ -1000,13 +1017,15 @@ class BroCodeCodingAgent {
     final detail = syntaxObservation.detail;
     final lowerScript = script.toLowerCase();
 
-    final hasHtmlTemplate = lowerScript.contains('<!doctype') ||
+    final hasHtmlTemplate =
+        lowerScript.contains('<!doctype') ||
         (lowerScript.contains('const html') && lowerScript.contains('<html'));
     final hasBrowserApi =
         lowerScript.contains('document.') || lowerScript.contains('fetch(');
     if (!hasHtmlTemplate || !hasBrowserApi) return false;
 
-    final nestedTokenHints = summary.contains('unexpected token') ||
+    final nestedTokenHints =
+        summary.contains('unexpected token') ||
         summary.contains("expecting ';'") ||
         summary.contains('expecting ";"') ||
         detail.contains(r'${') ||
@@ -1022,7 +1041,8 @@ class BroCodeCodingAgent {
     return '$tokens';
   }
 
-  static String _systemPrompt() => '''
+  static String _systemPrompt() =>
+      '''
 You are the Bro Code Coding Agent for Project Aur Bhai (on-device).
 You improve ONE Javascript Bro Code unit using tools. Respond in English.
 Each turn return ONLY raw JSON (no markdown):
@@ -1090,7 +1110,9 @@ Rules:
     buf.writeln('Description: ${workspace.description}');
     buf.writeln('inputSchema: ${jsonEncode(workspace.inputSchema)}');
     buf.writeln('Script length: ${workspace.scriptCharCount} chars');
-    final dashboardLikely = BroCodeAgentTools.changeImpliesDashboard(changeRequest);
+    final dashboardLikely = BroCodeAgentTools.changeImpliesDashboard(
+      changeRequest,
+    );
     if (workspace.assets.isNotEmpty) {
       buf.writeln('Assets: ${workspace.assets.keys.join(', ')}');
       buf.writeln(
@@ -1254,5 +1276,6 @@ String? _firstBalancedJsonObject(String source) {
   return null;
 }
 
-final broCodeCodingAgentProvider =
-    Provider<BroCodeCodingAgent>((ref) => BroCodeCodingAgent(ref));
+final broCodeCodingAgentProvider = Provider<BroCodeCodingAgent>(
+  (ref) => BroCodeCodingAgent(ref),
+);

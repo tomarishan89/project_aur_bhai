@@ -27,9 +27,11 @@ class ScriptEdit {
 
   factory ScriptEdit.fromJson(Map<String, dynamic> json) {
     final oldB64 =
-        json['oldStringBase64'] as String? ?? json['old_string_base64'] as String?;
+        json['oldStringBase64'] as String? ??
+        json['old_string_base64'] as String?;
     final newB64 =
-        json['newStringBase64'] as String? ?? json['new_string_base64'] as String?;
+        json['newStringBase64'] as String? ??
+        json['new_string_base64'] as String?;
 
     String? oldString;
     String? newString;
@@ -56,9 +58,8 @@ class ScriptEdit {
     return ScriptEdit(
       oldString: oldString,
       newString: newString,
-      replaceAll: json['replaceAll'] as bool? ??
-          json['replace_all'] as bool? ??
-          false,
+      replaceAll:
+          json['replaceAll'] as bool? ?? json['replace_all'] as bool? ?? false,
       asset: (asset == null || asset.isEmpty) ? null : asset,
     );
   }
@@ -88,9 +89,7 @@ String applyScriptEdits(String source, List<ScriptEdit> edits) {
   for (var i = 0; i < edits.length; i++) {
     final edit = edits[i];
     if (edit.oldString.isEmpty) {
-      throw FormatException(
-        'Edit ${i + 1} has an empty oldString. Tap Retry.',
-      );
+      throw FormatException('Edit ${i + 1} has an empty oldString. Tap Retry.');
     }
     if (edit.oldString == edit.newString) {
       throw FormatException(
@@ -140,7 +139,10 @@ String _applyOneEdit(String source, ScriptEdit edit, {required int editIndex}) {
         'Edit $editIndex: oldString not found in the script. Tap Retry.',
       );
     }
-    final matches = RegExp(pattern, multiLine: true).allMatches(source).toList();
+    final matches = RegExp(
+      pattern,
+      multiLine: true,
+    ).allMatches(source).toList();
     var working = source;
     for (final m in matches.reversed) {
       working = working.replaceRange(m.start, m.end, edit.newString);
@@ -347,11 +349,13 @@ List<LocalSyntaxFixResult> localSyntaxFixCandidates(
     newLines[lineIndex] = candidateLine;
     final joined = newLines.join('\n');
     if (!seen.add(joined)) continue;
-    results.add(LocalSyntaxFixResult(
-      script: joined,
-      notes:
-          'Local fix: adjusted line ${loc.line} for missing semicolon (col ${loc.column}).',
-    ));
+    results.add(
+      LocalSyntaxFixResult(
+        script: joined,
+        notes:
+            'Local fix: adjusted line ${loc.line} for missing semicolon (col ${loc.column}).',
+      ),
+    );
   }
 
   if (lineIndex > 0) {
@@ -365,11 +369,13 @@ List<LocalSyntaxFixResult> localSyntaxFixCandidates(
       newLines[lineIndex - 1] = '$prev;';
       final joined = newLines.join('\n');
       if (seen.add(joined)) {
-        results.add(LocalSyntaxFixResult(
-          script: joined,
-          notes:
-              'Local fix: inserted semicolon at end of line ${loc.line - 1}.',
-        ));
+        results.add(
+          LocalSyntaxFixResult(
+            script: joined,
+            notes:
+                'Local fix: inserted semicolon at end of line ${loc.line - 1}.',
+          ),
+        );
       }
     }
   }

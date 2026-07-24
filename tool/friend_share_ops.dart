@@ -51,10 +51,9 @@ Future<void> main(List<String> args) async {
   }
 
   final owner = Platform.environment['CIRCLE_OWNER']?.trim() ?? '';
-  final repo =
-      Platform.environment['CIRCLE_REPO']?.trim().isNotEmpty == true
-          ? Platform.environment['CIRCLE_REPO']!.trim()
-          : 'aur_bhai_circle';
+  final repo = Platform.environment['CIRCLE_REPO']?.trim().isNotEmpty == true
+      ? Platform.environment['CIRCLE_REPO']!.trim()
+      : 'aur_bhai_circle';
   final token = Platform.environment['CIRCLE_TOKEN']?.trim() ?? '';
 
   if (owner.isEmpty || token.isEmpty) {
@@ -165,7 +164,12 @@ Future<void> _ensureRepo(
   }
 
   // Create under the authenticated user. For orgs, create the repo in the UI.
-  final user = await _github(client, method: 'GET', path: '/user', token: token);
+  final user = await _github(
+    client,
+    method: 'GET',
+    path: '/user',
+    token: token,
+  );
   if (user.statusCode != 200) {
     stderr.writeln('Token cannot read /user: HTTP ${user.statusCode}');
     exit(1);

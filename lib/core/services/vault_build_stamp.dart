@@ -9,10 +9,7 @@ String vaultContentHash(String body) {
   return digest.toString().substring(0, 8);
 }
 
-String formatVaultBuildId({
-  required String hash,
-  required DateTime updatedAt,
-}) {
+String formatVaultBuildId({required String hash, required DateTime updatedAt}) {
   final local = updatedAt.toLocal();
   final stamp = DateFormat('yyyy-MM-dd HH:mm').format(local);
   return '$hash · $stamp';
@@ -50,8 +47,7 @@ final _badgeRe = RegExp(
 String injectHtmlBuildStamp(String html, String buildId) {
   var out = html.replaceAll(_metaRe, '').replaceAll(_badgeRe, '');
   final escaped = const HtmlEscape().convert(buildId);
-  final meta =
-      '<meta name="aur-bhai-build" content="$escaped">';
+  final meta = '<meta name="aur-bhai-build" content="$escaped">';
   final badge = '''
 <div id="aur-bhai-build" style="position:fixed;right:8px;bottom:8px;z-index:2147483647;padding:4px 8px;border-radius:4px;background:rgba(0,0,0,0.72);color:#b8f5c0;font:11px/1.3 ui-monospace,Menlo,Consolas,monospace;pointer-events:none;">build $escaped</div>''';
 

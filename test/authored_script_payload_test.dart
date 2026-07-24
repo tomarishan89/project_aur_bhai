@@ -41,7 +41,9 @@ async function execute(params) {
     test('maps FormatException / unterminated string to friendly copy', () {
       expect(
         authoredJsonParseFailureMessage(
-          const FormatException('Unterminated string (at line 5, character 909)'),
+          const FormatException(
+            'Unterminated string (at line 5, character 909)',
+          ),
         ),
         startsWith(AgentBridgeSpec.incompleteJsonUserMessage),
       );

@@ -11,11 +11,11 @@ import 'qjs_typedefs.dart';
 final DynamicLibrary qjsDynamicLibrary = Platform.isAndroid
     ? DynamicLibrary.open("libfastdev_quickjs_runtime.so")
     : (Platform.isWindows
-        ? DynamicLibrary.open('flutter_js_plugin.dll')
-        : DynamicLibrary.process());
+          ? DynamicLibrary.open('flutter_js_plugin.dll')
+          : DynamicLibrary.process());
 
-typedef FnBridgeCallback = Function(
-    dynamic args); //String Function(String channel, String message);
+typedef FnBridgeCallback =
+    Function(dynamic args); //String Function(String channel, String message);
 
 final Map<String, FnBridgeCallback> mapJsBridge = {};
 
@@ -48,8 +48,9 @@ Pointer<JSValueConst> bridgeCallbackGlobalHandler(
   }
 
   return QuickJsRuntime.jsEval(
-          ctx, "'No channel registered: ($channelNameStr) => $messageStr'")
-      .rawResult;
+    ctx,
+    "'No channel registered: ($channelNameStr) => $messageStr'",
+  ).rawResult;
 }
 
 Pointer<NativeFunction<ChannelCallback>>? consoleLogBridgeFunction;
@@ -65,21 +66,30 @@ class QuickJsRuntime extends JavascriptRuntime {
   QuickJsRuntime(this.fileName) {
     _runtime = _jsNewRuntimeDartBridge();
     jsSetMaxStackSize(_runtime, 1024 * 1024);
-    consoleLogBridgeFunction = Pointer.fromFunction<
-        Pointer<JSValueConst> Function(
+    consoleLogBridgeFunction =
+        Pointer.fromFunction<
+          Pointer<JSValueConst> Function(
             Pointer<JSContext> ctx,
             Pointer<Utf8NullTerminated> channel,
-            Pointer<Utf8NullTerminated> msg)>(bridgeCallbackGlobalHandler);
-    setTimeoutBridgeFunction = Pointer.fromFunction<
-        Pointer<JSValueConst> Function(
+            Pointer<Utf8NullTerminated> msg,
+          )
+        >(bridgeCallbackGlobalHandler);
+    setTimeoutBridgeFunction =
+        Pointer.fromFunction<
+          Pointer<JSValueConst> Function(
             Pointer<JSContext> ctx,
             Pointer<Utf8NullTerminated> channel,
-            Pointer<Utf8NullTerminated> msg)>(bridgeCallbackGlobalHandler);
-    sendNativeBridgeFunction = Pointer.fromFunction<
-        Pointer<JSValueConst> Function(
+            Pointer<Utf8NullTerminated> msg,
+          )
+        >(bridgeCallbackGlobalHandler);
+    sendNativeBridgeFunction =
+        Pointer.fromFunction<
+          Pointer<JSValueConst> Function(
             Pointer<JSContext> ctx,
             Pointer<Utf8NullTerminated> channel,
-            Pointer<Utf8NullTerminated> msg)>(bridgeCallbackGlobalHandler);
+            Pointer<Utf8NullTerminated> msg,
+          )
+        >(bridgeCallbackGlobalHandler);
     _context = _jsNewContext(
       _runtime,
       consoleLogBridgeFunction,
@@ -91,17 +101,12 @@ class QuickJsRuntime extends JavascriptRuntime {
   }
 
   /// DLLEXPORT void jsSetMaxStackSize(JSRuntime *rt, size_t stack_size)
-  final void Function(
-    Pointer<JSRuntime>,
-    int,
-  ) jsSetMaxStackSize = qjsDynamicLibrary
-      .lookup<
-          NativeFunction<
-              Void Function(
-                Pointer<JSRuntime>,
-                IntPtr,
-              )>>('jsSetMaxStackSize')
-      .asFunction();
+  final void Function(Pointer<JSRuntime>, int) jsSetMaxStackSize =
+      qjsDynamicLibrary
+          .lookup<NativeFunction<Void Function(Pointer<JSRuntime>, IntPtr)>>(
+            'jsSetMaxStackSize',
+          )
+          .asFunction();
 
   // NATIVE BRIDGE DECLARATIONS
   static JSEvalWrapper _jsEvalWrapper = qjsDynamicLibrary
@@ -122,12 +127,13 @@ class QuickJsRuntime extends JavascriptRuntime {
 
   static JSExecutePendingJob _jsExecutePendingJob = qjsDynamicLibrary
       .lookupFunction<JSExecutePendingJobNative, JSExecutePendingJob>(
-    'JS_ExecutePendingJob',
-  );
+        'JS_ExecutePendingJob',
+      );
 
   static JSCallFunction1Arg _callJsFunction1Arg = qjsDynamicLibrary
       .lookupFunction<JSCallFunction1ArgNative, JSCallFunction1Arg>(
-          'callJsFunction1Arg');
+        'callJsFunction1Arg',
+      );
 
   static JSGetTypeTag _jsGetTypeTag = qjsDynamicLibrary
       .lookupFunction<JSGetTypeTagNative, JSGetTypeTag>('getTypeTag');
@@ -135,24 +141,23 @@ class QuickJsRuntime extends JavascriptRuntime {
   static JSIsArray _jsIsArray = qjsDynamicLibrary
       .lookupFunction<JSIsArrayNative, JSIsArray>('JS_IsArrayDartWrapper');
 
-  static JSJSONStringify _jSJSONStringify =
-      qjsDynamicLibrary.lookupFunction<JSJSONStringifyNative, JSJSONStringify>(
-          'JS_JSONStringifyDartWrapper');
+  static JSJSONStringify _jSJSONStringify = qjsDynamicLibrary
+      .lookupFunction<JSJSONStringifyNative, JSJSONStringify>(
+        'JS_JSONStringifyDartWrapper',
+      );
   // END NATIVE BRIDGE DECLARATIONS
 
-  JsEvalResult callFunction(
-    Pointer function,
-    Pointer argument,
-  ) {
+  JsEvalResult callFunction(Pointer function, Pointer argument) {
     Pointer result = calloc<JSValueConst>();
     Pointer<Pointer<Utf8NullTerminated>> stringResult =
         calloc<Pointer<Utf8NullTerminated>>();
     int operationResult = _callJsFunction1Arg(
-        _context,
-        function as Pointer<JSValueConst>,
-        argument as Pointer<JSValueConst>,
-        result as Pointer<JSValueConst>,
-        stringResult);
+      _context,
+      function as Pointer<JSValueConst>,
+      argument as Pointer<JSValueConst>,
+      result as Pointer<JSValueConst>,
+      stringResult,
+    );
     String resultStr = Utf8NullTerminated.fromUtf8(stringResult.value);
     return JsEvalResult(
       resultStr,
@@ -201,18 +206,27 @@ class QuickJsRuntime extends JavascriptRuntime {
     Pointer<Pointer<Utf8NullTerminated>> stringResult =
         calloc<Pointer<Utf8NullTerminated>>();
     Pointer<Int32> errors = calloc<Int32>();
-    
+
     // #region agent log
     try {
       final jsByteLen = utf8.encode(js).length;
       File('debug-c55aa3.log').writeAsStringSync(
-          '{"sessionId":"c55aa3","id":"log_\${DateTime.now().millisecondsSinceEpoch}_3","timestamp":\${DateTime.now().millisecondsSinceEpoch},"location":"quickjs_runtime.dart:205","message":"jsEval length mismatch check","data":{"dartLength":\${js.length},"utf8Length":\$jsByteLen},"runId":"run1","hypothesisId":"H1"}\\n',
-          mode: FileMode.append);
-    } catch(e) {}
+        '{"sessionId":"c55aa3","id":"log_\${DateTime.now().millisecondsSinceEpoch}_3","timestamp":\${DateTime.now().millisecondsSinceEpoch},"location":"quickjs_runtime.dart:205","message":"jsEval length mismatch check","data":{"dartLength":\${js.length},"utf8Length":\$jsByteLen},"runId":"run1","hypothesisId":"H1"}\\n',
+        mode: FileMode.append,
+      );
+    } catch (e) {}
     // #endregion
 
-    _jsEvalWrapper(ctx, Utf8NullTerminated.toUtf8(js), js.length,
-        Utf8NullTerminated.toUtf8(fileName), 0, errors, result, stringResult);
+    _jsEvalWrapper(
+      ctx,
+      Utf8NullTerminated.toUtf8(js),
+      js.length,
+      Utf8NullTerminated.toUtf8(fileName),
+      0,
+      errors,
+      result,
+      stringResult,
+    );
 
     final strResult = Utf8NullTerminated.fromUtf8(stringResult.value);
     return JsEvalResult(
@@ -224,7 +238,9 @@ class QuickJsRuntime extends JavascriptRuntime {
   }
 
   static T? convertToValue<T>(
-      Pointer<JSContext> context, JsEvalResult evalResult) {
+    Pointer<JSContext> context,
+    JsEvalResult evalResult,
+  ) {
     Type type = getTypeForJsValue(evalResult.rawResult);
 
     if (_jsIsArray(context, evalResult.rawResult) == 1) {
@@ -236,8 +252,9 @@ class QuickJsRuntime extends JavascriptRuntime {
         stringifiedValue,
         stringResultPointer,
       );
-      final stringResult =
-          Utf8NullTerminated.fromUtf8(stringResultPointer.value);
+      final stringResult = Utf8NullTerminated.fromUtf8(
+        stringResultPointer.value,
+      );
       return jsonDecode(stringResult);
     }
     switch (type) {
@@ -259,8 +276,9 @@ class QuickJsRuntime extends JavascriptRuntime {
           stringifiedValue,
           stringResultPointer,
         );
-        final stringResult =
-            Utf8NullTerminated.fromUtf8(stringResultPointer.value);
+        final stringResult = Utf8NullTerminated.fromUtf8(
+          stringResultPointer.value,
+        );
         return jsonDecode(stringResult);
     }
     return null;

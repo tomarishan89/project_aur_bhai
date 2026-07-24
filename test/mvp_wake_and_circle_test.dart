@@ -46,7 +46,10 @@ void main() {
 
   test('issue status label mapping', () {
     expect(issueStatusFromLabel('diagnosing'), IssueReportStatus.diagnosing);
-    expect(issueStatusFromLabel('fixed-in-build'), IssueReportStatus.fixedInBuild);
+    expect(
+      issueStatusFromLabel('fixed-in-build'),
+      IssueReportStatus.fixedInBuild,
+    );
     expect(issueStatusFromLabel('received'), IssueReportStatus.received);
     final r = IssueReport(
       id: '1',

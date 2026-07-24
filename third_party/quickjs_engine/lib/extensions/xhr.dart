@@ -46,7 +46,8 @@ String _debugSendNativeCallback() {
     return "";
 }
 
-final String xhrJsCode = """
+final String xhrJsCode =
+    """
 function XMLHttpRequest() {
   this._send_native = XMLHttpRequestExtension_send_native;
   this._httpMethod = null;
@@ -271,9 +272,11 @@ extension JavascriptRuntimeXhrExtension on JavascriptRuntime {
       // for each pending call, calls the remote http service
       pendingCalls.forEach((element) async {
         XhrPendingCall pendingCall = element as XhrPendingCall;
-        HttpMethod eMethod = HttpMethod.values.firstWhere((e) =>
-            e.toString().toLowerCase() ==
-            ("HttpMethod.${pendingCall.method}".toLowerCase()));
+        HttpMethod eMethod = HttpMethod.values.firstWhere(
+          (e) =>
+              e.toString().toLowerCase() ==
+              ("HttpMethod.${pendingCall.method}".toLowerCase()),
+        );
         late http.Response response;
         switch (eMethod) {
           case HttpMethod.head:
@@ -329,8 +332,10 @@ extension JavascriptRuntimeXhrExtension on JavascriptRuntime {
         } on Exception {}
         final xhrResult = XmlHttpRequestResponse(
           responseText: responseText,
-          responseInfo:
-              XhtmlHttpResponseInfo(statusCode: 200, statusText: "OK"),
+          responseInfo: XhtmlHttpResponseInfo(
+            statusCode: 200,
+            statusText: "OK",
+          ),
         );
 
         final responseInfo = jsonEncode(xhrResult.responseInfo);
@@ -414,10 +419,7 @@ class XhtmlHttpResponseInfo {
   final String? statusText;
   final List<List<String>> responseHeaders = [];
 
-  XhtmlHttpResponseInfo({
-    this.statusCode,
-    this.statusText,
-  });
+  XhtmlHttpResponseInfo({this.statusCode, this.statusText});
 
   void addResponseHeaders(String name, String value) {
     responseHeaders.add([name, value]);
@@ -427,7 +429,7 @@ class XhtmlHttpResponseInfo {
     return {
       "statusCode": statusCode,
       "statusText": statusText,
-      "responseHeaders": jsonEncode(responseHeaders)
+      "responseHeaders": jsonEncode(responseHeaders),
     };
   }
 }
@@ -443,7 +445,7 @@ class XmlHttpRequestResponse {
     return {
       'responseText': responseText,
       'responseInfo': responseInfo!.toJson(),
-      'error': error
+      'error': error,
     };
   }
 }

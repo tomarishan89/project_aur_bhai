@@ -23,10 +23,7 @@ void main() {
   });
 
   test('findAgentForDashboardKey matches Locator.html → Locator', () {
-    final agents = <BroCode>[
-      _NamedBro('Calculator'),
-      _NamedBro('Locator'),
-    ];
+    final agents = <BroCode>[_NamedBro('Calculator'), _NamedBro('Locator')];
     expect(findAgentForDashboardKey(agents, 'locator.html')?.name, 'Locator');
     expect(
       findAgentForDashboardKey(agents, 'LocatorDashboard.html')?.name,

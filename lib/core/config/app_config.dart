@@ -10,6 +10,7 @@ class AppConfig {
 
   // --- Wake / privacy (MS-OFFLINE-WAKE) ---
   static const String wakeWordPhraseLabel = 'Aur Bhai';
+
   /// Interim Porcupine built-in until custom .ppn ships.
   static const String wakeWordInterimBuiltIn = 'Jarvis';
   static const String wakePrivacyTitle = 'Wake listen privacy';
@@ -32,6 +33,7 @@ class AppConfig {
   static const String circlePrefsRepoKey = 'circle_github_repo';
   static const String circlePrefsTokenKey = 'circle_github_token';
   static const String circlePrefsAuthorKey = 'circle_author_display';
+
   /// Must match the GitHub repo name exactly (hyphens vs underscores).
   static const String circleDefaultRepo = 'aur_bhai_circle';
   static const String circleIndexPath = 'commons/index.json';
@@ -52,6 +54,7 @@ class AppConfig {
   static const String circleFriendApkHint =
       'Friends install a signed release APK (not Play Store for closed circle). '
       'Share APK privately; they paste the same owner/repo/token in Settings.';
+
   /// Future: search on Mere Bhai / Sabke Bhai (deferred).
   static const bool bhaiLogSearchDeferred = true;
 
@@ -84,7 +87,8 @@ class AppConfig {
       'OEM battery killers may stop background mic — exempt Aur Bhai if needed.';
 
   // --- Vault keys ---
-  static const String vaultAmbientCandidates = 'model_studio:ambient_candidates';
+  static const String vaultAmbientCandidates =
+      'model_studio:ambient_candidates';
   static String agentInboxKey(String name) => 'agent:$name:inbox';
 
   // --- Social seed Bhai Codes (MVP-S13) ---

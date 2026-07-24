@@ -4,34 +4,29 @@ import '../services/js_bridge_service.dart';
 import 'agent_base.dart';
 
 /// 4-tier trust classification for Bhai Code (Bhai log).
-enum AgentSecurityClass {
-  c1Core,
-  c2Verified,
-  c3DueDiligence,
-  c4Unverified,
-}
+enum AgentSecurityClass { c1Core, c2Verified, c3DueDiligence, c4Unverified }
 
 extension AgentSecurityClassX on AgentSecurityClass {
   String get id => switch (this) {
-        AgentSecurityClass.c1Core => 'C1',
-        AgentSecurityClass.c2Verified => 'C2',
-        AgentSecurityClass.c3DueDiligence => 'C3',
-        AgentSecurityClass.c4Unverified => 'C4',
-      };
+    AgentSecurityClass.c1Core => 'C1',
+    AgentSecurityClass.c2Verified => 'C2',
+    AgentSecurityClass.c3DueDiligence => 'C3',
+    AgentSecurityClass.c4Unverified => 'C4',
+  };
 
   /// Product-facing pool / status labels (ids stay C1–C4 for vault).
   String get label => switch (this) {
-        AgentSecurityClass.c1Core => 'Core',
-        AgentSecurityClass.c2Verified => 'Mere Bhai',
-        AgentSecurityClass.c3DueDiligence => 'Due Diligence',
-        AgentSecurityClass.c4Unverified => 'Sabke Bhai',
-      };
+    AgentSecurityClass.c1Core => 'Core',
+    AgentSecurityClass.c2Verified => 'Mere Bhai',
+    AgentSecurityClass.c3DueDiligence => 'Due Diligence',
+    AgentSecurityClass.c4Unverified => 'Sabke Bhai',
+  };
 
   /// Short status for cards when diligence is in progress / done.
   String? get diligenceChip => switch (this) {
-        AgentSecurityClass.c3DueDiligence => 'Due diligence…',
-        _ => null,
-      };
+    AgentSecurityClass.c3DueDiligence => 'Due diligence…',
+    _ => null,
+  };
 
   static AgentSecurityClass fromId(String? id) {
     switch (id?.toUpperCase()) {
@@ -97,8 +92,8 @@ class JsAgentAdapter extends BroCode {
     this.diligencePassed = false,
     this.createdAt,
     this.updatedAt,
-  })  : _name = name,
-        _assets = Map<String, String>.from(assets);
+  }) : _name = name,
+       _assets = Map<String, String>.from(assets);
 
   /// Production RUN allowed only for Core (C1) or Verified (C2).
   bool get canExecute =>

@@ -26,27 +26,30 @@ void main() {
       container.dispose();
     });
 
-    test('mock telemetry records persist in SQLite without query errors', () async {
-      final bus = container.read(telemetryBusProvider);
+    test(
+      'mock telemetry records persist in SQLite without query errors',
+      () async {
+        final bus = container.read(telemetryBusProvider);
 
-      for (var i = 0; i < 5; i++) {
-        await bus.addRecord(
-          latitude: 28.6139 + i * 0.001,
-          longitude: 77.2090 + i * 0.001,
-          accelerometerZ: 9.8 + i * 0.1,
-          compassDirection: 180.0 + i,
+        for (var i = 0; i < 5; i++) {
+          await bus.addRecord(
+            latitude: 28.6139 + i * 0.001,
+            longitude: 77.2090 + i * 0.001,
+            accelerometerZ: 9.8 + i * 0.1,
+            compassDirection: 180.0 + i,
+          );
+        }
+
+        final rows = await bus.executeQuery(
+          'SELECT COUNT(*) AS count FROM telemetry',
         );
-      }
+        expect(rows.first['count'], greaterThanOrEqualTo(5));
 
-      final rows = await bus.executeQuery(
-        'SELECT COUNT(*) AS count FROM telemetry',
-      );
-      expect(rows.first['count'], greaterThanOrEqualTo(5));
-
-      final recent = await bus.getRecentRecords(5);
-      expect(recent.length, 5);
-      expect(recent.first.accelerometerZ, isNonZero);
-    });
+        final recent = await bus.getRecentRecords(5);
+        expect(recent.length, 5);
+        expect(recent.first.accelerometerZ, isNonZero);
+      },
+    );
   });
 
   group('MS-VAULT-SERVER Test Case B — Edge Server Health', () {
@@ -106,9 +109,9 @@ void main() {
       final base = server.localhostAddress;
       final request = await client.postUrl(Uri.parse('$base/api/query'));
       request.headers.contentType = ContentType.json;
-      request.write(jsonEncode({
-        'sql': 'SELECT COUNT(*) AS count FROM telemetry',
-      }));
+      request.write(
+        jsonEncode({'sql': 'SELECT COUNT(*) AS count FROM telemetry'}),
+      );
       final response = await request.close();
       expect(response.statusCode, 200);
 
@@ -147,8 +150,7 @@ void main() {
 
       final client = HttpClient();
       final base = server.localhostAddress;
-      final request =
-          await client.getUrl(Uri.parse('$base/vault/light.html'));
+      final request = await client.getUrl(Uri.parse('$base/vault/light.html'));
       final response = await request.close();
       expect(response.statusCode, 200);
       expect(
@@ -175,25 +177,27 @@ void main() {
 
       expect(await postSql('DELETE FROM telemetry'), 400);
       expect(await postSql('SELECT * FROM telemetry'), 400);
-      expect(await postSql('SELECT * FROM telemetry; DROP TABLE telemetry'), 400);
       expect(
-        await postSql('SELECT COUNT(*) AS c FROM telemetry'),
-        200,
+        await postSql('SELECT * FROM telemetry; DROP TABLE telemetry'),
+        400,
       );
+      expect(await postSql('SELECT COUNT(*) AS c FROM telemetry'), 200);
       client.close();
     });
 
-    test('ENG4 LAN exposure off rejects non-loopback style via pair gate helpers',
-        () async {
-      expect(server.lanExposureEnabled, isFalse);
-      server.setLanExposureEnabled(true);
-      expect(server.lanExposureEnabled, isTrue);
-      expect(server.pairingToken.length, 6);
-      final before = server.pairingToken;
-      server.rotatePairingToken();
-      expect(server.pairingToken, isNot(before));
-      server.setLanExposureEnabled(false);
-      expect(server.lanExposureEnabled, isFalse);
-    });
+    test(
+      'ENG4 LAN exposure off rejects non-loopback style via pair gate helpers',
+      () async {
+        expect(server.lanExposureEnabled, isFalse);
+        server.setLanExposureEnabled(true);
+        expect(server.lanExposureEnabled, isTrue);
+        expect(server.pairingToken.length, 6);
+        final before = server.pairingToken;
+        server.rotatePairingToken();
+        expect(server.pairingToken, isNot(before));
+        server.setLanExposureEnabled(false);
+        expect(server.lanExposureEnabled, isFalse);
+      },
+    );
   });
 }

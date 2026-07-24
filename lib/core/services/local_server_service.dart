@@ -58,7 +58,10 @@ class LocalServerService extends ChangeNotifier {
   String vaultUrl(String key) {
     final k = normalizeVaultKeyForUrl(key);
     final url = '$serverAddress/vault/$k';
-    assert(isVaultDashboardUrl(url), 'vaultUrl produced non-dashboard URL: $url');
+    assert(
+      isVaultDashboardUrl(url),
+      'vaultUrl produced non-dashboard URL: $url',
+    );
     return url;
   }
 
@@ -138,7 +141,8 @@ self.addEventListener('fetch', (event) => {
       return Response.forbidden(
         jsonEncode({
           'success': false,
-          'error': 'LAN access disabled. Enable in Settings → Local Edge Server.',
+          'error':
+              'LAN access disabled. Enable in Settings → Local Edge Server.',
         }),
         headers: {'Content-Type': 'application/json'},
       );
@@ -160,9 +164,8 @@ self.addEventListener('fetch', (event) => {
   }
 
   String _presentedPairToken(Request request) {
-    final header = request.headers[pairHeader] ??
-        request.headers['X-Aur-Pair'] ??
-        '';
+    final header =
+        request.headers[pairHeader] ?? request.headers['X-Aur-Pair'] ?? '';
     if (header.isNotEmpty) return header.trim();
     final query = request.url.queryParameters['pair'] ?? '';
     if (query.isNotEmpty) return query.trim();
@@ -178,8 +181,7 @@ self.addEventListener('fetch', (event) => {
     final q = request.url.queryParameters['pair'] ?? '';
     if (q.isNotEmpty && q == _pairingToken) {
       return {
-        'Set-Cookie':
-            'aur_pair=$_pairingToken; Path=/; SameSite=Lax; HttpOnly',
+        'Set-Cookie': 'aur_pair=$_pairingToken; Path=/; SameSite=Lax; HttpOnly',
       };
     }
     return const {};
@@ -210,18 +212,21 @@ self.addEventListener('fetch', (event) => {
     _router.get('/', (Request request) async {
       try {
         final bus = _ref.read(telemetryBusProvider);
-        final dashboards =
-            await bus.listVaultEntries(mimeType: 'text/html');
-        final links = dashboards.map((d) {
-          final key = d['key'] ?? '';
-          final build = d['build_id'] ?? '';
-          final href = '/vault/${key.split('/').map(Uri.encodeComponent).join('/')}';
-          final buildNote = build.isEmpty
-              ? ''
-              : ' <span style="color:#888">build ${_htmlEscape(build)}</span>';
-          return '<li><a href="$href">${_htmlEscape(key)}</a>$buildNote</li>';
-        }).join('\n');
-        final body = '''
+        final dashboards = await bus.listVaultEntries(mimeType: 'text/html');
+        final links = dashboards
+            .map((d) {
+              final key = d['key'] ?? '';
+              final build = d['build_id'] ?? '';
+              final href =
+                  '/vault/${key.split('/').map(Uri.encodeComponent).join('/')}';
+              final buildNote = build.isEmpty
+                  ? ''
+                  : ' <span style="color:#888">build ${_htmlEscape(build)}</span>';
+              return '<li><a href="$href">${_htmlEscape(key)}</a>$buildNote</li>';
+            })
+            .join('\n');
+        final body =
+            '''
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Aur Bhai Edge Server</title>
@@ -246,9 +251,7 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
           },
         );
       } catch (e) {
-        return Response.internalServerError(
-          body: 'Edge index error: $e',
-        );
+        return Response.internalServerError(body: 'Edge index error: $e');
       }
     });
 
@@ -311,24 +314,28 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
           if (_isServiceWorkerKey(key)) {
             return _killerServiceWorkerResponse();
           }
-          return Response.notFound('Asset "$key" not found in Sovereign Vault.');
+          return Response.notFound(
+            'Asset "$key" not found in Sovereign Vault.',
+          );
         }
 
         final mime = _vaultMime(key, asset['mime_type']);
         final hash = asset['content_hash'] ?? vaultContentHash(asset['value']!);
-        final buildId = asset['build_id'] ??
+        final buildId =
+            asset['build_id'] ??
             resolveVaultBuildId(
               value: asset['value']!,
               contentHash: asset['content_hash'],
               updatedAtIso: asset['updated_at'],
             );
-        final isHtml = mime.contains('html') ||
-            key.toLowerCase().endsWith('.html');
+        final isHtml =
+            mime.contains('html') || key.toLowerCase().endsWith('.html');
         final raw = asset['value'] ?? '';
         if (isHtml && raw.trim().length < 40) {
           return Response(
             502,
-            body: 'Vault HTML "$key" is empty or unusable '
+            body:
+                'Vault HTML "$key" is empty or unusable '
                 '(${raw.trim().length} chars). Re-run the Bro Code / APPLY so '
                 'System.writeVault publishes a full dashboard document. '
                 'build=$buildId',
@@ -339,8 +346,7 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
             },
           );
         }
-        final body =
-            isHtml ? injectHtmlBuildStamp(raw, buildId) : raw;
+        final body = isHtml ? injectHtmlBuildStamp(raw, buildId) : raw;
 
         return Response.ok(
           body,
@@ -359,7 +365,9 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
           },
         );
       } catch (e) {
-        return Response.internalServerError(body: 'Vault asset retrieval error: $e');
+        return Response.internalServerError(
+          body: 'Vault asset retrieval error: $e',
+        );
       }
     });
 
@@ -387,11 +395,7 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
         final handler = const Pipeline()
             .addMiddleware(_lanGateMiddleware())
             .addHandler(_router.call);
-        _server = await io.serve(
-          handler,
-          InternetAddress.anyIPv4,
-          tryPort,
-        );
+        _server = await io.serve(handler, InternetAddress.anyIPv4, tryPort);
         if (!_disposed) notifyListeners();
         debugPrint(
           '[LocalServer] Shelf Edge Server listening on 0.0.0.0:${_server!.port}'
@@ -434,9 +438,7 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
       return (Request request) async {
         final path = request.url.path;
         // Status + killer SW + index stay reachable for discovery; data paths gated.
-        final public = path.isEmpty ||
-            path == 'api/status' ||
-            path == 'sw.js';
+        final public = path.isEmpty || path == 'api/status' || path == 'sw.js';
         if (!public) {
           final denied = _authorizeLan(request);
           if (denied != null) return denied;

@@ -23,25 +23,26 @@ class AuthoringTurn {
   });
 
   Map<String, dynamic> toJson() => {
-        'role': role,
-        'text': text,
-        'at': at.toIso8601String(),
-        if (phase != null) 'phase': phase,
-        if (provider != null) 'provider': provider,
-        if (modelId != null) 'modelId': modelId,
-        if (llmSlot != null) 'llmSlot': llmSlot,
-      };
+    'role': role,
+    'text': text,
+    'at': at.toIso8601String(),
+    if (phase != null) 'phase': phase,
+    if (provider != null) 'provider': provider,
+    if (modelId != null) 'modelId': modelId,
+    if (llmSlot != null) 'llmSlot': llmSlot,
+  };
 
   factory AuthoringTurn.fromJson(Map<String, dynamic> json) => AuthoringTurn(
-        role: json['role'] as String? ?? 'user',
-        text: json['text'] as String? ?? '',
-        at: DateTime.tryParse(json['at'] as String? ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0),
-        phase: json['phase'] as String?,
-        provider: json['provider'] as String?,
-        modelId: json['modelId'] as String?,
-        llmSlot: json['llmSlot'] as String?,
-      );
+    role: json['role'] as String? ?? 'user',
+    text: json['text'] as String? ?? '',
+    at:
+        DateTime.tryParse(json['at'] as String? ?? '') ??
+        DateTime.fromMillisecondsSinceEpoch(0),
+    phase: json['phase'] as String?,
+    provider: json['provider'] as String?,
+    modelId: json['modelId'] as String?,
+    llmSlot: json['llmSlot'] as String?,
+  );
 }
 
 /// Frozen App Spec form interactions for a Bro Code (S15).
@@ -74,16 +75,16 @@ class AuthoringTrace {
       '${AppConfig.authoringTraceVaultPrefix}$agentName';
 
   Map<String, dynamic> toJson() => {
-        'traceVersion': version,
-        if (agentName != null) 'agentName': agentName,
-        if (provider != null) 'provider': provider,
-        if (modelId != null) 'modelId': modelId,
-        'llmSlot': llmSlot,
-        'turns': turns.map((t) => t.toJson()).toList(),
-        if (appSpecAtBuild != null) 'appSpecAtBuild': appSpecAtBuild,
-        if (buildOutcome != null) 'buildOutcome': buildOutcome,
-        'truncated': truncated,
-      };
+    'traceVersion': version,
+    if (agentName != null) 'agentName': agentName,
+    if (provider != null) 'provider': provider,
+    if (modelId != null) 'modelId': modelId,
+    'llmSlot': llmSlot,
+    'turns': turns.map((t) => t.toJson()).toList(),
+    if (appSpecAtBuild != null) 'appSpecAtBuild': appSpecAtBuild,
+    if (buildOutcome != null) 'buildOutcome': buildOutcome,
+    'truncated': truncated,
+  };
 
   factory AuthoringTrace.fromJson(Map<String, dynamic> json) {
     final rawTurns = (json['turns'] as List?) ?? const [];
@@ -132,15 +133,17 @@ class AuthoringTrace {
         text = '${text.substring(0, maxChars)}…';
         truncated = true;
       }
-      capped.add(AuthoringTurn(
-        role: t.role,
-        text: text,
-        at: t.at,
-        phase: t.phase,
-        provider: t.provider,
-        modelId: t.modelId,
-        llmSlot: t.llmSlot,
-      ));
+      capped.add(
+        AuthoringTurn(
+          role: t.role,
+          text: text,
+          at: t.at,
+          phase: t.phase,
+          provider: t.provider,
+          modelId: t.modelId,
+          llmSlot: t.llmSlot,
+        ),
+      );
     }
     return AuthoringTrace(
       version: version,

@@ -63,8 +63,12 @@ friend_share/
 *.apk
 *.aab
 
-# Bro Code fixture captures / screenshots (local + pull tool only — never commit)
-test/fixtures/bro_code/
+# Bro Code fixture captures (local + pull tool). Keep the folder in git;
+# ignore captured bundles/screenshots so they stay local unless explicitly forced.
+test/fixtures/bro_code/**
+!test/fixtures/bro_code/.gitkeep
+!test/fixtures/bro_code/README.md
+
 
 # One-off scratch scripts / snippets at repo root
 /_acts.txt

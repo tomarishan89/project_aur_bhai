@@ -32,13 +32,13 @@ class DueDiligenceFinding {
   });
 
   Map<String, dynamic> toJson() => {
-        'code': code,
-        'message': message,
-        'category': category,
-        'severity': severity,
-        'improveHint': improveHint,
-        'likelyFalsePositive': likelyFalsePositive,
-      };
+    'code': code,
+    'message': message,
+    'category': category,
+    'severity': severity,
+    'improveHint': improveHint,
+    'likelyFalsePositive': likelyFalsePositive,
+  };
 
   @override
   String toString() => '[$code] $message';
@@ -49,10 +49,7 @@ class DueDiligenceResult {
   final bool passed;
   final List<DueDiligenceFinding> findings;
 
-  const DueDiligenceResult({
-    required this.passed,
-    this.findings = const [],
-  });
+  const DueDiligenceResult({required this.passed, this.findings = const []});
 
   bool get flagged => !passed;
 
@@ -88,7 +85,8 @@ class AgentVerificationService extends ChangeNotifier {
 
   PendingPromotion? get pendingPromotion => _pendingPromotion;
   int get promotionRequestId => _promotionRequestId;
-  bool get hasVaultPassword => _passwordHash != null && _passwordHash!.isNotEmpty;
+  bool get hasVaultPassword =>
+      _passwordHash != null && _passwordHash!.isNotEmpty;
 
   void clearPendingPromotion() {
     _pendingPromotion = null;
@@ -115,81 +113,97 @@ class AgentVerificationService extends ChangeNotifier {
     final sandboxOnly = _stripEmbeddedHtmlTemplates(script);
     final lower = sandboxOnly.toLowerCase();
 
-    if (RegExp(r'\b(delete|drop|truncate|alter)\s+(from|table|into)\b',
-            caseSensitive: false)
-        .hasMatch(sandboxOnly)) {
-      findings.add(const DueDiligenceFinding(
-        code: 'DD_DESTRUCTIVE_SQL',
-        message: 'Destructive SQL pattern detected (DELETE/DROP/TRUNCATE/ALTER).',
-        severity: 'blocking',
-        improveHint: 'Remove DELETE/DROP/TRUNCATE/ALTER; use read-only SQL.',
-      ));
+    if (RegExp(
+      r'\b(delete|drop|truncate|alter)\s+(from|table|into)\b',
+      caseSensitive: false,
+    ).hasMatch(sandboxOnly)) {
+      findings.add(
+        const DueDiligenceFinding(
+          code: 'DD_DESTRUCTIVE_SQL',
+          message:
+              'Destructive SQL pattern detected (DELETE/DROP/TRUNCATE/ALTER).',
+          severity: 'blocking',
+          improveHint: 'Remove DELETE/DROP/TRUNCATE/ALTER; use read-only SQL.',
+        ),
+      );
     }
 
     if (RegExp(
       r"system\.sendhttp\s*\(\s*['\x22]https?://(?!localhost|127\.0\.0\.1)",
       caseSensitive: false,
     ).hasMatch(lower)) {
-      findings.add(const DueDiligenceFinding(
-        code: 'DD_EXTERNAL_HTTP',
-        message: 'Outbound HTTP to an external host via System.sendHTTP.',
-        severity: 'blocking',
-        improveHint: 'Prefer localhost/System vault; gate external HTTP behind C2.',
-      ));
+      findings.add(
+        const DueDiligenceFinding(
+          code: 'DD_EXTERNAL_HTTP',
+          message: 'Outbound HTTP to an external host via System.sendHTTP.',
+          severity: 'blocking',
+          improveHint:
+              'Prefer localhost/System vault; gate external HTTP behind C2.',
+        ),
+      );
     }
 
     if (RegExp(r'\beval\s*\(', caseSensitive: false).hasMatch(sandboxOnly) ||
-        RegExp(r'new\s+Function\s*\(', caseSensitive: false)
-            .hasMatch(sandboxOnly)) {
-      findings.add(const DueDiligenceFinding(
-        code: 'DD_DYNAMIC_CODE',
-        message: 'Dynamic code execution pattern (eval / Function constructor).',
-        severity: 'blocking',
-        improveHint: 'Delete eval/Function; use static execute() logic.',
-      ));
+        RegExp(
+          r'new\s+Function\s*\(',
+          caseSensitive: false,
+        ).hasMatch(sandboxOnly)) {
+      findings.add(
+        const DueDiligenceFinding(
+          code: 'DD_DYNAMIC_CODE',
+          message:
+              'Dynamic code execution pattern (eval / Function constructor).',
+          severity: 'blocking',
+          improveHint: 'Delete eval/Function; use static execute() logic.',
+        ),
+      );
     }
 
     if (lower.contains('document.') ||
         lower.contains('window.') ||
         lower.contains('fetch(') ||
         lower.contains('xmlhttprequest')) {
-      findings.add(const DueDiligenceFinding(
-        code: 'DD_BROWSER_DOM',
-        message: 'Browser/DOM API usage outside the System bridge sandbox.',
-        severity: 'warning',
-        improveHint:
-            'Move DOM/fetch into vault HTML assets; keep execute() thin.',
-        likelyFalsePositive: true,
-      ));
+      findings.add(
+        const DueDiligenceFinding(
+          code: 'DD_BROWSER_DOM',
+          message: 'Browser/DOM API usage outside the System bridge sandbox.',
+          severity: 'warning',
+          improveHint:
+              'Move DOM/fetch into vault HTML assets; keep execute() thin.',
+          likelyFalsePositive: true,
+        ),
+      );
     }
 
     if (RegExp(
       r"(api[_-]?key|secret|password|token)\s*[:=]",
       caseSensitive: false,
     ).hasMatch(sandboxOnly)) {
-      findings.add(const DueDiligenceFinding(
-        code: 'DD_HARDCODED_SECRET',
-        message: 'Hard-coded credential-like key in script source.',
-        severity: 'blocking',
-        improveHint: 'Remove secrets; use BYOK Settings keys at runtime.',
-      ));
+      findings.add(
+        const DueDiligenceFinding(
+          code: 'DD_HARDCODED_SECRET',
+          message: 'Hard-coded credential-like key in script source.',
+          severity: 'blocking',
+          improveHint: 'Remove secrets; use BYOK Settings keys at runtime.',
+        ),
+      );
     }
 
-    if (RegExp(r'system\.querysql\s*\([^)]*\b(insert|update|delete|drop)\b',
-            caseSensitive: false)
-        .hasMatch(lower)) {
-      findings.add(const DueDiligenceFinding(
-        code: 'DD_WRITE_SQL',
-        message: 'Non-SELECT SQL attempted via System.querySQL.',
-        severity: 'blocking',
-        improveHint: 'Use SELECT-only queries via System.querySQL.',
-      ));
+    if (RegExp(
+      r'system\.querysql\s*\([^)]*\b(insert|update|delete|drop)\b',
+      caseSensitive: false,
+    ).hasMatch(lower)) {
+      findings.add(
+        const DueDiligenceFinding(
+          code: 'DD_WRITE_SQL',
+          message: 'Non-SELECT SQL attempted via System.querySQL.',
+          severity: 'blocking',
+          improveHint: 'Use SELECT-only queries via System.querySQL.',
+        ),
+      );
     }
 
-    return DueDiligenceResult(
-      passed: findings.isEmpty,
-      findings: findings,
-    );
+    return DueDiligenceResult(passed: findings.isEmpty, findings: findings);
   }
 
   /// Dashboard HTML embedded in agent scripts runs in the browser, not QuickJS.
@@ -220,14 +234,16 @@ class AgentVerificationService extends ChangeNotifier {
       out.write(cleaned.substring(cursor, start));
       final template = cleaned.substring(start, end + 1);
       final lower = template.toLowerCase();
-      final isHtml = lower.contains('<!doctype') ||
+      final isHtml =
+          lower.contains('<!doctype') ||
           lower.contains('<html') ||
           lower.contains('<head') ||
           lower.contains('<body') ||
           lower.contains('<script') ||
           lower.contains('<div') ||
           lower.contains('<meta');
-      final isServiceWorker = lower.contains('self.addeventlistener') ||
+      final isServiceWorker =
+          lower.contains('self.addeventlistener') ||
           lower.contains('self.skipwaiting') ||
           lower.contains('clients.claim');
       out.write((isHtml || isServiceWorker) ? '``' : template);
@@ -356,8 +372,7 @@ class AgentVerificationService extends ChangeNotifier {
     final current = await _currentClass(registry, agentName);
 
     // Normal path: must be C3 first.
-    if (!deviceAuthenticated &&
-        current != AgentSecurityClass.c3DueDiligence) {
+    if (!deviceAuthenticated && current != AgentSecurityClass.c3DueDiligence) {
       return false;
     }
 
@@ -379,5 +394,5 @@ class AgentVerificationService extends ChangeNotifier {
 
 final agentVerificationProvider =
     ChangeNotifierProvider<AgentVerificationService>((ref) {
-  return AgentVerificationService();
-});
+      return AgentVerificationService();
+    });

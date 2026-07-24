@@ -33,7 +33,8 @@ class _LlmSlotEditorsState extends ConsumerState<LlmSlotEditors> {
     final def = byok.configForSlot(LlmSlot.defaultSlot);
     for (final slot in _editable) {
       final dedicated = byok.dedicatedSlotOrNull(slot);
-      final seed = dedicated ??
+      final seed =
+          dedicated ??
           ByokSlotConfig(
             provider: def.provider,
             apiKey: '',
@@ -62,7 +63,9 @@ class _LlmSlotEditorsState extends ConsumerState<LlmSlotEditors> {
   }
 
   Future<void> _saveSlot(LlmSlot slot) async {
-    await ref.read(byokServiceProvider).updateSlot(
+    await ref
+        .read(byokServiceProvider)
+        .updateSlot(
           slot,
           ByokSlotConfig(
             provider: _providers[slot] ?? 'Google Gemini',
@@ -72,9 +75,9 @@ class _LlmSlotEditorsState extends ConsumerState<LlmSlotEditors> {
           ),
         );
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${slot.label} slot saved')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${slot.label} slot saved')));
     }
   }
 

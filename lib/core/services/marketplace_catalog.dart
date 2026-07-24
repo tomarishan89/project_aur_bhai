@@ -112,12 +112,11 @@ async function execute(params) {
     );
 
     final telemetry = _ref.read(telemetryBusProvider);
-    final schemaEntry =
-        await telemetry.readVaultData(registry.schemaKeyFor(listing.name));
+    final schemaEntry = await telemetry.readVaultData(
+      registry.schemaKeyFor(listing.name),
+    );
     final schemaMap = schemaEntry != null
-        ? Map<String, dynamic>.from(
-            jsonDecode(schemaEntry['value']!) as Map,
-          )
+        ? Map<String, dynamic>.from(jsonDecode(schemaEntry['value']!) as Map)
         : <String, dynamic>{
             'name': listing.name,
             'securityClass': AgentSecurityClass.c4Unverified.id,

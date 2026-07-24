@@ -33,7 +33,9 @@ void main() {
         SessionResponseIntent.buildShortcut,
       );
       expect(
-        ConversationalSessionService.classifyResponseLocal('actually change the name'),
+        ConversationalSessionService.classifyResponseLocal(
+          'actually change the name',
+        ),
         SessionResponseIntent.amend,
       );
       expect(
@@ -77,16 +79,19 @@ void main() {
       expect(spec.name.status, SlotStatus.confirmed);
     });
 
-    test('conditional external integrations slot activates on social keywords', () {
-      final spec = AppSpec(
-        purpose: const SpecField(
-          value: 'Post pothole alerts to Twitter',
-          status: SlotStatus.confirmed,
-          confidence: SlotConfidence.stated,
-        ),
-      );
-      expect(spec.isSlotRelevant(AppSpecSlot.externalIntegrations), isTrue);
-    });
+    test(
+      'conditional external integrations slot activates on social keywords',
+      () {
+        final spec = AppSpec(
+          purpose: const SpecField(
+            value: 'Post pothole alerts to Twitter',
+            status: SlotStatus.confirmed,
+            confidence: SlotConfidence.stated,
+          ),
+        );
+        expect(spec.isSlotRelevant(AppSpecSlot.externalIntegrations), isTrue);
+      },
+    );
 
     test('parameter bindings map to input schema', () {
       final spec = AppSpec(
@@ -105,9 +110,7 @@ void main() {
     });
 
     test('normalizedRegistryName title-cases Latin phrases', () {
-      final spec = AppSpec(
-        name: const SpecField(value: 'my telemetry agent'),
-      );
+      final spec = AppSpec(name: const SpecField(value: 'my telemetry agent'));
       expect(spec.normalizedRegistryName(), 'MyTelemetryAgent');
     });
 
@@ -230,9 +233,7 @@ void main() {
         ),
       );
       session.recordEchoedSlots([AppSpecSlot.name]);
-      session.applyImplicitConsent(
-        localIntent: SessionResponseIntent.other,
-      );
+      session.applyImplicitConsent(localIntent: SessionResponseIntent.other);
       expect(session.appSpec.name.status, SlotStatus.confirmed);
     });
 
@@ -283,11 +284,13 @@ void main() {
     test('session summarize recaps author slots', () {
       final session = ConversationalSessionService();
       session.startAuthor();
-      session.applyAppSpec(AppSpec(
-        purpose: const SpecField(value: 'Telemetry dashboard'),
-        name: const SpecField(value: 'MobileTelemetry'),
-        invocationPrompt: const SpecField(value: 'list commands'),
-      ));
+      session.applyAppSpec(
+        AppSpec(
+          purpose: const SpecField(value: 'Telemetry dashboard'),
+          name: const SpecField(value: 'MobileTelemetry'),
+          invocationPrompt: const SpecField(value: 'list commands'),
+        ),
+      );
 
       final summary = session.summarize();
       expect(summary, contains('MobileTelemetry'));
@@ -338,9 +341,11 @@ async function execute(params) {
       expect(result.findings, isNotEmpty);
     });
 
-    test('does not false-flag document/fetch inside dashboard HTML templates', () {
-      final service = AgentVerificationService();
-      const dashboardAgent = r'''
+    test(
+      'does not false-flag document/fetch inside dashboard HTML templates',
+      () {
+        final service = AgentVerificationService();
+        const dashboardAgent = r'''
 async function execute(params) {
   const html = `<!DOCTYPE html><html><body>
   <script>
@@ -353,9 +358,10 @@ async function execute(params) {
   return 'Dashboard ready. Open it from the Vault Dashboards panel.';
 }
 ''';
-      final scan = service.scanScript(dashboardAgent);
-      expect(scan.passed, isTrue, reason: scan.findings.join('; '));
-    });
+        final scan = service.scanScript(dashboardAgent);
+        expect(scan.passed, isTrue, reason: scan.findings.join('; '));
+      },
+    );
 
     test('does not false-flag HTML assigned without const/let/var', () {
       final service = AgentVerificationService();

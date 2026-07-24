@@ -39,7 +39,7 @@ void main() {
     final nameMatch = RegExp(r'"name":\s*"([^"]+)"').firstMatch(raw);
     final goalMatch =
         RegExp(r'"improveGoal":\s*"([^"]*)"').firstMatch(raw) ??
-            RegExp(r'"changeRequest":\s*"([^"]*)"').firstMatch(raw);
+        RegExp(r'"changeRequest":\s*"([^"]*)"').firstMatch(raw);
 
     parsed = {
       'reportVersion': 1,
@@ -76,9 +76,7 @@ void main() {
     };
     stdout.writeln('Repaired invalid JSON export into valid fixture.');
   } else {
-    final fixture = Map<String, dynamic>.from(
-      parsed['fixture'] as Map? ?? {},
-    );
+    final fixture = Map<String, dynamic>.from(parsed['fixture'] as Map? ?? {});
     final tags = [
       ...((fixture['tags'] as List?)?.map((e) => e.toString()) ??
           const <String>[]),

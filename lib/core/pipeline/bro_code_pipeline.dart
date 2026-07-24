@@ -8,10 +8,7 @@ class CoderAgentResult {
   final AuthoredAgentDraft draft;
   final bool usedFullRewrite;
 
-  const CoderAgentResult({
-    required this.draft,
-    this.usedFullRewrite = true,
-  });
+  const CoderAgentResult({required this.draft, this.usedFullRewrite = true});
 }
 
 /// Internal AI Agent that authors or rewrites Bro Code as a complete script.
@@ -176,5 +173,6 @@ class BroCodePipeline {
   }
 }
 
-final broCodePipelineProvider =
-    Provider<BroCodePipeline>((ref) => BroCodePipeline(ref));
+final broCodePipelineProvider = Provider<BroCodePipeline>(
+  (ref) => BroCodePipeline(ref),
+);

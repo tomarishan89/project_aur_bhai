@@ -23,7 +23,7 @@ IconData _originIcon(String? source) {
 /// BHAI LOG Sandbox — unverified installs (C4/C3) + test-later queue.
 class SandboxQueueTab extends ConsumerWidget {
   final void Function(BuildContext context, WidgetRef ref, AurBhaiAgent agent)
-      onOpenInstalled;
+  onOpenInstalled;
 
   const SandboxQueueTab({super.key, required this.onOpenInstalled});
 
@@ -100,8 +100,11 @@ class SandboxQueueTab extends ConsumerWidget {
                       Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(_originIcon(js.source),
-                              color: Colors.amberAccent, size: 26),
+                          Icon(
+                            _originIcon(js.source),
+                            color: Colors.amberAccent,
+                            size: 26,
+                          ),
                           const SizedBox(height: 6),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -131,8 +134,11 @@ class SandboxQueueTab extends ConsumerWidget {
                         const Positioned(
                           top: 4,
                           right: 4,
-                          child: Icon(Icons.check_circle,
-                              color: Colors.greenAccent, size: 14),
+                          child: Icon(
+                            Icons.check_circle,
+                            color: Colors.greenAccent,
+                            size: 14,
+                          ),
                         ),
                     ],
                   ),
@@ -170,8 +176,11 @@ class SandboxQueueTab extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.science,
-                            color: Colors.lightBlueAccent, size: 20),
+                        const Icon(
+                          Icons.science,
+                          color: Colors.lightBlueAccent,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -184,8 +193,11 @@ class SandboxQueueTab extends ConsumerWidget {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close,
-                              color: Colors.white38, size: 18),
+                          icon: const Icon(
+                            Icons.close,
+                            color: Colors.white38,
+                            size: 18,
+                          ),
                           onPressed: () =>
                               ref.read(sandboxQueueProvider).remove(item.id),
                         ),
@@ -195,14 +207,18 @@ class SandboxQueueTab extends ConsumerWidget {
                       item.description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style:
-                          const TextStyle(color: Colors.white54, fontSize: 11),
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Queued ${DateFormat('MMM d, HH:mm').format(item.enqueuedAt.toLocal())}',
-                      style:
-                          const TextStyle(color: Colors.white30, fontSize: 10),
+                      style: const TextStyle(
+                        color: Colors.white30,
+                        fontSize: 10,
+                      ),
                     ),
                     if (item.lastResult != null) ...[
                       const SizedBox(height: 6),

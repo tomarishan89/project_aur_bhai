@@ -30,7 +30,7 @@ class JSPropertyNameArray {
   /// [index] (size_t) The index of the property name to retrieve.
   String propertyNameArrayGetNameAtIndex(int index) {
     return JSString(
-            JSObjectRef.jSPropertyNameArrayGetNameAtIndex(pointer, index))
-        .string!;
+      JSObjectRef.jSPropertyNameArrayGetNameAtIndex(pointer, index),
+    ).string!;
   }
 }

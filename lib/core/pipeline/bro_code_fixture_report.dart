@@ -51,49 +51,50 @@ class BroCodeImproveAttempt {
   });
 
   Map<String, dynamic> toJson() => {
-        'attemptNumber': attemptNumber,
-        'completedAt': completedAt.toIso8601String(),
-        'changeRequest': changeRequest,
-        'verified': verified,
-        'outcomeMessage': outcomeMessage,
-        'turnsUsed': turnsUsed,
-        'estimatedTokensUsed': estimatedTokensUsed,
-        'agentActivity': agentActivity,
-        'scriptBefore': scriptBefore,
-        'scriptAfter': scriptAfter,
-        if (assetsAfter.isNotEmpty) 'assetsAfter': assetsAfter,
-        if (lastRunError != null) 'lastRunError': lastRunError,
-        'dueDiligenceFindings': dueDiligenceFindings,
-        'diagnostics': BroCodeFixtureReport.diagnosticsMap(
-          baselineSyntax: baselineSyntax,
-          lastSyntaxError: lastSyntaxError,
-          lastSandboxError: lastSandboxError,
-          lastFormatError: lastFormatError,
-          lastStyleError: lastStyleError,
-          lastPolicyError: lastPolicyError,
-          failingObservations: failingObservations,
-        ),
-      };
+    'attemptNumber': attemptNumber,
+    'completedAt': completedAt.toIso8601String(),
+    'changeRequest': changeRequest,
+    'verified': verified,
+    'outcomeMessage': outcomeMessage,
+    'turnsUsed': turnsUsed,
+    'estimatedTokensUsed': estimatedTokensUsed,
+    'agentActivity': agentActivity,
+    'scriptBefore': scriptBefore,
+    'scriptAfter': scriptAfter,
+    if (assetsAfter.isNotEmpty) 'assetsAfter': assetsAfter,
+    if (lastRunError != null) 'lastRunError': lastRunError,
+    'dueDiligenceFindings': dueDiligenceFindings,
+    'diagnostics': BroCodeFixtureReport.diagnosticsMap(
+      baselineSyntax: baselineSyntax,
+      lastSyntaxError: lastSyntaxError,
+      lastSandboxError: lastSandboxError,
+      lastFormatError: lastFormatError,
+      lastStyleError: lastStyleError,
+      lastPolicyError: lastPolicyError,
+      failingObservations: failingObservations,
+    ),
+  };
 
   factory BroCodeImproveAttempt.fromJson(Map<String, dynamic> json) {
     return BroCodeImproveAttempt(
       attemptNumber: json['attemptNumber'] as int? ?? 0,
-      completedAt: DateTime.tryParse(json['completedAt'] as String? ?? '') ??
+      completedAt:
+          DateTime.tryParse(json['completedAt'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
       changeRequest: json['changeRequest'] as String? ?? '',
       verified: json['verified'] as bool? ?? false,
       outcomeMessage: json['outcomeMessage'] as String? ?? '',
       turnsUsed: json['turnsUsed'] as int? ?? 0,
       estimatedTokensUsed: json['estimatedTokensUsed'] as int? ?? 0,
-      agentActivity: (json['agentActivity'] as List?)
-              ?.map((e) => e.toString())
-              .toList() ??
+      agentActivity:
+          (json['agentActivity'] as List?)?.map((e) => e.toString()).toList() ??
           const [],
       scriptBefore: json['scriptBefore'] as String? ?? '',
       scriptAfter: json['scriptAfter'] as String? ?? '',
       assetsAfter: _stringMap(json['assetsAfter']),
       lastRunError: json['lastRunError'] as String?,
-      dueDiligenceFindings: (json['dueDiligenceFindings'] as List?)
+      dueDiligenceFindings:
+          (json['dueDiligenceFindings'] as List?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
@@ -161,10 +162,8 @@ class BroCodeImproveSession {
   }
 
   /// Empty session for the same agent (Start fresh).
-  BroCodeImproveSession freshCopy() => BroCodeImproveSession(
-        agentName: agentName,
-        startedAt: DateTime.now(),
-      );
+  BroCodeImproveSession freshCopy() =>
+      BroCodeImproveSession(agentName: agentName, startedAt: DateTime.now());
 
   List<String> distinctChangeRequests() {
     final seen = <String>{};
@@ -178,12 +177,12 @@ class BroCodeImproveSession {
   }
 
   Map<String, dynamic> toJson() => {
-        'sessionVersion': sessionVersion,
-        'agentName': agentName,
-        'startedAt': startedAt.toIso8601String(),
-        'changeRequests': distinctChangeRequests(),
-        'attempts': attempts.map((a) => a.toJson()).toList(),
-      };
+    'sessionVersion': sessionVersion,
+    'agentName': agentName,
+    'startedAt': startedAt.toIso8601String(),
+    'changeRequests': distinctChangeRequests(),
+    'attempts': attempts.map((a) => a.toJson()).toList(),
+  };
 
   factory BroCodeImproveSession.fromJson(Map<String, dynamic> json) {
     final attemptsRaw = json['attempts'];
@@ -199,7 +198,8 @@ class BroCodeImproveSession {
     }
     final session = BroCodeImproveSession(
       agentName: json['agentName'] as String? ?? 'Unnamed',
-      startedAt: DateTime.tryParse(json['startedAt'] as String? ?? '') ??
+      startedAt:
+          DateTime.tryParse(json['startedAt'] as String? ?? '') ??
           DateTime.now(),
       attempts: attempts,
     );
@@ -328,63 +328,64 @@ class BroCodeFixtureReport {
       'lastFormatError': ?lastFormat,
       'lastStyleError': ?lastStyle,
       'lastPolicyError': ?lastPolicy,
-      'failingObservations':
-          failingObservations.map((o) => o.toJson()).toList(),
+      'failingObservations': failingObservations
+          .map((o) => o.toJson())
+          .toList(),
     };
   }
 
   Map<String, dynamic> _diagnosticsJson() => diagnosticsMap(
-        baselineSyntax: baselineSyntax,
-        lastSyntaxError: lastSyntaxError,
-        lastSandboxError: lastSandboxError,
-        lastFormatError: lastFormatError,
-        lastStyleError: lastStyleError,
-        lastPolicyError: lastPolicyError,
-        failingObservations: failingObservations,
-      );
+    baselineSyntax: baselineSyntax,
+    lastSyntaxError: lastSyntaxError,
+    lastSandboxError: lastSandboxError,
+    lastFormatError: lastFormatError,
+    lastStyleError: lastStyleError,
+    lastPolicyError: lastPolicyError,
+    failingObservations: failingObservations,
+  );
 
   Map<String, dynamic> toJson() => {
-        'reportVersion': reportVersion,
-        'exportedAt': exportedAt.toIso8601String(),
-        'appVersion': appVersion,
-        'broCode': {
-          'name': workspace.name,
-          'script': workspace.script,
-          'schema': {
-            'name': workspace.name,
-            'description': workspace.description,
-            'inputSchema': workspace.inputSchema,
-          },
-          if (workspace.assets.isNotEmpty) 'assets': workspace.assets,
-        },
-        'improve': {
-          'changeRequest': changeRequest,
-          if (attemptNumber != null) 'attemptNumber': attemptNumber,
-          if (verified != null) 'verified': verified,
-          if (lastRunError != null) 'lastRunError': lastRunError,
-          'dueDiligenceFindings': dueDiligenceFindings,
-          'agentActivity': agentActivity,
-          'failureMessage': failureMessage,
-          'turnsUsed': turnsUsed,
-          'estimatedTokensUsed': estimatedTokensUsed,
-          'diagnostics': _diagnosticsJson(),
-        },
-        if (session != null) 'session': session!.toJson(),
-        if (authoringTrace != null)
-          'authoringTrace': authoringTrace!.sanitized().toJson()
-        else if (authoringTraceMissingReason != null)
-          'authoringTrace': {
-            'traceVersion': AuthoringTrace.traceVersion,
-            'missing': true,
-            'reason': authoringTraceMissingReason,
-          },
-        'fixture': {
-          if (expectSyntaxOk != null) 'expectSyntaxOk': expectSyntaxOk,
-          if (expectSandboxOk != null) 'expectSandboxOk': expectSandboxOk,
-          'improveGoal': changeRequest,
-          'tags': ['repro', 'improve-failed'],
-        },
-      };
+    'reportVersion': reportVersion,
+    'exportedAt': exportedAt.toIso8601String(),
+    'appVersion': appVersion,
+    'broCode': {
+      'name': workspace.name,
+      'script': workspace.script,
+      'schema': {
+        'name': workspace.name,
+        'description': workspace.description,
+        'inputSchema': workspace.inputSchema,
+      },
+      if (workspace.assets.isNotEmpty) 'assets': workspace.assets,
+    },
+    'improve': {
+      'changeRequest': changeRequest,
+      if (attemptNumber != null) 'attemptNumber': attemptNumber,
+      if (verified != null) 'verified': verified,
+      if (lastRunError != null) 'lastRunError': lastRunError,
+      'dueDiligenceFindings': dueDiligenceFindings,
+      'agentActivity': agentActivity,
+      'failureMessage': failureMessage,
+      'turnsUsed': turnsUsed,
+      'estimatedTokensUsed': estimatedTokensUsed,
+      'diagnostics': _diagnosticsJson(),
+    },
+    if (session != null) 'session': session!.toJson(),
+    if (authoringTrace != null)
+      'authoringTrace': authoringTrace!.sanitized().toJson()
+    else if (authoringTraceMissingReason != null)
+      'authoringTrace': {
+        'traceVersion': AuthoringTrace.traceVersion,
+        'missing': true,
+        'reason': authoringTraceMissingReason,
+      },
+    'fixture': {
+      if (expectSyntaxOk != null) 'expectSyntaxOk': expectSyntaxOk,
+      if (expectSandboxOk != null) 'expectSandboxOk': expectSandboxOk,
+      'improveGoal': changeRequest,
+      'tags': ['repro', 'improve-failed'],
+    },
+  };
 
   String toJsonString({bool pretty = true}) {
     if (pretty) {

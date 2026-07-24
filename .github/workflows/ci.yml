@@ -17,9 +17,10 @@ jobs:
       - name: Pub get
         run: flutter pub get
       - name: Format
-        run: dart format --output=none --set-exit-if-changed .
+        # Scope to source trees only — avoid broken/transient `build/` paths.
+        run: dart format --output=none --set-exit-if-changed lib test tool third_party
       - name: Analyze
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze --no-fatal-infos lib test tool
       - name: Unit / widget tests (includes QuickJS path deps)
         run: flutter test --reporter expanded
 

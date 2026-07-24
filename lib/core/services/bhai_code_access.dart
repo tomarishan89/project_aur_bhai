@@ -22,19 +22,18 @@ class BhaiCodeAccess {
   }
 
   Map<String, dynamic> toJson() => {
-        'shareModel': shareModel,
-        'allowDiligence': allowDiligence,
-        'allowSandboxTest': allowSandboxTest,
-      };
+    'shareModel': shareModel,
+    'allowDiligence': allowDiligence,
+    'allowSandboxTest': allowSandboxTest,
+  };
 
   BhaiCodeAccess copyWith({
     bool? shareModel,
     bool? allowDiligence,
     bool? allowSandboxTest,
-  }) =>
-      BhaiCodeAccess(
-        shareModel: shareModel ?? this.shareModel,
-        allowDiligence: allowDiligence ?? this.allowDiligence,
-        allowSandboxTest: allowSandboxTest ?? this.allowSandboxTest,
-      );
+  }) => BhaiCodeAccess(
+    shareModel: shareModel ?? this.shareModel,
+    allowDiligence: allowDiligence ?? this.allowDiligence,
+    allowSandboxTest: allowSandboxTest ?? this.allowSandboxTest,
+  );
 }

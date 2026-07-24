@@ -15,8 +15,8 @@ import 'dart:io';
 Future<void> main(List<String> args) async {
   final issueArg = _flag(args, '--issue');
   final agentArg = _flag(args, '--agent');
-  final latest = args.contains('--latest') ||
-      (issueArg == null && agentArg == null);
+  final latest =
+      args.contains('--latest') || (issueArg == null && agentArg == null);
 
   final owner = Platform.environment['CIRCLE_OWNER'] ?? '';
   final repo = Platform.environment['CIRCLE_REPO'] ?? 'aur_bhai_circle';
@@ -26,9 +26,18 @@ Future<void> main(List<String> args) async {
   }
 
   final repoSlug = '$owner/$repo';
-  final issues = await _ghJson(
-    ['api', 'repos/$repoSlug/issues', '--jq', '.', '-f', 'state=open', '-f', 'labels=aur-bhai-report', '-f', 'per_page=50'],
-  );
+  final issues = await _ghJson([
+    'api',
+    'repos/$repoSlug/issues',
+    '--jq',
+    '.',
+    '-f',
+    'state=open',
+    '-f',
+    'labels=aur-bhai-report',
+    '-f',
+    'per_page=50',
+  ]);
   if (issues is! List) {
     stderr.writeln('Unexpected gh response for issues list.');
     exit(1);
@@ -68,7 +77,9 @@ Future<void> main(List<String> args) async {
       exit(1);
     }
     if (!latest && matches.length > 1) {
-      stderr.writeln('Ambiguous (${matches.length} matches). Pass --issue N or --latest.');
+      stderr.writeln(
+        'Ambiguous (${matches.length} matches). Pass --issue N or --latest.',
+      );
       for (final m in matches) {
         stderr.writeln('  #${m['number']} ${m['title']}');
       }
@@ -108,8 +119,10 @@ Future<void> main(List<String> args) async {
     exit(1);
   }
 
-  final agent = (bundle['name'] as String? ?? 'agent')
-      .replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+  final agent = (bundle['name'] as String? ?? 'agent').replaceAll(
+    RegExp(r'[^A-Za-z0-9_-]'),
+    '_',
+  );
   final stamp = DateTime.now()
       .toUtc()
       .toIso8601String()
@@ -125,7 +138,9 @@ Future<void> main(List<String> args) async {
     'Locked fixture: Issue #$number | agent=$agent | '
     'title=${chosen['title']} | path=${dest.path}',
   );
-  stdout.writeln('Next: dart run tool/install_issue_fixture.dart --path ${dest.path}');
+  stdout.writeln(
+    'Next: dart run tool/install_issue_fixture.dart --path ${dest.path}',
+  );
 }
 
 String? _flag(List<String> args, String name) {

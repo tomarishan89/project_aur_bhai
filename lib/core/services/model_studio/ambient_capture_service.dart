@@ -26,13 +26,13 @@ class AmbientCaptureCandidate {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'agentName': agentName,
-        'proposedLabel': proposedLabel,
-        'compressedSnapshot': compressedSnapshot,
-        'createdAt': createdAt.toIso8601String(),
-        'decision': decision,
-      };
+    'id': id,
+    'agentName': agentName,
+    'proposedLabel': proposedLabel,
+    'compressedSnapshot': compressedSnapshot,
+    'createdAt': createdAt.toIso8601String(),
+    'decision': decision,
+  };
 
   factory AmbientCaptureCandidate.fromJson(Map<String, dynamic> json) {
     return AmbientCaptureCandidate(
@@ -40,7 +40,8 @@ class AmbientCaptureCandidate {
       agentName: json['agentName'] as String? ?? '',
       proposedLabel: json['proposedLabel'] as String? ?? '',
       compressedSnapshot: json['compressedSnapshot'] as String? ?? '[]',
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+      createdAt:
+          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
           DateTime.now(),
       decision: json['decision'] as String?,
     );
@@ -74,13 +75,15 @@ class AmbientCaptureService extends ChangeNotifier {
     required double accelerometerZ,
     required double compassDirection,
   }) {
-    buffer.push(FineTelemetrySample(
-      at: DateTime.now().toUtc(),
-      latitude: latitude,
-      longitude: longitude,
-      accelerometerZ: accelerometerZ,
-      compassDirection: compassDirection,
-    ));
+    buffer.push(
+      FineTelemetrySample(
+        at: DateTime.now().toUtc(),
+        latitude: latitude,
+        longitude: longitude,
+        accelerometerZ: accelerometerZ,
+        compassDirection: compassDirection,
+      ),
+    );
   }
 
   /// Propose a label from the current fine buffer (Path H still owns runtime).
@@ -104,8 +107,9 @@ class AmbientCaptureService extends ChangeNotifier {
   Future<void> decide(String id, {required bool confirm}) async {
     final i = _pending.indexWhere((c) => c.id == id);
     if (i < 0) return;
-    _pending[i] =
-        _pending[i].copyWith(decision: confirm ? 'confirm' : 'reject');
+    _pending[i] = _pending[i].copyWith(
+      decision: confirm ? 'confirm' : 'reject',
+    );
     await _persist();
     notifyListeners();
   }
@@ -140,7 +144,8 @@ class AmbientCaptureService extends ChangeNotifier {
   }
 }
 
-final ambientCaptureProvider =
-    ChangeNotifierProvider<AmbientCaptureService>((ref) {
+final ambientCaptureProvider = ChangeNotifierProvider<AmbientCaptureService>((
+  ref,
+) {
   return AmbientCaptureService(ref);
 });

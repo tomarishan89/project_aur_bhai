@@ -25,11 +25,17 @@ void main() {
     });
 
     test('Exception on division by zero', () {
-      expect(() => SimpleMathParser('10 / 0').evaluate(), throwsUnsupportedError);
+      expect(
+        () => SimpleMathParser('10 / 0').evaluate(),
+        throwsUnsupportedError,
+      );
     });
 
     test('Exception on invalid format', () {
-      expect(() => SimpleMathParser('2 + abc').evaluate(), throwsFormatException);
+      expect(
+        () => SimpleMathParser('2 + abc').evaluate(),
+        throwsFormatException,
+      );
     });
   });
 

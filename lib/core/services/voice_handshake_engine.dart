@@ -35,7 +35,7 @@ class LogEntry {
   final String message;
   final bool isError;
   LogEntry(this.title, this.message, {this.isError = false})
-      : timestamp = DateTime.now();
+    : timestamp = DateTime.now();
 }
 
 class VoiceHandshakeEngine extends ChangeNotifier {
@@ -69,9 +69,15 @@ class VoiceHandshakeEngine extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String> _runAgent(AurBhaiAgent agent, Map<String, dynamic> params) async {
+  Future<String> _runAgent(
+    AurBhaiAgent agent,
+    Map<String, dynamic> params,
+  ) async {
     if (agent is JsAgentAdapter) {
-      _addLog('Javascript Agent', 'Executing Javascript Agent: ${agent.name}...');
+      _addLog(
+        'Javascript Agent',
+        'Executing Javascript Agent: ${agent.name}...',
+      );
       agent.bridgeLogSink = (step) => _addLog('JS Bridge', step);
     }
 
@@ -149,8 +155,10 @@ class VoiceHandshakeEngine extends ChangeNotifier {
         effectiveIntent == AgentIntent.direct &&
         looksLikeAuthorRequest(turn.transcription)) {
       effectiveIntent = AgentIntent.author;
-      _addLog('Intent Override',
-          'Reclassified DIRECT → AUTHOR (author-verb safety net).');
+      _addLog(
+        'Intent Override',
+        'Reclassified DIRECT → AUTHOR (author-verb safety net).',
+      );
     }
 
     final intentLabel = effectiveIntent.name.toUpperCase();
@@ -215,11 +223,9 @@ class VoiceHandshakeEngine extends ChangeNotifier {
     }
 
     try {
-      final entry = await _ref.read(agentFeedServiceProvider).push(
-            agentName: name,
-            text: payload,
-            source: 'voice',
-          );
+      final entry = await _ref
+          .read(agentFeedServiceProvider)
+          .push(agentName: name, text: payload, source: 'voice');
       lastTranscribedWords = 'Fed $name';
       _addLog(
         'Feed Intent',
@@ -236,7 +242,11 @@ class VoiceHandshakeEngine extends ChangeNotifier {
   Future<void> _dispatchExecute(LlmParsedResponse response) async {
     final target = response.targetAgent;
     if (target == null) {
-      _addLog('Agent Error', 'EXECUTE intent had no target agent.', isError: true);
+      _addLog(
+        'Agent Error',
+        'EXECUTE intent had no target agent.',
+        isError: true,
+      );
       await speak("I didn't catch which agent to use.");
       return;
     }
@@ -281,14 +291,20 @@ class VoiceHandshakeEngine extends ChangeNotifier {
 
     final initial = turn.spec ?? AppSpec();
     _session.startAuthor(initialSpec: initial);
-    final authorCfg = _ref.read(byokServiceProvider).configForSlot(LlmSlot.author);
+    final authorCfg = _ref
+        .read(byokServiceProvider)
+        .configForSlot(LlmSlot.author);
     _session.setAuthorModel(
       provider: authorCfg.provider,
       modelId: authorCfg.modelName,
     );
     final kickoff = turn.transcription.trim();
     if (kickoff.isNotEmpty) {
-      _session.appendAuthoringTurn(role: 'user', text: kickoff, phase: 'eliciting');
+      _session.appendAuthoringTurn(
+        role: 'user',
+        text: kickoff,
+        phase: 'eliciting',
+      );
     }
     if (turn.spec != null) {
       _session.mergeAppSpec(turn.spec!);
@@ -305,8 +321,9 @@ class VoiceHandshakeEngine extends ChangeNotifier {
   }
 
   Future<void> _handleAuthorTurn(TurnParsedResponse turn) async {
-    final localIntent =
-        ConversationalSessionService.classifyResponseLocal(turn.transcription);
+    final localIntent = ConversationalSessionService.classifyResponseLocal(
+      turn.transcription,
+    );
     final uttered = turn.transcription.trim();
     if (uttered.isNotEmpty) {
       _session.appendAuthoringTurn(
@@ -341,8 +358,7 @@ class VoiceHandshakeEngine extends ChangeNotifier {
       } else if (_session.isInReview) {
         // Still in review; re-speak the recap + build hint.
         final recap = _session.appSpec.capturedSlotsRecap();
-        final spoken =
-            '$recap ${AuthorPrompts.reviewBuildHint}';
+        final spoken = '$recap ${AuthorPrompts.reviewBuildHint}';
         _addLog('Author Review', spoken);
         notifyListeners();
         await speak(spoken);
@@ -421,8 +437,9 @@ class VoiceHandshakeEngine extends ChangeNotifier {
     final echo = justUpdatedSlots.isNotEmpty
         ? _session.appSpec.echoForSlots(justUpdatedSlots)
         : '';
-    final question =
-        nextSlot != null ? AuthorPrompts.slotQuestion(nextSlot) : '';
+    final question = nextSlot != null
+        ? AuthorPrompts.slotQuestion(nextSlot)
+        : '';
     final spoken = [echo, question].where((s) => s.isNotEmpty).join(' ');
     final fallback = spoken.isNotEmpty ? spoken : turn.confirmation;
 
@@ -492,25 +509,22 @@ class VoiceHandshakeEngine extends ChangeNotifier {
 
       final verification = _ref.read(agentVerificationProvider);
       final scan = verification.scanScript(draft.script);
-      _session.setLastScan(
-        passed: scan.passed,
-        findings: scan.findingMessages,
-      );
+      _session.setLastScan(passed: scan.passed, findings: scan.findingMessages);
       final hasExternal = spec.externalIntegrations.isNotEmpty;
       _addLog(
         'Due Diligence',
         scan.passed
             ? hasExternal
-                ? 'Clean scan; external integrations require C2 promotion and platform keys in Settings.'
-                : 'Clean scan for $registryName.'
+                  ? 'Clean scan; external integrations require C2 promotion and platform keys in Settings.'
+                  : 'Clean scan for $registryName.'
             : 'Flagged: ${scan.findingMessages.join(' ')}',
         isError: !scan.passed,
       );
       notifyListeners();
 
       // MS-MODEL-META-AGT1 — Path L slots when purpose implies classification.
-      final purposeText =
-          '${spec.purpose.value ?? ''} ${draft.description}'.toLowerCase();
+      final purposeText = '${spec.purpose.value ?? ''} ${draft.description}'
+          .toLowerCase();
       final wantsPathL = RegExp(
         r'classif|detect|pothole|label|sensor|accelerometer|ambient|train',
       ).hasMatch(purposeText);
@@ -521,10 +535,7 @@ class VoiceHandshakeEngine extends ChangeNotifier {
               labelSchema: {
                 'labels': ['positive', 'negative'],
               },
-              capturePolicy: {
-                'mode': 'ambient',
-                'fineWindowSeconds': 45,
-              },
+              capturePolicy: {'mode': 'ambient', 'fineWindowSeconds': 45},
               fineWindow: Duration(seconds: 45),
             )
           : null;
@@ -550,12 +561,17 @@ class VoiceHandshakeEngine extends ChangeNotifier {
         buildOutcome: 'built',
         appSpecAtBuild: spec.toJson(),
       );
-      await _ref.read(telemetryBusProvider).writeVaultData(
+      await _ref
+          .read(telemetryBusProvider)
+          .writeVaultData(
             AuthoringTrace.vaultKeyFor(registryName),
             trace.toJsonString(),
             mimeType: 'application/json',
           );
-      _addLog('Authoring Trace', 'Frozen ${trace.turns.length} turn(s) for $registryName');
+      _addLog(
+        'Authoring Trace',
+        'Frozen ${trace.turns.length} turn(s) for $registryName',
+      );
 
       _session.complete();
       lastTranscribedWords = 'Agent $displayName created';
@@ -582,7 +598,10 @@ class VoiceHandshakeEngine extends ChangeNotifier {
     }
   }
 
-  Future<void> _beginRefineSession(String? agentName, {String? initialPayload}) async {
+  Future<void> _beginRefineSession(
+    String? agentName, {
+    String? initialPayload,
+  }) async {
     if (agentName == null || agentName.trim().isEmpty) {
       _addLog('Refine Error', 'No target agent named.', isError: true);
       await speak('Which agent should I improve?');
@@ -592,7 +611,11 @@ class VoiceHandshakeEngine extends ChangeNotifier {
     final registry = _ref.read(jsAgentRegistryProvider);
     final bundle = await registry.readAgentBundle(agentName);
     if (bundle == null) {
-      _addLog('Refine Error', 'Agent $agentName not found in vault.', isError: true);
+      _addLog(
+        'Refine Error',
+        'Agent $agentName not found in vault.',
+        isError: true,
+      );
       await speak('I could not find agent $agentName in the vault.');
       return;
     }
@@ -620,8 +643,9 @@ class VoiceHandshakeEngine extends ChangeNotifier {
   }
 
   Future<void> _handleRefineTurn(TurnParsedResponse turn) async {
-    final localIntent =
-        ConversationalSessionService.classifyResponseLocal(turn.transcription);
+    final localIntent = ConversationalSessionService.classifyResponseLocal(
+      turn.transcription,
+    );
 
     if (localIntent == SessionResponseIntent.cancel) {
       _session.cancel();
@@ -661,13 +685,16 @@ class VoiceHandshakeEngine extends ChangeNotifier {
       final workspace = BroCodeWorkspace(
         name: target,
         description: _session.refineLoadedDescription ?? '',
-        inputSchema:
-            schema is Map ? Map<String, dynamic>.from(schema) : <String, dynamic>{},
+        inputSchema: schema is Map
+            ? Map<String, dynamic>.from(schema)
+            : <String, dynamic>{},
         script: script,
         assets: assets,
       );
 
-      final result = await _ref.read(broCodeCodingAgentProvider).improve(
+      final result = await _ref
+          .read(broCodeCodingAgentProvider)
+          .improve(
             workspace: workspace,
             changeRequest: issue,
             lastRunError: (_session.lastScan?.findings.isNotEmpty ?? false)
@@ -707,7 +734,8 @@ class VoiceHandshakeEngine extends ChangeNotifier {
       _addLog('Coding Agent Error', '$e', isError: true);
       notifyListeners();
       await speak(
-          'The coding agent hit an error. Please describe the change again.');
+        'The coding agent hit an error. Please describe the change again.',
+      );
     }
   }
 
@@ -715,7 +743,9 @@ class VoiceHandshakeEngine extends ChangeNotifier {
     final target = _session.refineTarget;
     final cachedScript = _session.pendingPatchScript;
     if (target == null || cachedScript == null) {
-      await speak('I do not have a prepared patch yet. Describe the change first.');
+      await speak(
+        'I do not have a prepared patch yet. Describe the change first.',
+      );
       return;
     }
 
@@ -731,16 +761,16 @@ class VoiceHandshakeEngine extends ChangeNotifier {
         script: cachedScript,
         description: _session.pendingPatchAgentDescription,
         inputSchema: inputSchema?.map((key, value) {
-                final field = value is Map ? value : <String, dynamic>{};
-                return MapEntry(
-                  key,
-                  AgentParameter(
-                    type: field['type']?.toString() ?? 'string',
-                    description: field['description']?.toString() ?? '',
-                    required: field['required'] as bool? ?? true,
-                  ),
-                );
-              }),
+          final field = value is Map ? value : <String, dynamic>{};
+          return MapEntry(
+            key,
+            AgentParameter(
+              type: field['type']?.toString() ?? 'string',
+              description: field['description']?.toString() ?? '',
+              required: field['required'] as bool? ?? true,
+            ),
+          );
+        }),
         assetUpdates: _session.pendingAssetUpdates,
       );
 
@@ -845,13 +875,14 @@ class VoiceHandshakeEngine extends ChangeNotifier {
         final name = map['name'] ?? '';
         final genderField = (map['gender'] ?? '').toLowerCase();
 
-        final female = genderField.contains('female') ||
+        final female =
+            genderField.contains('female') ||
             genderField == 'f' ||
             isFemaleName(name);
         final male =
             (genderField.contains('male') && !genderField.contains('female')) ||
-                genderField == 'm' ||
-                isMaleName(name);
+            genderField == 'm' ||
+            isMaleName(name);
 
         if (wantFemale && female) {
           picked = map;
@@ -864,9 +895,10 @@ class VoiceHandshakeEngine extends ChangeNotifier {
       }
 
       if (picked != null) {
-        await _tts.setVoice(
-          {'name': picked['name']!, 'locale': picked['locale']!},
-        );
+        await _tts.setVoice({
+          'name': picked['name']!,
+          'locale': picked['locale']!,
+        });
         // Slight pitch bias as a soft cue when the engine still ignores gender.
         await _tts.setPitch(wantFemale ? 1.05 : 0.9);
         debugPrint(
@@ -936,8 +968,9 @@ class VoiceHandshakeEngine extends ChangeNotifier {
       return;
     }
 
-    final word =
-        byok.responseWord.trim().isEmpty ? "Haan bhai" : byok.responseWord.trim();
+    final word = byok.responseWord.trim().isEmpty
+        ? "Haan bhai"
+        : byok.responseWord.trim();
     try {
       // speak() already applies voiceGender from Settings.
       await speak(word);
@@ -1018,7 +1051,10 @@ class VoiceHandshakeEngine extends ChangeNotifier {
 
       await _audioRecorder.start(
         const RecordConfig(
-            encoder: AudioEncoder.aacLc, numChannels: 1, sampleRate: 16000),
+          encoder: AudioEncoder.aacLc,
+          numChannels: 1,
+          sampleRate: 16000,
+        ),
         path: path,
       );
 
@@ -1058,7 +1094,10 @@ class VoiceHandshakeEngine extends ChangeNotifier {
 
         await _audioRecorder.start(
           const RecordConfig(
-              encoder: AudioEncoder.aacLc, numChannels: 1, sampleRate: 16000),
+            encoder: AudioEncoder.aacLc,
+            numChannels: 1,
+            sampleRate: 16000,
+          ),
           path: path,
         );
 
@@ -1103,11 +1142,13 @@ class VoiceHandshakeEngine extends ChangeNotifier {
 
     // S17 — pending Bro Call ack (Haan Bhai) takes priority.
     final calls = _ref.read(broCallServiceProvider);
-    if (calls.nextPending != null &&
-        calls.looksLikeAck(turn.transcription)) {
+    if (calls.nextPending != null && calls.looksLikeAck(turn.transcription)) {
       final delivered = await calls.acknowledgeAndDeliver();
       if (delivered != null) {
-        _addLog('Bro Call', 'Delivered ${delivered.id} from ${delivered.agentName}');
+        _addLog(
+          'Bro Call',
+          'Delivered ${delivered.id} from ${delivered.agentName}',
+        );
         lastTranscribedWords = 'Bro Call: ${delivered.title}';
         // Payload spoken via BroCallService.onDeliverPayload; ensure TTS if unset.
         if (calls.onDeliverPayload == null) {

@@ -81,20 +81,24 @@ void main() {
 
   test('fine buffer window trims old samples', () {
     final buf = FineTelemetryBuffer(window: const Duration(seconds: 1));
-    buf.push(FineTelemetrySample(
-      at: DateTime.now().toUtc().subtract(const Duration(seconds: 5)),
-      latitude: 1,
-      longitude: 2,
-      accelerometerZ: 3,
-      compassDirection: 4,
-    ));
-    buf.push(FineTelemetrySample(
-      at: DateTime.now().toUtc(),
-      latitude: 1,
-      longitude: 2,
-      accelerometerZ: 3,
-      compassDirection: 4,
-    ));
+    buf.push(
+      FineTelemetrySample(
+        at: DateTime.now().toUtc().subtract(const Duration(seconds: 5)),
+        latitude: 1,
+        longitude: 2,
+        accelerometerZ: 3,
+        compassDirection: 4,
+      ),
+    );
+    buf.push(
+      FineTelemetrySample(
+        at: DateTime.now().toUtc(),
+        latitude: 1,
+        longitude: 2,
+        accelerometerZ: 3,
+        compassDirection: 4,
+      ),
+    );
     expect(buf.length, 1);
   });
 }

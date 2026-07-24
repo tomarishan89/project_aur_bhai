@@ -13,13 +13,19 @@ class SimpleMathParser {
     double val = _parseExpression();
     _skipWhitespace();
     if (_index < input.length) {
-      throw FormatException("Unexpected character '${input[_index]}' at index $_index");
+      throw FormatException(
+        "Unexpected character '${input[_index]}' at index $_index",
+      );
     }
     return val;
   }
 
   void _skipWhitespace() {
-    while (_index < input.length && (input[_index] == ' ' || input[_index] == '\t' || input[_index] == '\r' || input[_index] == '\n')) {
+    while (_index < input.length &&
+        (input[_index] == ' ' ||
+            input[_index] == '\t' ||
+            input[_index] == '\r' ||
+            input[_index] == '\n')) {
       _index++;
     }
   }
@@ -76,7 +82,7 @@ class SimpleMathParser {
     }
 
     String current = input[_index];
-    
+
     // Support unary operators
     if (current == '+') {
       _index++;
@@ -108,7 +114,9 @@ class SimpleMathParser {
         _index++;
       } else if (ch == '.') {
         if (hasDot) {
-          throw const FormatException("Multiple decimal points in a single number");
+          throw const FormatException(
+            "Multiple decimal points in a single number",
+          );
         }
         hasDot = true;
         _index++;
@@ -118,7 +126,9 @@ class SimpleMathParser {
     }
 
     if (start == _index) {
-      throw FormatException("Unexpected character '${input[_index]}' instead of a number");
+      throw FormatException(
+        "Unexpected character '${input[_index]}' instead of a number",
+      );
     }
 
     return double.parse(input.substring(start, _index));
@@ -131,13 +141,15 @@ class CalculatorAgent extends AurBhaiAgent {
   String get name => "Calculator";
 
   @override
-  String get description => "Evaluates standard arithmetic expressions (e.g., 2+2, 12 * 12, (50 - 10) / 2).";
+  String get description =>
+      "Evaluates standard arithmetic expressions (e.g., 2+2, 12 * 12, (50 - 10) / 2).";
 
   @override
   Map<String, AgentParameter> get inputSchema => {
     'expression': const AgentParameter(
       type: 'string',
-      description: 'The standard mathematical expression to solve. Cleaned of words, e.g. "2+2" or "10*5-3".',
+      description:
+          'The standard mathematical expression to solve. Cleaned of words, e.g. "2+2" or "10*5-3".',
       required: true,
     ),
   };
@@ -145,12 +157,15 @@ class CalculatorAgent extends AurBhaiAgent {
   @override
   Future<String> execute(Map<String, dynamic> parameters) async {
     final rawExpression = parameters['expression']?.toString() ?? '';
-    
+
     // Sanitize the expression to keep only math characters
     // Clean words like "calculate", "what is", etc.
     String cleanExpression = rawExpression
-        .replaceAll(RegExp(r'[a-zA-Z]'), '') // remove any stray alphabetical chars
-        .replaceAll('x', '*')               // convert common verbal symbols
+        .replaceAll(
+          RegExp(r'[a-zA-Z]'),
+          '',
+        ) // remove any stray alphabetical chars
+        .replaceAll('x', '*') // convert common verbal symbols
         .replaceAll('X', '*')
         .replaceAll('÷', '/')
         .trim();
@@ -162,13 +177,15 @@ class CalculatorAgent extends AurBhaiAgent {
     try {
       final parser = SimpleMathParser(cleanExpression);
       final double result = parser.evaluate();
-      
+
       // format result: if it's an integer, print without trailing .0
       String finalResult;
       if (result == result.toInt().toDouble()) {
         finalResult = result.toInt().toString();
       } else {
-        finalResult = result.toStringAsFixed(4).replaceAll(RegExp(r'\.?0+$'), '');
+        finalResult = result
+            .toStringAsFixed(4)
+            .replaceAll(RegExp(r'\.?0+$'), '');
       }
       return "Calculator agent says, the answer is $finalResult.";
     } catch (e) {

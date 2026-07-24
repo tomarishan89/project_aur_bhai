@@ -54,7 +54,8 @@ class JsBridgeService {
     dynamic runtime;
     try {
       runtime = getJavascriptRuntime(xhr: false);
-      final probe = '''
+      final probe =
+          '''
 $script
 ;(typeof execute === 'function' ? 'ok' : 'missing_execute')
 ''';
@@ -120,7 +121,8 @@ $script
         onStepLog?.call('Injected ${assets.length} System.assets key(s)');
       }
 
-      final wrapped = '''
+      final wrapped =
+          '''
 ${_systemBootstrap(assets: assets)}
 
 $script
@@ -143,7 +145,8 @@ $script
       onStepLog?.call('Bro Code execution completed');
 
       final message = _parseJsResult(result);
-      final looksLikeError = message.toLowerCase().contains('error') ||
+      final looksLikeError =
+          message.toLowerCase().contains('error') ||
           message.toLowerCase().contains('syntaxerror');
       return AgentExecutionResult(
         message: message,
@@ -185,25 +188,35 @@ $script
     List<BroCodeExecutionEvent> eventsOut,
   ) {
     runtime.onMessage('AurBhai_BridgeLog', (dynamic args) {
-      final message = args is Map ? args['message']?.toString() ?? '$args' : '$args';
+      final message = args is Map
+          ? args['message']?.toString() ?? '$args'
+          : '$args';
       onStepLog?.call(message);
-      eventsOut.add(BroCodeExecutionEvent(
-        kind: 'log',
-        data: {'message': message},
-        summary: message.length > 120 ? '${message.substring(0, 120)}…' : message,
-      ));
+      eventsOut.add(
+        BroCodeExecutionEvent(
+          kind: 'log',
+          data: {'message': message},
+          summary: message.length > 120
+              ? '${message.substring(0, 120)}…'
+              : message,
+        ),
+      );
     });
 
     runtime.onMessage('AurBhai_querySQL', (dynamic args) async {
       final query = (args['query'] as String?)?.trim() ?? '';
-      onStepLog?.call('System.querySQL → ${query.length > 80 ? '${query.substring(0, 80)}...' : query}');
+      onStepLog?.call(
+        'System.querySQL → ${query.length > 80 ? '${query.substring(0, 80)}...' : query}',
+      );
       final rows = await _telemetry.executeQuery(query);
       onStepLog?.call('System.querySQL ← ${rows.length} row(s)');
-      eventsOut.add(BroCodeExecutionEvent(
-        kind: 'querySQL',
-        data: {'query': query, 'rowCount': rows.length},
-        summary: 'querySQL → ${rows.length} row(s)',
-      ));
+      eventsOut.add(
+        BroCodeExecutionEvent(
+          kind: 'querySQL',
+          data: {'query': query, 'rowCount': rows.length},
+          summary: 'querySQL → ${rows.length} row(s)',
+        ),
+      );
       return rows;
     });
 
@@ -213,7 +226,8 @@ $script
       final mimeType = args['mimeType'] as String? ?? 'text/plain';
       onStepLog?.call('System.writeVault → $key ($mimeType)');
       // Default finite TTL for HTML dashboards (MS-TELEMETRY-DASHBOARD-UX3).
-      final isHtml = mimeType.toLowerCase().contains('html') ||
+      final isHtml =
+          mimeType.toLowerCase().contains('html') ||
           key.toLowerCase().endsWith('.html');
       await _telemetry.writeVaultData(
         key,
@@ -225,15 +239,13 @@ $script
           key.toLowerCase().endsWith('.html')) {
         htmlKeysOut.add(key);
       }
-      eventsOut.add(BroCodeExecutionEvent(
-        kind: 'writeVault',
-        data: {
-          'key': key,
-          'mimeType': mimeType,
-          'byteLength': value.length,
-        },
-        summary: 'writeVault $key ($mimeType)',
-      ));
+      eventsOut.add(
+        BroCodeExecutionEvent(
+          kind: 'writeVault',
+          data: {'key': key, 'mimeType': mimeType, 'byteLength': value.length},
+          summary: 'writeVault $key ($mimeType)',
+        ),
+      );
       onStepLog?.call('System.writeVault ← ok');
       return {'success': true, 'key': key};
     });
@@ -264,20 +276,22 @@ $script
           ? '${response.body.substring(0, 4096)}…'
           : response.body;
       onStepLog?.call('System.sendHTTP ← HTTP ${response.statusCode}');
-      eventsOut.add(BroCodeExecutionEvent(
-        kind: 'sendHTTP',
-        data: {
-          'url': url,
-          'method': payload == null ? 'GET' : 'POST',
-          'statusCode': response.statusCode,
-          'bodyPreview': body.length > 500 ? '${body.substring(0, 500)}…' : body,
-        },
-        summary: 'sendHTTP ${payload == null ? 'GET' : 'POST'} $url → ${response.statusCode}',
-      ));
-      return {
-        'statusCode': response.statusCode,
-        'body': body,
-      };
+      eventsOut.add(
+        BroCodeExecutionEvent(
+          kind: 'sendHTTP',
+          data: {
+            'url': url,
+            'method': payload == null ? 'GET' : 'POST',
+            'statusCode': response.statusCode,
+            'bodyPreview': body.length > 500
+                ? '${body.substring(0, 500)}…'
+                : body,
+          },
+          summary:
+              'sendHTTP ${payload == null ? 'GET' : 'POST'} $url → ${response.statusCode}',
+        ),
+      );
+      return {'statusCode': response.statusCode, 'body': body};
     });
 
     runtime.onMessage('AurBhai_readInbox', (dynamic args) async {
@@ -294,11 +308,13 @@ $script
         limit: limit,
       );
       onStepLog?.call('System.readInbox ← ${entries.length} entr(y/ies)');
-      eventsOut.add(BroCodeExecutionEvent(
-        kind: 'readInbox',
-        data: {'count': entries.length, 'unreadOnly': unreadOnly},
-        summary: 'readInbox → ${entries.length}',
-      ));
+      eventsOut.add(
+        BroCodeExecutionEvent(
+          kind: 'readInbox',
+          data: {'count': entries.length, 'unreadOnly': unreadOnly},
+          summary: 'readInbox → ${entries.length}',
+        ),
+      );
       return entries.map((e) => e.toJson()).toList();
     });
 
@@ -314,11 +330,13 @@ $script
       onStepLog?.call('System.consumeInbox → $agentName');
       final n = await feed.consume(agentName, ids: ids.isEmpty ? null : ids);
       onStepLog?.call('System.consumeInbox ← $n consumed');
-      eventsOut.add(BroCodeExecutionEvent(
-        kind: 'consumeInbox',
-        data: {'consumed': n},
-        summary: 'consumeInbox → $n',
-      ));
+      eventsOut.add(
+        BroCodeExecutionEvent(
+          kind: 'consumeInbox',
+          data: {'consumed': n},
+          summary: 'consumeInbox → $n',
+        ),
+      );
       return {'consumed': n};
     });
 
@@ -337,16 +355,19 @@ $script
         body: body,
         speakText: speak,
       );
-      eventsOut.add(BroCodeExecutionEvent(
-        kind: 'notifyUser',
-        data: {'id': call.id, 'title': title},
-        summary: 'notifyUser → ${call.id}',
-      ));
+      eventsOut.add(
+        BroCodeExecutionEvent(
+          kind: 'notifyUser',
+          data: {'id': call.id, 'title': title},
+          summary: 'notifyUser → ${call.id}',
+        ),
+      );
       return {'id': call.id, 'queued': true};
     });
   }
 
-  String _systemBootstrap({Map<String, String> assets = const {}}) => '''
+  String _systemBootstrap({Map<String, String> assets = const {}}) =>
+      '''
 const System = {
   log: function(message) {
     sendMessage('AurBhai_BridgeLog', JSON.stringify({ message: String(message) }));

@@ -72,7 +72,8 @@ class JsAgentRegistry {
             : <String, dynamic>{};
 
         final displayName = schema['name'] as String? ?? agentName;
-        final description = schema['description'] as String? ??
+        final description =
+            schema['description'] as String? ??
             'Bro Code loaded from vault ($key)';
         final createdAt = _parseDate(schema['createdAt'] as String?);
         final updatedAt = _parseDate(schema['updatedAt'] as String?);
@@ -86,8 +87,9 @@ class JsAgentRegistry {
             inputSchema: _parseInputSchema(schema['inputSchema']),
             script: vaultEntry['value']!,
             assets: assets,
-            securityClass:
-                AgentSecurityClassX.fromId(schema['securityClass'] as String?),
+            securityClass: AgentSecurityClassX.fromId(
+              schema['securityClass'] as String?,
+            ),
             source: BhaiCodeOrigin.normalize(schema['source'] as String?),
             diligencePassed: schema['diligencePassed'] as bool? ?? false,
             createdAt: createdAt,
@@ -108,7 +110,9 @@ class JsAgentRegistry {
     if (kIsWeb) return;
     final candidates = <File>[
       File('tool/.friend_install_queue.json'),
-      File('${Directory.current.path}${Platform.pathSeparator}tool${Platform.pathSeparator}.friend_install_queue.json'),
+      File(
+        '${Directory.current.path}${Platform.pathSeparator}tool${Platform.pathSeparator}.friend_install_queue.json',
+      ),
     ];
     File? queue;
     for (final f in candidates) {
@@ -128,8 +132,9 @@ class JsAgentRegistry {
         debugPrint('[JsAgentRegistry] Friend install queue invalid; skipping');
         return;
       }
-      final inputRaw =
-          Map<String, dynamic>.from(payload['inputSchema'] as Map? ?? {});
+      final inputRaw = Map<String, dynamic>.from(
+        payload['inputSchema'] as Map? ?? {},
+      );
       final inputSchema = <String, AgentParameter>{};
       for (final e in inputRaw.entries) {
         final field = e.value is Map
@@ -153,7 +158,9 @@ class JsAgentRegistry {
         final trace = AuthoringTrace.fromJson(
           Map<String, dynamic>.from(traceRaw),
         );
-        await _ref.read(telemetryBusProvider).writeVaultData(
+        await _ref
+            .read(telemetryBusProvider)
+            .writeVaultData(
               AuthoringTrace.vaultKeyFor(name),
               trace.toJsonString(),
               mimeType: 'application/json',
@@ -186,8 +193,9 @@ class JsAgentRegistry {
     DateTime? updatedAt,
     BroCodeMlMeta? mlMeta,
   }) async {
-    final syntax =
-        _ref.read(jsBridgeServiceProvider).validateScriptSyntax(script);
+    final syntax = _ref
+        .read(jsBridgeServiceProvider)
+        .validateScriptSyntax(script);
     if (!syntax.ok) {
       throw Exception(
         'Script failed QuickJS syntax check: ${syntax.message ?? "unknown error"}',
@@ -206,7 +214,8 @@ class JsAgentRegistry {
     final priorSchema = await telemetry.readVaultData(schemaKeyFor(name));
     if (priorSchema != null) {
       try {
-        final decoded = jsonDecode(priorSchema['value']!) as Map<String, dynamic>;
+        final decoded =
+            jsonDecode(priorSchema['value']!) as Map<String, dynamic>;
         existingCreatedAt = decoded['createdAt'] as String?;
         existingSource = decoded['source'] as String?;
         existingDiligence = decoded['diligencePassed'] as bool?;
@@ -266,7 +275,9 @@ class JsAgentRegistry {
       updatedAt: DateTime.tryParse(updated),
     );
     agentService.registerAgent(adapter);
-    debugPrint('[JsAgentRegistry] Saved & registered agent: $name (${securityClass.id})');
+    debugPrint(
+      '[JsAgentRegistry] Saved & registered agent: $name (${securityClass.id})',
+    );
     return adapter;
   }
 
@@ -276,8 +287,7 @@ class JsAgentRegistry {
     final schemaEntry = await telemetry.readVaultData(schemaKeyFor(name));
     if (schemaEntry == null) return false;
     try {
-      final schema =
-          jsonDecode(schemaEntry['value']!) as Map<String, dynamic>;
+      final schema = jsonDecode(schemaEntry['value']!) as Map<String, dynamic>;
       final next = BroCodeMlMeta.mergeIntoSchema(schema, meta);
       next['updatedAt'] = DateTime.now().toIso8601String();
       await telemetry.writeVaultData(
@@ -318,7 +328,10 @@ class JsAgentRegistry {
   }
 
   /// Updates the persisted security class and refreshes the live adapter.
-  Future<bool> updateSecurityClass(String name, AgentSecurityClass securityClass) async {
+  Future<bool> updateSecurityClass(
+    String name,
+    AgentSecurityClass securityClass,
+  ) async {
     final telemetry = _ref.read(telemetryBusProvider);
     final schemaEntry = await telemetry.readVaultData(schemaKeyFor(name));
     if (schemaEntry == null) return false;
@@ -350,7 +363,9 @@ class JsAgentRegistry {
         ),
       );
     }
-    debugPrint('[JsAgentRegistry] Updated $name security class to ${securityClass.id}');
+    debugPrint(
+      '[JsAgentRegistry] Updated $name security class to ${securityClass.id}',
+    );
     return true;
   }
 
@@ -417,7 +432,9 @@ class JsAgentRegistry {
     final telemetry = _ref.read(telemetryBusProvider);
     final existingScript = await telemetry.readVaultData(vaultKeyFor(name));
     if (existingScript != null) {
-      final versionKeys = await telemetry.listVaultKeys(prefix: '${vaultKeyFor(name)}:v');
+      final versionKeys = await telemetry.listVaultKeys(
+        prefix: '${vaultKeyFor(name)}:v',
+      );
       final nextVersion = versionKeys.length + 1;
       await telemetry.writeVaultData(
         '${vaultKeyFor(name)}:v$nextVersion',
@@ -432,10 +449,10 @@ class JsAgentRegistry {
       final mime = lower.endsWith('.html') || lower.endsWith('.htm')
           ? 'text/html'
           : lower.endsWith('.webmanifest') || lower.endsWith('manifest.json')
-              ? 'application/manifest+json'
-              : lower.endsWith('.js')
-                  ? 'application/javascript'
-                  : 'text/plain';
+          ? 'application/manifest+json'
+          : lower.endsWith('.js')
+          ? 'application/javascript'
+          : 'text/plain';
       await telemetry.writeVaultData(
         assetKeyFor(name, entry.key),
         entry.value,
@@ -446,9 +463,10 @@ class JsAgentRegistry {
 
     final bundle = await readAgentBundle(name);
     final schema = bundle?['schema'] as Map<String, dynamic>? ?? {};
-    final desc = description ?? schema['description'] as String? ?? 'Refined agent.';
-    final schemaParams = inputSchema ??
-        _parseInputSchema(schema['inputSchema']);
+    final desc =
+        description ?? schema['description'] as String? ?? 'Refined agent.';
+    final schemaParams =
+        inputSchema ?? _parseInputSchema(schema['inputSchema']);
 
     return saveAndRegisterAgent(
       name: name,

@@ -12,9 +12,7 @@ void main() {
 
     test('allows trailing semicolon on SELECT', () {
       expect(
-        () => SqlQueryGuard.validate(
-          'SELECT COUNT(*) AS c FROM telemetry;',
-        ),
+        () => SqlQueryGuard.validate('SELECT COUNT(*) AS c FROM telemetry;'),
         returnsNormally,
       );
     });

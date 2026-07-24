@@ -33,7 +33,9 @@ class ToolObservation {
     final buf = StringBuffer();
     buf.writeln('Observation ($tool): ${ok ? 'OK' : 'FAIL'} — $summary');
     if (detail.isNotEmpty) {
-      buf.writeln(detail.length > 2500 ? '${detail.substring(0, 2500)}…' : detail);
+      buf.writeln(
+        detail.length > 2500 ? '${detail.substring(0, 2500)}…' : detail,
+      );
     }
     if (nextHint != null && nextHint!.isNotEmpty) {
       buf.writeln('Hint: $nextHint');
@@ -42,13 +44,13 @@ class ToolObservation {
   }
 
   Map<String, dynamic> toJson() => {
-        'ok': ok,
-        'tool': tool,
-        'summary': summary,
-        'detail': detail,
-        if (nextHint != null) 'nextHint': nextHint,
-        if (data != null) 'data': data,
-      };
+    'ok': ok,
+    'tool': tool,
+    'summary': summary,
+    'detail': detail,
+    if (nextHint != null) 'nextHint': nextHint,
+    if (data != null) 'data': data,
+  };
 }
 
 /// Host-side tools against a [BroCodeWorkspace].
@@ -113,6 +115,7 @@ class BroCodeAgentTools {
 
   bool get allowAssetWriteFullEscalation =>
       applyEditMissCount >= maxApplyEditMissesBeforeWriteFull;
+
   /// Host-only: normalize whitespace without counting as an LLM mutation.
   ToolObservation ensureFormat() {
     final result = BroCodeStyleChecker.format(workspace.script);
@@ -125,9 +128,7 @@ class BroCodeAgentTools {
         detail: result.findings.isEmpty
             ? 'No format issues.'
             : result.findings.map((f) => '• $f').join('\n'),
-        data: {
-          'findings': result.findings.map((f) => f.toJson()).toList(),
-        },
+        data: {'findings': result.findings.map((f) => f.toJson()).toList()},
       );
     }
     workspace.script = result.formattedScript;
@@ -135,8 +136,7 @@ class BroCodeAgentTools {
     return ToolObservation(
       ok: true,
       tool: 'apply_format',
-      summary:
-          'Host auto-applied format (${result.findings.length} fix(es))',
+      summary: 'Host auto-applied format (${result.findings.length} fix(es))',
       detail: result.findings.map((f) => '• $f').join('\n'),
       nextHint:
           'Format normalized by host; syntax/style/policy checks run automatically after edits.',
@@ -218,9 +218,9 @@ class BroCodeAgentTools {
       detail: result.findings.map((f) => '• $f').join('\n'),
       nextHint: BroCodePlatformIntegrity.canAutoRepair(result)
           ? 'Host can auto-repair with a thin execute() publisher for '
-              '${result.suggestedPublishAssetId}. Prefer that over apply_edit thrash.'
+                '${result.suggestedPublishAssetId}. Prefer that over apply_edit thrash.'
           : 'Wire System.assets + writeVault, or remove unused assets. '
-              'Do not leave dead code after return.',
+                'Do not leave dead code after return.',
       data: {
         'findings': result.findings,
         'orphanAssetIds': result.orphanAssetIds,
@@ -233,15 +233,16 @@ class BroCodeAgentTools {
 
   /// Replace execute() with a thin publisher for [htmlAssetId].
   ToolObservation applyThinPublishRepair({String? htmlAssetId}) {
-    final id = htmlAssetId ??
+    final id =
+        htmlAssetId ??
         lastIntegrityResult?.suggestedPublishAssetId ??
         workspace.assets.keys.cast<String?>().firstWhere(
-              (k) =>
-                  k != null &&
-                  (k.toLowerCase().endsWith('.html') ||
-                      k.toLowerCase().endsWith('.htm')),
-              orElse: () => null,
-            );
+          (k) =>
+              k != null &&
+              (k.toLowerCase().endsWith('.html') ||
+                  k.toLowerCase().endsWith('.htm')),
+          orElse: () => null,
+        );
     if (id == null || id.isEmpty) {
       return const ToolObservation(
         ok: false,
@@ -249,11 +250,8 @@ class BroCodeAgentTools {
         summary: 'No HTML asset available for thin publish repair',
       );
     }
-    final resolved = BroCodePlatformIntegrity.resolveAssetKey(
-          workspace.assets,
-          id,
-        ) ??
-        id;
+    final resolved =
+        BroCodePlatformIntegrity.resolveAssetKey(workspace.assets, id) ?? id;
     workspace.script = BroCodePlatformIntegrity.buildThinPublishExecute(
       htmlAssetId: resolved,
       vaultKey: resolved,
@@ -303,8 +301,7 @@ class BroCodeAgentTools {
     return ToolObservation(
       ok: false,
       tool: 'check_dashboard_goals',
-      summary:
-          'Dashboard goals failed (${result.findings.length} finding(s))',
+      summary: 'Dashboard goals failed (${result.findings.length} finding(s))',
       detail: result.findings.map((f) => '• $f').join('\n'),
       nextHint:
           'Edit the HTML that System.writeVault publishes (template or '
@@ -323,7 +320,8 @@ class BroCodeAgentTools {
       return ToolObservation(
         ok: true,
         tool: 'read_script',
-        summary: 'Excerpt around line $line (${workspace.scriptCharCount} chars total)',
+        summary:
+            'Excerpt around line $line (${workspace.scriptCharCount} chars total)',
         detail: workspace.excerptAroundLine(line),
       );
     }
@@ -331,9 +329,14 @@ class BroCodeAgentTools {
       final lines = workspace.script.split('\n');
       final s = (start - 1).clamp(0, lines.length);
       final e = end.clamp(0, lines.length);
-      final slice = lines.sublist(s, e).asMap().entries.map((e) {
-        return '${(e.key + s + 1).toString().padLeft(4)}| ${e.value}';
-      }).join('\n');
+      final slice = lines
+          .sublist(s, e)
+          .asMap()
+          .entries
+          .map((e) {
+            return '${(e.key + s + 1).toString().padLeft(4)}| ${e.value}';
+          })
+          .join('\n');
       return ToolObservation(
         ok: true,
         tool: 'read_script',
@@ -365,8 +368,10 @@ class BroCodeAgentTools {
         detail: 'Known: ${workspace.assets.keys.join(', ')}',
       );
     }
-    final resolved =
-        BroCodePlatformIntegrity.resolveAssetKey(workspace.assets, id);
+    final resolved = BroCodePlatformIntegrity.resolveAssetKey(
+      workspace.assets,
+      id,
+    );
     if (resolved == null) {
       return ToolObservation(
         ok: false,
@@ -380,7 +385,9 @@ class BroCodeAgentTools {
       ok: true,
       tool: 'read_asset',
       summary: 'Asset $resolved (${content.length} chars)',
-      detail: content.length > 4000 ? '${content.substring(0, 4000)}…' : content,
+      detail: content.length > 4000
+          ? '${content.substring(0, 4000)}…'
+          : content,
     );
   }
 
@@ -392,10 +399,14 @@ class BroCodeAgentTools {
     String? newStr = args['new'] as String? ?? args['newString'] as String?;
     try {
       if (oldB64 != null && oldB64.trim().isNotEmpty) {
-        oldStr = utf8.decode(base64Decode(oldB64.replaceAll(RegExp(r'\s+'), '')));
+        oldStr = utf8.decode(
+          base64Decode(oldB64.replaceAll(RegExp(r'\s+'), '')),
+        );
       }
       if (newB64 != null && newB64.trim().isNotEmpty) {
-        newStr = utf8.decode(base64Decode(newB64.replaceAll(RegExp(r'\s+'), '')));
+        newStr = utf8.decode(
+          base64Decode(newB64.replaceAll(RegExp(r'\s+'), '')),
+        );
       }
     } catch (e) {
       return ToolObservation(
@@ -403,7 +414,8 @@ class BroCodeAgentTools {
         tool: 'apply_edit',
         summary: 'Invalid Base64 in edit',
         detail: '$e',
-        nextHint: 'EDIT_NOT_FOUND-style: resend exact UTF-8 in old/new or Base64.',
+        nextHint:
+            'EDIT_NOT_FOUND-style: resend exact UTF-8 in old/new or Base64.',
       );
     }
     if (oldStr == null || newStr == null) {
@@ -440,7 +452,7 @@ class BroCodeAgentTools {
                 : 'Known: ${workspace.assets.keys.join(", ")}',
             nextHint: allowAssetWriteFullEscalation
                 ? 'apply_edit missed $applyEditMissCount times — use write_full '
-                    '{"asset":"<exact id>","content":"…"} for this asset.'
+                      '{"asset":"<exact id>","content":"…"} for this asset.'
                 : 'Use an exact asset id from the Assets list (case may differ).',
             data: {
               'applyEditMissCount': applyEditMissCount,
@@ -476,17 +488,17 @@ class BroCodeAgentTools {
         tool: 'apply_edit',
         summary: scriptEditFailureMessage(e),
         detail: '$e',
-        nextHint: allowAssetWriteFullEscalation &&
-                target != null &&
-                target.isNotEmpty
+        nextHint:
+            allowAssetWriteFullEscalation && target != null && target.isNotEmpty
             ? 'apply_edit missed $applyEditMissCount times — use write_full '
-                'with {"asset":"$target","content":"…"} (near-green lifted for assets).'
+                  'with {"asset":"$target","content":"…"} (near-green lifted for assets).'
             : 'EDIT_NOT_FOUND — host also tried whitespace-fuzzy match. '
-                'read_script/read_asset and use a longer unique old snippet.',
+                  'read_script/read_asset and use a longer unique old snippet.',
         data: {
           'applyEditMissCount': applyEditMissCount,
           'allowAssetWriteFullEscalation': allowAssetWriteFullEscalation,
-          'skipIdenticalFailure': applyEditMissCount < maxApplyEditMissesBeforeWriteFull,
+          'skipIdenticalFailure':
+              applyEditMissCount < maxApplyEditMissesBeforeWriteFull,
         },
       );
     }
@@ -501,7 +513,8 @@ class BroCodeAgentTools {
         return ToolObservation(
           ok: false,
           tool: 'write_full',
-          summary: 'write_full asset budget exhausted ($maxWriteFullAssetPerRun per run)',
+          summary:
+              'write_full asset budget exhausted ($maxWriteFullAssetPerRun per run)',
           nextHint: 'Use apply_edit with "asset" for further changes.',
         );
       }
@@ -510,13 +523,15 @@ class BroCodeAgentTools {
         return ToolObservation(
           ok: false,
           tool: 'write_full',
-          summary: 'write_full script budget exhausted ($maxWriteFullScriptPerRun per run)',
+          summary:
+              'write_full script budget exhausted ($maxWriteFullScriptPerRun per run)',
           nextHint: 'Use apply_edit for further changes.',
         );
       }
     }
     String? content = args['content'] as String? ?? args['script'] as String?;
-    final b64 = args['contentBase64'] as String? ?? args['scriptBase64'] as String?;
+    final b64 =
+        args['contentBase64'] as String? ?? args['scriptBase64'] as String?;
     try {
       if (b64 != null && b64.trim().isNotEmpty) {
         content = utf8.decode(base64Decode(b64.replaceAll(RegExp(r'\s+'), '')));
@@ -532,7 +547,7 @@ class BroCodeAgentTools {
     if (content == null || content.isEmpty) {
       final assetHint = workspace.assets.isNotEmpty
           ? ' Prefer apply_edit with {"asset":"${workspace.assets.keys.first}",...} '
-              'on listed Assets instead of rewrite_full.'
+                'on listed Assets instead of rewrite_full.'
           : ' Prefer apply_edit with a small unique old/new snippet.';
       return ToolObservation(
         ok: false,
@@ -584,9 +599,7 @@ class BroCodeAgentTools {
         detail: result.findings.isEmpty
             ? 'No format issues.'
             : result.findings.map((f) => '• $f').join('\n'),
-        data: {
-          'findings': result.findings.map((f) => f.toJson()).toList(),
-        },
+        data: {'findings': result.findings.map((f) => f.toJson()).toList()},
       );
     }
     formatOkAfterLastMutate = false;
@@ -625,9 +638,7 @@ class BroCodeAgentTools {
             : result.findings.map((f) => '• $f').join('\n'),
         nextHint:
             'Host re-lints after edits. Action done when syntax/sandbox gates are green.',
-        data: {
-          'findings': result.findings.map((f) => f.toJson()).toList(),
-        },
+        data: {'findings': result.findings.map((f) => f.toJson()).toList()},
       );
     }
     styleOkAfterLastMutate = false;
@@ -639,9 +650,7 @@ class BroCodeAgentTools {
       detail: result.findings.map((f) => '• $f').join('\n'),
       nextHint:
           'Fix with apply_edit using line/code hints. Host re-lints after your edit.',
-      data: {
-        'findings': result.findings.map((f) => f.toJson()).toList(),
-      },
+      data: {'findings': result.findings.map((f) => f.toJson()).toList()},
     );
   }
 
@@ -660,18 +669,14 @@ class BroCodeAgentTools {
     syntaxOkAfterLastMutate = false;
     final msg = check.message ?? 'syntax error';
     final loc = parseScriptErrorLocation(msg);
-    final detail = loc != null
-        ? workspace.excerptAroundLine(loc.line)
-        : msg;
+    final detail = loc != null ? workspace.excerptAroundLine(loc.line) : msg;
     return ToolObservation(
       ok: false,
       tool: 'validate_syntax',
       summary: msg,
       detail: detail,
       nextHint: 'SYNTAX — fix with apply_edit near the marked line.',
-      data: loc != null
-          ? {'line': loc.line, 'column': loc.column}
-          : null,
+      data: loc != null ? {'line': loc.line, 'column': loc.column} : null,
     );
   }
 
@@ -690,7 +695,8 @@ class BroCodeAgentTools {
 
     sandboxRunCount++;
     final expectHtmlKeys = _parseExpectHtmlKeys(args['expectHtmlKeys']);
-    final expectDashboard = args['expectDashboard'] as bool? ??
+    final expectDashboard =
+        args['expectDashboard'] as bool? ??
         (expectHtmlKeys.isNotEmpty ||
             changeImpliesDashboard(args['changeRequest'] as String?));
 
@@ -731,8 +737,7 @@ class BroCodeAgentTools {
       );
     }
     final judgeOk = judgeHint == null || judgeHint.ok;
-    final passed =
-        !execution.isError && dashboardOk && keysOk && judgeOk;
+    final passed = !execution.isError && dashboardOk && keysOk && judgeOk;
     sandboxOkAfterLastMutate = passed;
 
     if (!passed) {
@@ -750,10 +755,10 @@ class BroCodeAgentTools {
         summary: missingKeys.isNotEmpty
             ? 'Sandbox missing expected HTML key(s): ${missingKeys.join(', ')}'
             : judgeHint != null && !judgeHint.ok
-                ? 'Capability judge rejected: ${judgeHint.summary}'
-                : expectDashboard && htmlKeys.isEmpty && !execution.isError
-                    ? 'Smoke ran but wrote no HTML dashboard (expected for this change)'
-                    : 'Sandbox failed: ${execution.message}',
+            ? 'Capability judge rejected: ${judgeHint.summary}'
+            : expectDashboard && htmlKeys.isEmpty && !execution.isError
+            ? 'Smoke ran but wrote no HTML dashboard (expected for this change)'
+            : 'Sandbox failed: ${execution.message}',
         detail: [
           execution.message,
           ...goalDetail,
@@ -836,8 +841,9 @@ class BroCodeAgentTools {
   }
 
   ToolObservation _scanPolicy() {
-    final scan =
-        _ref.read(agentVerificationProvider).scanScript(workspace.script);
+    final scan = _ref
+        .read(agentVerificationProvider)
+        .scanScript(workspace.script);
     policyOkAfterLastMutate = scan.passed;
     return ToolObservation(
       ok: scan.passed,
@@ -851,9 +857,7 @@ class BroCodeAgentTools {
       nextHint: scan.passed
           ? null
           : 'Keep browser APIs inside HTML template strings only; fix with apply_edit. Host re-scans after edits.',
-      data: {
-        'findings': scan.findings.map((f) => f.toJson()).toList(),
-      },
+      data: {'findings': scan.findings.map((f) => f.toJson()).toList()},
     );
   }
 

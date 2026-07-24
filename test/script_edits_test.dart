@@ -19,11 +19,7 @@ void main() {
     test('replaceAll replaces every occurrence', () {
       const source = 'foo bar foo';
       final result = applyScriptEdits(source, [
-        const ScriptEdit(
-          oldString: 'foo',
-          newString: 'baz',
-          replaceAll: true,
-        ),
+        const ScriptEdit(oldString: 'foo', newString: 'baz', replaceAll: true),
       ]);
       expect(result, 'baz bar baz');
     });
@@ -119,14 +115,18 @@ async function execute(params) {
       expect(msg, contains('invalid Bro Code JSON'));
       expect(msg.toLowerCase(), isNot(contains('ask to fix only')));
       expect(msg, isNot(contains('large dashboard HTML')));
-      expect(AgentBridgeSpec.invalidPatchJsonUserMessage, contains('scriptBase64'));
+      expect(
+        AgentBridgeSpec.invalidPatchJsonUserMessage,
+        contains('scriptBase64'),
+      );
     });
   });
 
   group('large-script surgical fix', () {
     test('SyntaxError fix does not rewrite embedded HTML', () {
       final html = List.filled(80, '<div class="row">telemetry</div>').join();
-      final source = '''
+      final source =
+          '''
 async function execute(params) {
   System.log('start')
   const html = `$html`;

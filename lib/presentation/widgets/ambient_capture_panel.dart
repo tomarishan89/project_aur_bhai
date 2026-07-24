@@ -77,7 +77,7 @@ class _AmbientCapturePanelState extends ConsumerState<AmbientCapturePanel> {
           Text(
             _loaded
                 ? 'Fine buffer: $bufLen samples · window hint ${_fineWindowSecs}s '
-                    '(Path H still owns runtime; no train/bind yet)'
+                      '(Path H still owns runtime; no train/bind yet)'
                 : 'Loading candidates…',
             style: const TextStyle(color: Colors.white38, fontSize: 10),
           ),
@@ -97,8 +97,7 @@ class _AmbientCapturePanelState extends ConsumerState<AmbientCapturePanel> {
                   label: '${_fineWindowSecs}s',
                   onChanged: (v) {
                     setState(() => _fineWindowSecs = v.round());
-                    ambient.buffer.window =
-                        Duration(seconds: _fineWindowSecs);
+                    ambient.buffer.window = Duration(seconds: _fineWindowSecs);
                   },
                 ),
               ),
@@ -188,10 +187,7 @@ class _AmbientCapturePanelState extends ConsumerState<AmbientCapturePanel> {
                       onPressed: () => ambient.decide(c.id, confirm: false),
                       child: const Text(
                         'REJECT',
-                        style: TextStyle(
-                          color: Colors.redAccent,
-                          fontSize: 11,
-                        ),
+                        style: TextStyle(color: Colors.redAccent, fontSize: 11),
                       ),
                     ),
                   ],

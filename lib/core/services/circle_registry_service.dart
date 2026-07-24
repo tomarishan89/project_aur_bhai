@@ -41,17 +41,17 @@ class CircleListing {
   });
 
   Map<String, dynamic> toBundleJson() => {
-        'id': id,
-        'name': name,
-        'description': description,
-        'license': license,
-        'revisionId': revisionId,
-        if (parentRevisionId != null) 'parentRevisionId': parentRevisionId,
-        'author': author,
-        'script': script,
-        'inputSchema': inputSchema,
-        'access': access.toJson(),
-      };
+    'id': id,
+    'name': name,
+    'description': description,
+    'license': license,
+    'revisionId': revisionId,
+    if (parentRevisionId != null) 'parentRevisionId': parentRevisionId,
+    'author': author,
+    'script': script,
+    'inputSchema': inputSchema,
+    'access': access.toJson(),
+  };
 
   factory CircleListing.fromBundleJson(Map<String, dynamic> json) {
     return CircleListing(
@@ -75,24 +75,25 @@ class CircleListing {
   }
 
   MarketplaceListing toMarketplaceListing() => MarketplaceListing(
-        id: id,
-        name: name,
-        description: description,
-        script: script,
-        inputSchema: inputSchema,
-        license: license,
-        author: author,
-        access: access,
-      );
+    id: id,
+    name: name,
+    description: description,
+    script: script,
+    inputSchema: inputSchema,
+    license: license,
+    author: author,
+    access: access,
+  );
 }
 
 /// GitHub Contents API client for multi-city circle share.
 class CircleRegistryService {
   CircleRegistryService(this._ref, {SecureSecretStore? secretStore})
-      : _secrets = secretStore ??
-            (Platform.environment.containsKey('FLUTTER_TEST')
-                ? MemorySecureSecretStore()
-                : FlutterSecureSecretStore());
+    : _secrets =
+          secretStore ??
+          (Platform.environment.containsKey('FLUTTER_TEST')
+              ? MemorySecureSecretStore()
+              : FlutterSecureSecretStore());
 
   final Ref _ref;
   final SecureSecretStore _secrets;
@@ -113,7 +114,8 @@ class CircleRegistryService {
   Future<void> loadConfig() async {
     final prefs = await SharedPreferences.getInstance();
     _owner = prefs.getString(AppConfig.circlePrefsOwnerKey) ?? '';
-    _repo = prefs.getString(AppConfig.circlePrefsRepoKey) ??
+    _repo =
+        prefs.getString(AppConfig.circlePrefsRepoKey) ??
         AppConfig.circleDefaultRepo;
     _author = prefs.getString(AppConfig.circlePrefsAuthorKey) ?? 'circle-user';
     _token = await _secrets.read(AppConfig.circlePrefsTokenKey) ?? '';
@@ -140,8 +142,9 @@ class CircleRegistryService {
     final prefs = await SharedPreferences.getInstance();
     _owner = owner.trim();
     _repo = repo.trim().isEmpty ? AppConfig.circleDefaultRepo : repo.trim();
-    _author =
-        authorDisplay.trim().isEmpty ? 'circle-user' : authorDisplay.trim();
+    _author = authorDisplay.trim().isEmpty
+        ? 'circle-user'
+        : authorDisplay.trim();
     final incoming = token.trim();
     final existing = await _secrets.read(AppConfig.circlePrefsTokenKey) ?? '';
     // Empty PAT field means "keep stored token" — never wipe on blank re-save.
@@ -211,15 +214,14 @@ class CircleRegistryService {
     throw Exception('Circle verify failed: HTTP ${res.statusCode}');
   }
 
-  Uri _contentsUri(String path) => Uri.parse(
-        'https://api.github.com/repos/$_owner/$_repo/contents/$path',
-      );
+  Uri _contentsUri(String path) =>
+      Uri.parse('https://api.github.com/repos/$_owner/$_repo/contents/$path');
 
   Map<String, String> get _headers => {
-        'Accept': 'application/vnd.github+json',
-        'Authorization': 'Bearer $_token',
-        'X-GitHub-Api-Version': '2022-11-28',
-      };
+    'Accept': 'application/vnd.github+json',
+    'Authorization': 'Bearer $_token',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
 
   /// Thrown when Settings has no owner/repo/token yet (distinct from empty index).
   static const notConfiguredSentinel = 'CIRCLE_NOT_CONFIGURED';
@@ -242,7 +244,10 @@ class CircleRegistryService {
         throw Exception('Circle list failed: HTTP ${res.statusCode}');
       }
       final body = jsonDecode(res.body) as Map<String, dynamic>;
-      final contentB64 = (body['content'] as String? ?? '').replaceAll('\n', '');
+      final contentB64 = (body['content'] as String? ?? '').replaceAll(
+        '\n',
+        '',
+      );
       final decoded = utf8.decode(base64Decode(contentB64));
       final index = jsonDecode(decoded) as Map<String, dynamic>;
       final entries = (index['listings'] as List?) ?? const [];
@@ -322,8 +327,8 @@ class CircleRegistryService {
     final index = await _readIndex();
     final listings = List<Map<String, dynamic>>.from(
       (index['listings'] as List?)?.whereType<Map>().map(
-                (e) => Map<String, dynamic>.from(e),
-              ) ??
+            (e) => Map<String, dynamic>.from(e),
+          ) ??
           const [],
     );
     listings.removeWhere((e) => e['id'] == id);
@@ -377,7 +382,8 @@ class CircleRegistryService {
       final existing = await _http.get(_contentsUri(path), headers: _headers);
       if (existing.statusCode == 200) {
         useSha =
-            (jsonDecode(existing.body) as Map<String, dynamic>)['sha'] as String?;
+            (jsonDecode(existing.body) as Map<String, dynamic>)['sha']
+                as String?;
       }
     }
     final payload = <String, dynamic>{
@@ -404,8 +410,9 @@ class CircleRegistryService {
     // Override pool source set by catalog with Friend Circle provenance.
     final registry = _ref.read(jsAgentRegistryProvider);
     final telemetry = _ref.read(telemetryBusProvider);
-    final schemaEntry =
-        await telemetry.readVaultData(registry.schemaKeyFor(listing.name));
+    final schemaEntry = await telemetry.readVaultData(
+      registry.schemaKeyFor(listing.name),
+    );
     if (schemaEntry != null) {
       final schema = Map<String, dynamic>.from(
         jsonDecode(schemaEntry['value']!) as Map,
@@ -432,7 +439,9 @@ class CircleRegistryService {
     if (bundle == null) throw Exception('Agent $agentName not found');
     final schema = Map<String, dynamic>.from(bundle['schema'] as Map? ?? {});
     final script = bundle['script'] as String? ?? '';
-    final input = Map<String, dynamic>.from(schema['inputSchema'] as Map? ?? {});
+    final input = Map<String, dynamic>.from(
+      schema['inputSchema'] as Map? ?? {},
+    );
     await publish(
       name: agentName,
       description: schema['description'] as String? ?? agentName,

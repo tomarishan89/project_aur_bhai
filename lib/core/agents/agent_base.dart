@@ -11,10 +11,10 @@ class BroCodeParameter {
   });
 
   Map<String, dynamic> toJson() => {
-        'type': type,
-        'description': description,
-        'required': required,
-      };
+    'type': type,
+    'description': description,
+    'required': required,
+  };
 }
 
 /// @Deprecated Use [BroCodeParameter]. Kept for gradual migration.

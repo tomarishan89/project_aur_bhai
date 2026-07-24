@@ -27,18 +27,24 @@ void main() async {
   await telemetryBus.initialize();
 
   final voiceEngine = container.read(voiceHandshakeProvider);
-  debugPrint('[Main] Core engines pre-initialized. Voice State: ${voiceEngine.state}');
+  debugPrint(
+    '[Main] Core engines pre-initialized. Voice State: ${voiceEngine.state}',
+  );
 
   // Pre-initialize Shelf Local Edge Server
   final localServer = container.read(localServerProvider);
   await localServer.startServer();
-  debugPrint('[Main] Local Edge Server initialized. Address: ${localServer.serverAddress}');
+  debugPrint(
+    '[Main] Local Edge Server initialized. Address: ${localServer.serverAddress}',
+  );
 
   // Load Javascript agents from sovereign vault (MS-JS-BRIDGE-AGT1)
   final jsRegistry = container.read(jsAgentRegistryProvider);
-  await jsRegistry.seedCoreAgentsIfMissing(); // MS-CORE-JS-MIGRATION: Calculator + DrivingCoach as C2 JS agents
+  await jsRegistry
+      .seedCoreAgentsIfMissing(); // MS-CORE-JS-MIGRATION: Calculator + DrivingCoach as C2 JS agents
   await jsRegistry.seedDemoAgentIfMissing();
-  await jsRegistry.consumeFriendInstallQueueIfPresent(); // S15 friend fixture replay
+  await jsRegistry
+      .consumeFriendInstallQueueIfPresent(); // S15 friend fixture replay
   final jsAgentCount = await jsRegistry.loadAndRegisterAgents();
   debugPrint('[Main] JS Bridge: $jsAgentCount vault agent(s) registered.');
 

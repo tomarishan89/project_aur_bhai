@@ -50,10 +50,7 @@ async function execute(params) {
     final judge = HeuristicBroCodeCapabilityJudge();
     final verdict = await judge.judge(
       changeRequest: 'Publish a map dashboard',
-      trace: const BroCodeExecutionTrace(
-        ranOk: true,
-        events: [],
-      ),
+      trace: const BroCodeExecutionTrace(ranOk: true, events: []),
       publishedAssets: const {},
     );
     expect(verdict.ok, isFalse);

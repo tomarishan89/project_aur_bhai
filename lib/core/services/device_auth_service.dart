@@ -45,15 +45,12 @@ class DeviceAuthService {
     } catch (e) {
       debugPrint('[DeviceAuth] Authentication error: $e');
       final raw = e.toString();
-      if (raw.contains('uiUnavailable') ||
-          raw.contains('FragmentActivity')) {
+      if (raw.contains('uiUnavailable') || raw.contains('FragmentActivity')) {
         return DeviceAuthResult.fail(
           'Device authentication UI is unavailable. Rebuild the app so MainActivity uses FlutterFragmentActivity, then try again.',
         );
       }
-      return DeviceAuthResult.fail(
-        'Authentication error: $e',
-      );
+      return DeviceAuthResult.fail('Authentication error: $e');
     }
   }
 

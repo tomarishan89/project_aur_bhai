@@ -13,16 +13,29 @@ void main() {
     final bus = TelemetryBusService();
     await bus.initialize();
 
-    await bus.writeVaultData('sovereign-only', 'real-secret', mimeType: 'text/plain');
+    await bus.writeVaultData(
+      'sovereign-only',
+      'real-secret',
+      mimeType: 'text/plain',
+    );
 
     await bus.openSandbox(reset: true);
     expect(bus.isSandboxActive, isTrue);
 
-    final seedRows = await bus.executeQuery('SELECT COUNT(*) AS c FROM telemetry');
-    expect(seedRows.first['c'], 8,
-        reason: 'sandbox must seed a synthetic telemetry cluster');
+    final seedRows = await bus.executeQuery(
+      'SELECT COUNT(*) AS c FROM telemetry',
+    );
+    expect(
+      seedRows.first['c'],
+      8,
+      reason: 'sandbox must seed a synthetic telemetry cluster',
+    );
 
-    await bus.writeVaultData('sandbox-key', 'mock-only', mimeType: 'text/plain');
+    await bus.writeVaultData(
+      'sandbox-key',
+      'mock-only',
+      mimeType: 'text/plain',
+    );
     final sandboxRead = await bus.readVaultData('sandbox-key');
     // readVaultData always hits sovereign DB (registry/admin path).
     expect(sandboxRead, isNull);
@@ -36,8 +49,11 @@ void main() {
     final leakCheck = await bus.executeQuery(
       "SELECT value FROM sovereign_vault WHERE key = 'sovereign-only'",
     );
-    expect(leakCheck, isEmpty,
-        reason: 'sandbox must not see sovereign vault rows');
+    expect(
+      leakCheck,
+      isEmpty,
+      reason: 'sandbox must not see sovereign vault rows',
+    );
 
     await bus.closeSandbox();
     expect(bus.isSandboxActive, isFalse);

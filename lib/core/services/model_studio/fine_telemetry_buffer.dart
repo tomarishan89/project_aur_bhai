@@ -19,12 +19,12 @@ class FineTelemetrySample {
 
   /// Lossy write-time compression: round coords / accel for storage.
   Map<String, dynamic> toCompressedJson() => {
-        't': at.toUtc().millisecondsSinceEpoch,
-        'lat': double.parse(latitude.toStringAsFixed(5)),
-        'lng': double.parse(longitude.toStringAsFixed(5)),
-        'z': double.parse(accelerometerZ.toStringAsFixed(2)),
-        'h': double.parse(compassDirection.toStringAsFixed(1)),
-      };
+    't': at.toUtc().millisecondsSinceEpoch,
+    'lat': double.parse(latitude.toStringAsFixed(5)),
+    'lng': double.parse(longitude.toStringAsFixed(5)),
+    'z': double.parse(accelerometerZ.toStringAsFixed(2)),
+    'h': double.parse(compassDirection.toStringAsFixed(1)),
+  };
 
   factory FineTelemetrySample.fromCompressedJson(Map<String, dynamic> json) {
     return FineTelemetrySample(

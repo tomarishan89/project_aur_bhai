@@ -63,10 +63,11 @@ class ByokService extends ChangeNotifier {
   final SecureSecretStore _secrets;
 
   ByokService({SecureSecretStore? secretStore})
-      : _secrets = secretStore ??
-            (Platform.environment.containsKey('FLUTTER_TEST')
-                ? MemorySecureSecretStore()
-                : FlutterSecureSecretStore()) {
+    : _secrets =
+          secretStore ??
+          (Platform.environment.containsKey('FLUTTER_TEST')
+              ? MemorySecureSecretStore()
+              : FlutterSecureSecretStore()) {
     _loadSettings();
   }
 
@@ -145,8 +146,7 @@ class ByokService extends ChangeNotifier {
       _apiKey = await _secrets.read(_keyApiKey) ?? '';
       _externalPlatformKeys.clear();
       for (final platform in ExternalPlatform.values) {
-        final key =
-            await _secrets.read('$_keyExternalPrefix${platform.name}');
+        final key = await _secrets.read('$_keyExternalPrefix${platform.name}');
         if (key != null && key.isNotEmpty) {
           _externalPlatformKeys[platform.name] = key;
         }
@@ -158,7 +158,8 @@ class ByokService extends ChangeNotifier {
       _isLoaded = true;
       notifyListeners();
       debugPrint(
-          '[ByokService] Loaded configuration. Provider: $_apiProvider, Model: $_modelName multiSlot=$_multiSlotEnabled');
+        '[ByokService] Loaded configuration. Provider: $_apiProvider, Model: $_modelName multiSlot=$_multiSlotEnabled',
+      );
     } catch (e) {
       debugPrint('[ByokService] Load error: $e');
     }
@@ -182,8 +183,9 @@ class ByokService extends ChangeNotifier {
       for (final e in map.entries) {
         final slot = LlmSlot.fromId(e.key);
         if (e.value is Map) {
-          _slots[slot] =
-              ByokSlotConfig.fromJson(Map<String, dynamic>.from(e.value as Map));
+          _slots[slot] = ByokSlotConfig.fromJson(
+            Map<String, dynamic>.from(e.value as Map),
+          );
         }
       }
     } catch (e) {
@@ -277,7 +279,9 @@ class ByokService extends ChangeNotifier {
     _maxRecordingSeconds = maxRecordingSeconds;
     _responseMode = responseMode;
     _vibrateOnWake = vibrateOnWake;
-    _responseWord = responseWord.trim().isEmpty ? "Haan bhai" : responseWord.trim();
+    _responseWord = responseWord.trim().isEmpty
+        ? "Haan bhai"
+        : responseWord.trim();
     _voiceGender = voiceGender;
 
     if (externalPlatformKeys != null) {
@@ -319,7 +323,8 @@ class ByokService extends ChangeNotifier {
       await prefs.setBool(_migratedFlag, true);
       notifyListeners();
       debugPrint(
-          '[ByokService] Updated config: Provider: $provider, Model: $modelName');
+        '[ByokService] Updated config: Provider: $provider, Model: $modelName',
+      );
     } catch (e) {
       debugPrint('[ByokService] Update error: $e');
     }

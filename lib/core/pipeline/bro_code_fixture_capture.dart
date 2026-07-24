@@ -139,9 +139,9 @@ class BroCodeFixtureCapture {
     final pullHint = wroteToRepo
         ? 'Already in repo: test/fixtures/bro_code/$fileName'
         : 'On your PC (device connected):\n'
-            '  dart run tool/pull_bro_code_fixture.dart\n'
-            'This pulls LATEST.bundle.json from the phone into '
-            'test/fixtures/bro_code/$fileName';
+              '  dart run tool/pull_bro_code_fixture.dart\n'
+              'This pulls LATEST.bundle.json from the phone into '
+              'test/fixtures/bro_code/$fileName';
 
     return BroCodeFixtureCaptureResult(
       path: file.path,

@@ -21,10 +21,11 @@ class WakeWordService extends ChangeNotifier {
   static const _prefsAcknowledgedPrivacy = 'wake_privacy_ack';
 
   WakeWordService({SecureSecretStore? secretStore})
-      : _secrets = secretStore ??
-            (Platform.environment.containsKey('FLUTTER_TEST')
-                ? MemorySecureSecretStore()
-                : FlutterSecureSecretStore()) {
+    : _secrets =
+          secretStore ??
+          (Platform.environment.containsKey('FLUTTER_TEST')
+              ? MemorySecureSecretStore()
+              : FlutterSecureSecretStore()) {
     unawaited(_load());
   }
 
@@ -211,8 +212,7 @@ class WakeWordService extends ChangeNotifier {
   }
 }
 
-final wakeWordServiceProvider =
-    ChangeNotifierProvider<WakeWordService>((ref) {
+final wakeWordServiceProvider = ChangeNotifierProvider<WakeWordService>((ref) {
   // ChangeNotifierProvider disposes the notifier; do not double-dispose.
   return WakeWordService();
 });

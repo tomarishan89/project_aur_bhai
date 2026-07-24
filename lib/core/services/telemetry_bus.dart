@@ -64,8 +64,8 @@ class TelemetryBusService extends ChangeNotifier {
     this.databaseFileName = 'aur_bhai_telemetry_vault.db',
     SecureSecretStore? secretStore,
     bool enableVaultSeal = true,
-  })  : _secretStore = secretStore ?? MemorySecureSecretStore(),
-        _enableVaultSeal = enableVaultSeal;
+  }) : _secretStore = secretStore ?? MemorySecureSecretStore(),
+       _enableVaultSeal = enableVaultSeal;
 
   final SecureSecretStore _secretStore;
   final bool _enableVaultSeal;
@@ -136,7 +136,9 @@ class TelemetryBusService extends ChangeNotifier {
     final info = await db.rawQuery('PRAGMA table_info(sovereign_vault)');
     final cols = info.map((r) => r['name'] as String).toSet();
     if (!cols.contains('updated_at')) {
-      await db.execute('ALTER TABLE sovereign_vault ADD COLUMN updated_at TEXT');
+      await db.execute(
+        'ALTER TABLE sovereign_vault ADD COLUMN updated_at TEXT',
+      );
       debugPrint('[TelemetryBus] Added sovereign_vault.updated_at');
     }
     if (!cols.contains('content_hash')) {
@@ -155,7 +157,9 @@ class TelemetryBusService extends ChangeNotifier {
     final info = await db.rawQuery('PRAGMA table_info(sovereign_vault)');
     final cols = info.map((r) => r['name'] as String).toSet();
     if (!cols.contains('expires_at')) {
-      await db.execute('ALTER TABLE sovereign_vault ADD COLUMN expires_at TEXT');
+      await db.execute(
+        'ALTER TABLE sovereign_vault ADD COLUMN expires_at TEXT',
+      );
       debugPrint('[TelemetryBus] Added sovereign_vault.expires_at');
     }
   }
@@ -312,8 +316,9 @@ class TelemetryBusService extends ChangeNotifier {
     final mime = (row['mime_type'] as String?) ?? 'text/plain';
     final hash = row['content_hash'] as String?;
     final updatedAt = row['updated_at'] as String?;
-    final resolvedHash =
-        (hash != null && hash.isNotEmpty) ? hash : vaultContentHash(value);
+    final resolvedHash = (hash != null && hash.isNotEmpty)
+        ? hash
+        : vaultContentHash(value);
     return {
       'key': row['key'] as String? ?? '',
       'value': value,
@@ -352,18 +357,14 @@ class TelemetryBusService extends ChangeNotifier {
     final expiresAt = ttl == null
         ? null
         : DateTime.now().toUtc().add(ttl).toIso8601String();
-    await db.insert(
-      'sovereign_vault',
-      {
-        'key': key,
-        'value': value,
-        'mime_type': mimeType,
-        'updated_at': updatedAt,
-        'content_hash': hash,
-        'expires_at': expiresAt,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('sovereign_vault', {
+      'key': key,
+      'value': value,
+      'mime_type': mimeType,
+      'updated_at': updatedAt,
+      'content_hash': hash,
+      'expires_at': expiresAt,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
     final target = _sandboxDb != null ? 'sandbox' : 'sovereign';
     debugPrint(
       '[TelemetryBus] Wrote $target vault asset: $key ($mimeType) build=$hash'
@@ -423,15 +424,16 @@ class TelemetryBusService extends ChangeNotifier {
         .where((r) => !_isExpired(r['expires_at'] as String?))
         .map(_rowToVaultMap)
         .map((m) {
-      return {
-        'key': m['key']!,
-        'mime_type': m['mime_type']!,
-        'updated_at': m['updated_at']!,
-        'content_hash': m['content_hash']!,
-        'build_id': m['build_id']!,
-        'expires_at': m['expires_at'] ?? '',
-      };
-    }).toList();
+          return {
+            'key': m['key']!,
+            'mime_type': m['mime_type']!,
+            'updated_at': m['updated_at']!,
+            'content_hash': m['content_hash']!,
+            'build_id': m['build_id']!,
+            'expires_at': m['expires_at'] ?? '',
+          };
+        })
+        .toList();
   }
 
   Future<void> deleteVaultData(String key) async {
@@ -453,10 +455,7 @@ class TelemetryBusService extends ChangeNotifier {
       await deleteVaultData(key);
       return null;
     }
-    return _rowToVaultMap({
-      ...results.first,
-      'key': key,
-    });
+    return _rowToVaultMap({...results.first, 'key': key});
   }
 
   void _startPurgeFirewall() {
@@ -469,8 +468,9 @@ class TelemetryBusService extends ChangeNotifier {
 
   Future<void> purgeExpiredRecords() async {
     if (_db == null) return;
-    final expirationThreshold =
-        DateTime.now().subtract(ttlDuration).toIso8601String();
+    final expirationThreshold = DateTime.now()
+        .subtract(ttlDuration)
+        .toIso8601String();
 
     final count = await _db!.delete(
       'telemetry',
@@ -502,7 +502,9 @@ class TelemetryBusService extends ChangeNotifier {
   /// User-authored CSV dump of recent telemetry (ENG3 stretch — not a platform button).
   Future<String> exportTelemetryCsv({int limit = 500}) async {
     final rows = await getRecentRecords(limit);
-    final buf = StringBuffer('id,timestamp,latitude,longitude,accelerometerZ,compassDirection\n');
+    final buf = StringBuffer(
+      'id,timestamp,latitude,longitude,accelerometerZ,compassDirection\n',
+    );
     for (final r in rows) {
       buf.writeln(
         '${r.id},${r.timestamp.toIso8601String()},${r.latitude},${r.longitude},${r.accelerometerZ},${r.compassDirection}',
@@ -534,8 +536,9 @@ class TelemetryBusService extends ChangeNotifier {
 final telemetryBusProvider = Provider<TelemetryBusService>((ref) {
   final inTest = !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
   final bus = TelemetryBusService(
-    secretStore:
-        inTest ? MemorySecureSecretStore() : FlutterSecureSecretStore(),
+    secretStore: inTest
+        ? MemorySecureSecretStore()
+        : FlutterSecureSecretStore(),
     // Sealing in parallel unit tests races on the shared default DB path.
     enableVaultSeal: !inTest,
   );

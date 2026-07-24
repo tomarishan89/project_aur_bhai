@@ -7,16 +7,11 @@ class PublishToCircleResult {
   final String license;
   final BhaiCodeAccess access;
 
-  const PublishToCircleResult({
-    required this.license,
-    required this.access,
-  });
+  const PublishToCircleResult({required this.license, required this.access});
 }
 
 /// License + creator access checkboxes before publishing to Friend Circle.
-Future<PublishToCircleResult?> showPublishToCircleDialog(
-  BuildContext context,
-) {
+Future<PublishToCircleResult?> showPublishToCircleDialog(BuildContext context) {
   return showDialog<PublishToCircleResult>(
     context: context,
     builder: (ctx) => const _PublishToCircleDialog(),
@@ -36,10 +31,10 @@ class _PublishToCircleDialogState extends State<_PublishToCircleDialog> {
   bool _allowSandboxTest = true;
 
   BhaiCodeAccess get _access => BhaiCodeAccess(
-        shareModel: _shareModel,
-        allowDiligence: _allowDiligence,
-        allowSandboxTest: _allowSandboxTest,
-      );
+    shareModel: _shareModel,
+    allowDiligence: _allowDiligence,
+    allowSandboxTest: _allowSandboxTest,
+  );
 
   void _pickLicense(String license) {
     Navigator.pop(
@@ -84,8 +79,7 @@ class _PublishToCircleDialogState extends State<_PublishToCircleDialog> {
                 style: TextStyle(color: Colors.white, fontSize: 13),
               ),
               value: _allowDiligence,
-              onChanged: (v) =>
-                  setState(() => _allowDiligence = v ?? true),
+              onChanged: (v) => setState(() => _allowDiligence = v ?? true),
             ),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
@@ -96,8 +90,7 @@ class _PublishToCircleDialogState extends State<_PublishToCircleDialog> {
                 style: TextStyle(color: Colors.white, fontSize: 13),
               ),
               value: _allowSandboxTest,
-              onChanged: (v) =>
-                  setState(() => _allowSandboxTest = v ?? true),
+              onChanged: (v) => setState(() => _allowSandboxTest = v ?? true),
             ),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,

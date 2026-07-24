@@ -16,7 +16,8 @@ int _dbSeq = 0;
 TelemetryBusService _freshBus() {
   _dbSeq++;
   return TelemetryBusService(
-    databaseFileName: 'telemetry_iso_test_${_dbSeq}_${DateTime.now().microsecondsSinceEpoch}.db',
+    databaseFileName:
+        'telemetry_iso_test_${_dbSeq}_${DateTime.now().microsecondsSinceEpoch}.db',
   );
 }
 
@@ -28,40 +29,42 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   });
 
-  test('permission denied does not write Delhi (or any) sovereign fallback', () async {
-    final bus = _freshBus();
-    await bus.initialize();
+  test(
+    'permission denied does not write Delhi (or any) sovereign fallback',
+    () async {
+      final bus = _freshBus();
+      await bus.initialize();
 
-    final collector = TelemetryCollector(
-      bus: bus,
-      sampleInterval: const Duration(milliseconds: 50),
-      forceMobilePlatform: true,
-      requestLocationPermission: () async => false,
-      accelerometerEvents: () => const Stream.empty(),
-      readPosition: () async {
-        fail('readPosition must not run when denied');
-        return null;
-      },
-    );
+      final collector = TelemetryCollector(
+        bus: bus,
+        sampleInterval: const Duration(milliseconds: 50),
+        forceMobilePlatform: true,
+        requestLocationPermission: () async => false,
+        accelerometerEvents: () => const Stream.empty(),
+        readPosition: () async {
+          fail('readPosition must not run when denied');
+        },
+      );
 
-    await collector.start();
-    await Future<void>.delayed(const Duration(milliseconds: 120));
+      await collector.start();
+      await Future<void>.delayed(const Duration(milliseconds: 120));
 
-    expect(collector.isRunning, isFalse);
-    final rows = await bus.getRecentRecords(50);
-    expect(rows, isEmpty);
-    expect(
-      rows.any(
-        (r) =>
-            (r.latitude - _delhiLat).abs() < 0.01 &&
-            (r.longitude - _delhiLng).abs() < 0.01,
-      ),
-      isFalse,
-    );
+      expect(collector.isRunning, isFalse);
+      final rows = await bus.getRecentRecords(50);
+      expect(rows, isEmpty);
+      expect(
+        rows.any(
+          (r) =>
+              (r.latitude - _delhiLat).abs() < 0.01 &&
+              (r.longitude - _delhiLng).abs() < 0.01,
+        ),
+        isFalse,
+      );
 
-    await collector.stop();
-    bus.dispose();
-  });
+      await collector.stop();
+      bus.dispose();
+    },
+  );
 
   test('non-mobile platform skips collection without writing fakes', () async {
     final bus = _freshBus();
@@ -78,7 +81,6 @@ void main() {
       },
       readPosition: () async {
         fail('must not read position on desktop');
-        return null;
       },
     );
 
@@ -91,84 +93,88 @@ void main() {
     bus.dispose();
   });
 
-  test('granted path writes real coords via addRecord (sovereign only)', () async {
-    final bus = _freshBus();
-    await bus.initialize();
+  test(
+    'granted path writes real coords via addRecord (sovereign only)',
+    () async {
+      final bus = _freshBus();
+      await bus.initialize();
 
-    final collector = TelemetryCollector(
-      bus: bus,
-      sampleInterval: const Duration(hours: 1),
-      forceMobilePlatform: true,
-      requestLocationPermission: () async => true,
-      accelerometerEvents: () => Stream.value(
-        AccelerometerEvent(0, 0, 9.81, DateTime.now()),
-      ),
-      readPosition: () async => Position(
-        longitude: -122.4194,
-        latitude: 37.7749,
-        timestamp: DateTime.now(),
-        accuracy: 5,
-        altitude: 0,
-        altitudeAccuracy: 0,
-        heading: 45,
-        headingAccuracy: 0,
-        speed: 0,
-        speedAccuracy: 0,
-      ),
-    );
+      final collector = TelemetryCollector(
+        bus: bus,
+        sampleInterval: const Duration(hours: 1),
+        forceMobilePlatform: true,
+        requestLocationPermission: () async => true,
+        accelerometerEvents: () =>
+            Stream.value(AccelerometerEvent(0, 0, 9.81, DateTime.now())),
+        readPosition: () async => Position(
+          longitude: -122.4194,
+          latitude: 37.7749,
+          timestamp: DateTime.now(),
+          accuracy: 5,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 45,
+          headingAccuracy: 0,
+          speed: 0,
+          speedAccuracy: 0,
+        ),
+      );
 
-    await collector.start();
-    expect(collector.isRunning, isTrue);
+      await collector.start();
+      expect(collector.isRunning, isTrue);
 
-    final rows = await bus.getRecentRecords(5);
-    expect(rows, isNotEmpty);
-    expect(rows.first.latitude, closeTo(37.7749, 0.0001));
-    expect(rows.first.longitude, closeTo(-122.4194, 0.0001));
-    expect(
-      (rows.first.latitude - _delhiLat).abs() > 1.0,
-      isTrue,
-      reason: 'must not be Delhi fake',
-    );
+      final rows = await bus.getRecentRecords(5);
+      expect(rows, isNotEmpty);
+      expect(rows.first.latitude, closeTo(37.7749, 0.0001));
+      expect(rows.first.longitude, closeTo(-122.4194, 0.0001));
+      expect(
+        (rows.first.latitude - _delhiLat).abs() > 1.0,
+        isTrue,
+        reason: 'must not be Delhi fake',
+      );
 
-    await collector.stop();
-    bus.dispose();
-  });
+      await collector.stop();
+      bus.dispose();
+    },
+  );
 
-  test('sandbox seed is synthetic; sovereign count unchanged by sandbox SQL',
-      () async {
-    final bus = _freshBus();
-    await bus.initialize();
+  test(
+    'sandbox seed is synthetic; sovereign count unchanged by sandbox SQL',
+    () async {
+      final bus = _freshBus();
+      await bus.initialize();
 
-    await bus.addRecord(
-      latitude: 12.34,
-      longitude: 56.78,
-      accelerometerZ: 1.0,
-      compassDirection: 10.0,
-    );
-    final sovereignBefore = await bus.getRecentRecords(100);
-    expect(sovereignBefore.length, 1);
+      await bus.addRecord(
+        latitude: 12.34,
+        longitude: 56.78,
+        accelerometerZ: 1.0,
+        compassDirection: 10.0,
+      );
+      final sovereignBefore = await bus.getRecentRecords(100);
+      expect(sovereignBefore.length, 1);
 
-    await bus.openSandbox(reset: true);
-    final sandboxed = await bus.executeQuery(
-      'SELECT id, latitude, longitude FROM telemetry ORDER BY id LIMIT 50',
-    );
-    expect(sandboxed.length, 8);
-    expect(sandboxed.first['id'], 'sandbox-seed-0');
-    expect(sandboxed.first['latitude'] as double, closeTo(41.0, 0.01));
-    expect(
-      sandboxed.any((r) => (r['latitude'] as double) == 12.34),
-      isFalse,
-      reason: 'sandbox must not contain sovereign telemetry',
-    );
+      await bus.openSandbox(reset: true);
+      final sandboxed = await bus.executeQuery(
+        'SELECT id, latitude, longitude FROM telemetry ORDER BY id LIMIT 50',
+      );
+      expect(sandboxed.length, 8);
+      expect(sandboxed.first['id'], 'sandbox-seed-0');
+      expect(sandboxed.first['latitude'] as double, closeTo(41.0, 0.01));
+      expect(
+        sandboxed.any((r) => (r['latitude'] as double) == 12.34),
+        isFalse,
+        reason: 'sandbox must not contain sovereign telemetry',
+      );
 
-    await bus.closeSandbox();
+      await bus.closeSandbox();
 
-    final sovereignAfter = await bus.getRecentRecords(100);
-    expect(sovereignAfter.length, sovereignBefore.length);
-    expect(sovereignAfter.first.latitude, 12.34);
+      final sovereignAfter = await bus.getRecentRecords(100);
+      expect(sovereignAfter.length, sovereignBefore.length);
+      expect(sovereignAfter.first.latitude, 12.34);
 
-    bus.dispose();
-  });
+      bus.dispose();
+    },
+  );
 
   test('single-flight skips overlapping GPS reads', () async {
     final bus = _freshBus();
@@ -244,10 +250,11 @@ void main() {
     await bus.initialize();
     await bus.openSandbox(reset: true);
 
-    final sandboxCount = (await bus.executeQuery(
-      'SELECT COUNT(*) AS c FROM telemetry',
-    ))
-        .first['c'] as int;
+    final sandboxCount =
+        (await bus.executeQuery(
+              'SELECT COUNT(*) AS c FROM telemetry',
+            )).first['c']
+            as int;
 
     await bus.addRecord(
       latitude: 99.0,
@@ -256,10 +263,11 @@ void main() {
       compassDirection: 0.0,
     );
 
-    final sandboxAfter = (await bus.executeQuery(
-      'SELECT COUNT(*) AS c FROM telemetry',
-    ))
-        .first['c'] as int;
+    final sandboxAfter =
+        (await bus.executeQuery(
+              'SELECT COUNT(*) AS c FROM telemetry',
+            )).first['c']
+            as int;
     expect(sandboxAfter, sandboxCount);
 
     await bus.closeSandbox();

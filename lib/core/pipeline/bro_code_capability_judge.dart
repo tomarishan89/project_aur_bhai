@@ -16,7 +16,8 @@ import 'dart:convert';
 
 /// One side-effect captured during sandbox / dry-run execution.
 class BroCodeExecutionEvent {
-  final String kind; // writeVault | sendHTTP | log | querySQL | schedule | other
+  final String
+  kind; // writeVault | sendHTTP | log | querySQL | schedule | other
   final Map<String, dynamic> data;
   final String? summary;
 
@@ -27,10 +28,10 @@ class BroCodeExecutionEvent {
   });
 
   Map<String, dynamic> toJson() => {
-        'kind': kind,
-        'data': data,
-        if (summary != null) 'summary': summary,
-      };
+    'kind': kind,
+    'data': data,
+    if (summary != null) 'summary': summary,
+  };
 }
 
 /// Trace of sandbox side effects for capability judging.
@@ -49,10 +50,10 @@ class BroCodeExecutionTrace {
       events.where((e) => e.kind == kind).toList();
 
   Map<String, dynamic> toJson() => {
-        'ranOk': ranOk,
-        'returnMessage': returnMessage,
-        'events': events.map((e) => e.toJson()).toList(),
-      };
+    'ranOk': ranOk,
+    'returnMessage': returnMessage,
+    'events': events.map((e) => e.toJson()).toList(),
+  };
 }
 
 /// Outcome of comparing user intent to an execution trace.
@@ -95,7 +96,8 @@ class HeuristicBroCodeCapabilityJudge implements BroCodeCapabilityJudge {
       );
     }
     final req = changeRequest.toLowerCase();
-    final wantsUi = req.contains('dashboard') ||
+    final wantsUi =
+        req.contains('dashboard') ||
         req.contains('html') ||
         req.contains('map') ||
         req.contains('chart') ||
@@ -106,7 +108,9 @@ class HeuristicBroCodeCapabilityJudge implements BroCodeCapabilityJudge {
     final vaultHtml = trace.ofKind('writeVault').where((e) {
       final mime = (e.data['mimeType'] as String?)?.toLowerCase() ?? '';
       final key = (e.data['key'] as String?)?.toLowerCase() ?? '';
-      return mime.contains('html') || key.endsWith('.html') || key.endsWith('.htm');
+      return mime.contains('html') ||
+          key.endsWith('.html') ||
+          key.endsWith('.htm');
     }).toList();
 
     if (wantsUi && vaultHtml.isEmpty && publishedAssets.isEmpty) {
@@ -145,7 +149,7 @@ class LlmBroCodeCapabilityJudge implements BroCodeCapabilityJudge {
   final Future<String> Function(String prompt)? _complete;
 
   LlmBroCodeCapabilityJudge({Future<String> Function(String prompt)? complete})
-      : _complete = complete;
+    : _complete = complete;
 
   @override
   Future<BroCodeCapabilityJudgement> judge({
@@ -181,7 +185,8 @@ class LlmBroCodeCapabilityJudge implements BroCodeCapabilityJudge {
         })
         .join('\n---\n');
 
-    final prompt = '''
+    final prompt =
+        '''
 You are a Bro Code capability judge. Reply with ONLY JSON:
 {"ok":bool,"summary":string,"unmetExpectations":[string],"evidence":[string]}
 
@@ -198,7 +203,7 @@ Does the trace fulfill the ask? Be strict: no credit for unrelated side effects.
 ''';
 
     try {
-      final raw = await _complete!(prompt);
+      final raw = await _complete(prompt);
       final start = raw.indexOf('{');
       final end = raw.lastIndexOf('}');
       if (start < 0 || end <= start) {
@@ -208,17 +213,18 @@ Does the trace fulfill the ask? Be strict: no credit for unrelated side effects.
           publishedAssets: publishedAssets,
         );
       }
-      final json = jsonDecode(raw.substring(start, end + 1)) as Map<String, dynamic>;
+      final json =
+          jsonDecode(raw.substring(start, end + 1)) as Map<String, dynamic>;
       return BroCodeCapabilityJudgement(
         ok: json['ok'] == true,
         summary: json['summary']?.toString() ?? 'LLM judge',
-        unmetExpectations: (json['unmetExpectations'] as List?)
+        unmetExpectations:
+            (json['unmetExpectations'] as List?)
                 ?.map((e) => e.toString())
                 .toList() ??
             const [],
-        evidence: (json['evidence'] as List?)
-                ?.map((e) => e.toString())
-                .toList() ??
+        evidence:
+            (json['evidence'] as List?)?.map((e) => e.toString()).toList() ??
             const [],
       );
     } catch (_) {

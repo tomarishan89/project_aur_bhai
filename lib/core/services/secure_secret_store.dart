@@ -27,7 +27,7 @@ class MemorySecureSecretStore implements SecureSecretStore {
 
 class FlutterSecureSecretStore implements SecureSecretStore {
   FlutterSecureSecretStore({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? const FlutterSecureStorage();
 
   final FlutterSecureStorage _storage;
 

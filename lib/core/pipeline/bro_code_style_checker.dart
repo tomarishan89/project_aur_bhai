@@ -20,11 +20,11 @@ class BroCodeStyleFinding {
   });
 
   Map<String, dynamic> toJson() => {
-        'code': code,
-        'message': message,
-        if (line != null) 'line': line,
-        'severity': severity.name,
-      };
+    'code': code,
+    'message': message,
+    if (line != null) 'line': line,
+    'severity': severity.name,
+  };
 
   @override
   String toString() {
@@ -55,9 +55,8 @@ class BroCodeStyleResult {
   bool get ok =>
       findings.every((f) => f.severity != BroCodeStyleSeverity.error);
 
-  List<BroCodeStyleFinding> get blocking => findings
-      .where((f) => f.severity == BroCodeStyleSeverity.error)
-      .toList();
+  List<BroCodeStyleFinding> get blocking =>
+      findings.where((f) => f.severity == BroCodeStyleSeverity.error).toList();
 }
 
 /// Pure-Dart format + style checker for Bro Code JavaScript.
@@ -70,11 +69,13 @@ class BroCodeStyleChecker {
     var body = script;
 
     if (body.contains('\r\n') || body.contains('\r')) {
-      findings.add(const BroCodeStyleFinding(
-        code: 'CRLF',
-        message: 'Script uses CR/LF endings; normalize to LF.',
-        severity: BroCodeStyleSeverity.warning,
-      ));
+      findings.add(
+        const BroCodeStyleFinding(
+          code: 'CRLF',
+          message: 'Script uses CR/LF endings; normalize to LF.',
+          severity: BroCodeStyleSeverity.warning,
+        ),
+      );
       body = body.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
     }
 
@@ -84,12 +85,14 @@ class BroCodeStyleChecker {
       final line = lines[i];
       final trimmedRight = line.replaceFirst(RegExp(r'[ \t]+$'), '');
       if (trimmedRight != line) {
-        findings.add(BroCodeStyleFinding(
-          code: 'TRAILING_WS',
-          message: 'Trailing whitespace.',
-          line: i + 1,
-          severity: BroCodeStyleSeverity.warning,
-        ));
+        findings.add(
+          BroCodeStyleFinding(
+            code: 'TRAILING_WS',
+            message: 'Trailing whitespace.',
+            line: i + 1,
+            severity: BroCodeStyleSeverity.warning,
+          ),
+        );
       }
       stripped.add(trimmedRight);
     }
@@ -121,57 +124,71 @@ class BroCodeStyleChecker {
       final indent = RegExp(r'^([ \t]+)').firstMatch(line)?.group(1);
       if (indent == null) continue;
       if (indent.contains(' ') && indent.contains('\t')) {
-        findings.add(BroCodeStyleFinding(
-          code: 'MIXED_INDENT',
-          message: 'Line mixes tabs and spaces in indentation.',
-          line: i + 1,
-        ));
+        findings.add(
+          BroCodeStyleFinding(
+            code: 'MIXED_INDENT',
+            message: 'Line mixes tabs and spaces in indentation.',
+            line: i + 1,
+          ),
+        );
       }
       if (indent.contains(' ')) hasSpacesIndent = true;
       if (indent.contains('\t')) hasTabsIndent = true;
     }
     if (hasSpacesIndent && hasTabsIndent) {
-      findings.add(const BroCodeStyleFinding(
-        code: 'MIXED_INDENT',
-        message:
-            'Script mixes tab-indented and space-indented lines outside HTML templates.',
-      ));
+      findings.add(
+        const BroCodeStyleFinding(
+          code: 'MIXED_INDENT',
+          message:
+              'Script mixes tab-indented and space-indented lines outside HTML templates.',
+        ),
+      );
     }
 
     for (var i = 0; i < lines.length; i++) {
       if (lines[i].length > maxLineLength) {
-        findings.add(BroCodeStyleFinding(
-          code: 'LINE_LENGTH',
-          message: 'Line exceeds $maxLineLength characters (${lines[i].length}).',
-          line: i + 1,
-          severity: BroCodeStyleSeverity.warning,
-        ));
+        findings.add(
+          BroCodeStyleFinding(
+            code: 'LINE_LENGTH',
+            message:
+                'Line exceeds $maxLineLength characters (${lines[i].length}).',
+            line: i + 1,
+            severity: BroCodeStyleSeverity.warning,
+          ),
+        );
       }
     }
 
-    final executeMatches =
-        RegExp(r'\basync\s+function\s+execute\s*\(').allMatches(sandbox).length;
+    final executeMatches = RegExp(
+      r'\basync\s+function\s+execute\s*\(',
+    ).allMatches(sandbox).length;
     if (executeMatches == 0) {
-      findings.add(const BroCodeStyleFinding(
-        code: 'MISSING_EXECUTE',
-        message: 'Missing `async function execute(...)` entry point.',
-      ));
+      findings.add(
+        const BroCodeStyleFinding(
+          code: 'MISSING_EXECUTE',
+          message: 'Missing `async function execute(...)` entry point.',
+        ),
+      );
     } else if (executeMatches > 1) {
-      findings.add(BroCodeStyleFinding(
-        code: 'DUPLICATE_EXECUTE',
-        message:
-            'Found $executeMatches `async function execute` declarations; expected one.',
-      ));
+      findings.add(
+        BroCodeStyleFinding(
+          code: 'DUPLICATE_EXECUTE',
+          message:
+              'Found $executeMatches `async function execute` declarations; expected one.',
+        ),
+      );
     }
 
     final consoleLog = RegExp(r'\bconsole\.log\s*\(');
     for (final m in consoleLog.allMatches(sandbox)) {
-      findings.add(BroCodeStyleFinding(
-        code: 'CONSOLE_LOG',
-        message:
-            'console.log outside HTML templates — use System.log in the QuickJS sandbox.',
-        line: _lineOfOffset(sandbox, m.start),
-      ));
+      findings.add(
+        BroCodeStyleFinding(
+          code: 'CONSOLE_LOG',
+          message:
+              'console.log outside HTML templates — use System.log in the QuickJS sandbox.',
+          line: _lineOfOffset(sandbox, m.start),
+        ),
+      );
     }
 
     return BroCodeStyleResult(findings: findings);
@@ -223,7 +240,8 @@ class BroCodeStyleChecker {
       out.write(htmlDocuments.substring(cursor, start));
       final template = htmlDocuments.substring(start, end + 1);
       final lower = template.toLowerCase();
-      final isHtml = lower.contains('<!doctype') ||
+      final isHtml =
+          lower.contains('<!doctype') ||
           lower.contains('<html') ||
           lower.contains('<head') ||
           lower.contains('<body') ||

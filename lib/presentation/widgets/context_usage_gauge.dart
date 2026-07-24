@@ -22,9 +22,11 @@ class ContextUsageGauge extends StatelessWidget {
 
   String get _label {
     String fmt(int t) {
-      if (t >= 1000) return '${(t / 1000).toStringAsFixed(t >= 10000 ? 0 : 1)}K';
+      if (t >= 1000)
+        return '${(t / 1000).toStringAsFixed(t >= 10000 ? 0 : 1)}K';
       return '$t';
     }
+
     return '${fmt(usedTokens)} / ${fmt(budgetTokens)}';
   }
 
@@ -69,7 +71,7 @@ class _ContextRingPainter extends CustomPainter {
     canvas.drawCircle(center, radius, bg);
 
     final fg = Paint()
-      ..color = Color.lerp(Colors.white38, Colors.white, ratio)! 
+      ..color = Color.lerp(Colors.white38, Colors.white, ratio)!
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round;

@@ -6,10 +6,7 @@ class SqlQueryGuard {
   SqlQueryGuard._();
 
   static const int defaultMaxRows = 500;
-  static const Set<String> allowedTables = {
-    'telemetry',
-    'sovereign_vault',
-  };
+  static const Set<String> allowedTables = {'telemetry', 'sovereign_vault'};
 
   static const _forbiddenKeywords = [
     'INSERT',
@@ -38,8 +35,7 @@ class SqlQueryGuard {
     final upper = trimmed.toUpperCase();
 
     // Allow a single trailing semicolon; reject any other ';'.
-    final withoutTrailingSemi =
-        trimmed.replaceFirst(RegExp(r';\s*$'), '');
+    final withoutTrailingSemi = trimmed.replaceFirst(RegExp(r';\s*$'), '');
     if (withoutTrailingSemi.contains(';')) {
       throw const SqlQueryRejected('Multi-statement SQL is not allowed');
     }
@@ -74,8 +70,10 @@ class SqlQueryGuard {
       );
     }
 
-    final limitMatch =
-        RegExp(r'\bLIMIT\s+(\d+)', caseSensitive: false).firstMatch(trimmed);
+    final limitMatch = RegExp(
+      r'\bLIMIT\s+(\d+)',
+      caseSensitive: false,
+    ).firstMatch(trimmed);
     if (limitMatch != null) {
       final n = int.tryParse(limitMatch.group(1) ?? '') ?? 0;
       if (n > maxRows) {

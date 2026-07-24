@@ -41,8 +41,9 @@ class _CircleMarketplaceTabState extends ConsumerState<CircleMarketplaceTab> {
         }
         if (snap.hasError) {
           final err = '${snap.error}';
-          final notConfigured =
-              err.contains(CircleRegistryService.notConfiguredSentinel);
+          final notConfigured = err.contains(
+            CircleRegistryService.notConfiguredSentinel,
+          );
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -101,18 +102,23 @@ class _CircleMarketplaceTabState extends ConsumerState<CircleMarketplaceTab> {
               return Card(
                 color: const Color(0xFF1A1A1A),
                 child: ListTile(
-                  leading: const Icon(Icons.groups_outlined,
-                      color: Colors.greenAccent),
-                  title: Text(l.name,
-                      style: const TextStyle(color: Colors.white)),
+                  leading: const Icon(
+                    Icons.groups_outlined,
+                    color: Colors.greenAccent,
+                  ),
+                  title: Text(
+                    l.name,
+                    style: const TextStyle(color: Colors.white),
+                  ),
                   subtitle: Text(
                     '${l.description}\n${l.license} · ${l.revisionId} · ${l.author}',
-                    style:
-                        const TextStyle(color: Colors.white54, fontSize: 11),
+                    style: const TextStyle(color: Colors.white54, fontSize: 11),
                   ),
                   isThreeLine: true,
-                  trailing: const Icon(Icons.chevron_right,
-                      color: Colors.white38),
+                  trailing: const Icon(
+                    Icons.chevron_right,
+                    color: Colors.white38,
+                  ),
                   onTap: () => BhaiCodePreviewSheet.open(
                     context,
                     listing: l.toMarketplaceListing(),

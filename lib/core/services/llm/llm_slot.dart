@@ -41,20 +41,19 @@ class ByokSlotConfig {
     String? apiKey,
     String? modelName,
     String? customUrl,
-  }) =>
-      ByokSlotConfig(
-        provider: provider ?? this.provider,
-        apiKey: apiKey ?? this.apiKey,
-        modelName: modelName ?? this.modelName,
-        customUrl: customUrl ?? this.customUrl,
-      );
+  }) => ByokSlotConfig(
+    provider: provider ?? this.provider,
+    apiKey: apiKey ?? this.apiKey,
+    modelName: modelName ?? this.modelName,
+    customUrl: customUrl ?? this.customUrl,
+  );
 
   Map<String, dynamic> toJson() => {
-        'provider': provider,
-        'apiKey': apiKey,
-        'modelName': modelName,
-        'customUrl': customUrl,
-      };
+    'provider': provider,
+    'apiKey': apiKey,
+    'modelName': modelName,
+    'customUrl': customUrl,
+  };
 
   factory ByokSlotConfig.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const ByokSlotConfig();

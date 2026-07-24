@@ -19,11 +19,12 @@ Future<void> main(List<String> args) async {
   var path = _flag(args, '--path');
   final issue = _flag(args, '--issue');
   if (path == null && issue != null) {
-    final r = await Process.run(
-      'dart',
-      ['run', 'tool/fetch_issue_fixture.dart', '--issue', issue],
-      runInShell: true,
-    );
+    final r = await Process.run('dart', [
+      'run',
+      'tool/fetch_issue_fixture.dart',
+      '--issue',
+      issue,
+    ], runInShell: true);
     stdout.write(r.stdout);
     stderr.write(r.stderr);
     if (r.exitCode != 0) exit(r.exitCode);
@@ -63,7 +64,9 @@ Future<void> main(List<String> args) async {
     'session': bundle['session'],
     'note': 'Do not Publish unless intentional.',
   };
-  queueFile.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(payload));
+  queueFile.writeAsStringSync(
+    const JsonEncoder.withIndent('  ').convert(payload),
+  );
   stdout.writeln('Queued install → ${queueFile.path}');
   stdout.writeln('Agent will register as $installName (C4) on next app start.');
   stdout.writeln('Locked source: $path');

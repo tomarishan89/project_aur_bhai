@@ -11,7 +11,10 @@ void main() {
 
   group('BroCodeFixtureCapture', () {
     test('safeStem sanitizes names', () {
-      expect(BroCodeFixtureCapture.safeStem('Locator Dashboard'), 'locator_dashboard');
+      expect(
+        BroCodeFixtureCapture.safeStem('Locator Dashboard'),
+        'locator_dashboard',
+      );
       expect(BroCodeFixtureCapture.safeStem(''), 'bro_code');
     });
 
@@ -22,37 +25,40 @@ void main() {
       expect(dir.path, contains('bro_code'));
     });
 
-    test('writeBundle writes loadable *.bundle.json under overrideDir', () async {
-      final tmp = await Directory.systemTemp.createTemp('bro_capture_');
-      addTearDown(() => tmp.delete(recursive: true));
+    test(
+      'writeBundle writes loadable *.bundle.json under overrideDir',
+      () async {
+        final tmp = await Directory.systemTemp.createTemp('bro_capture_');
+        addTearDown(() => tmp.delete(recursive: true));
 
-      final report = BroCodeFixtureReport(
-        exportedAt: DateTime.now(),
-        appVersion: 'test',
-        workspace: BroCodeWorkspace(
-          name: 'DemoCapture',
-          description: 'd',
-          inputSchema: const {},
-          script: 'async function execute(params) { return "x"; }\n',
-        ),
-        changeRequest: 'fix me',
-        failureMessage: 'not verified',
-        expectSyntaxOk: false,
-        expectSandboxOk: false,
-      );
+        final report = BroCodeFixtureReport(
+          exportedAt: DateTime.now(),
+          appVersion: 'test',
+          workspace: BroCodeWorkspace(
+            name: 'DemoCapture',
+            description: 'd',
+            inputSchema: const {},
+            script: 'async function execute(params) { return "x"; }\n',
+          ),
+          changeRequest: 'fix me',
+          failureMessage: 'not verified',
+          expectSyntaxOk: false,
+          expectSandboxOk: false,
+        );
 
-      final result = await BroCodeFixtureCapture.writeBundle(
-        report,
-        overrideDir: tmp,
-      );
-      expect(result.bundleFileName, contains('democapture'));
-      expect(result.bundleFileName, endsWith('.bundle.json'));
-      final file = File(result.path);
-      expect(file.existsSync(), isTrue);
-      final body = file.readAsStringSync();
-      expect(body, contains('"name": "DemoCapture"'));
-      expect(body, contains('dev-capture'));
-    });
+        final result = await BroCodeFixtureCapture.writeBundle(
+          report,
+          overrideDir: tmp,
+        );
+        expect(result.bundleFileName, contains('democapture'));
+        expect(result.bundleFileName, endsWith('.bundle.json'));
+        final file = File(result.path);
+        expect(file.existsSync(), isTrue);
+        final body = file.readAsStringSync();
+        expect(body, contains('"name": "DemoCapture"'));
+        expect(body, contains('dev-capture'));
+      },
+    );
   });
 
   group('BroCodeSnapshotStore', () {

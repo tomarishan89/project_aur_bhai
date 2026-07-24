@@ -31,9 +31,7 @@ class BroCodePlatformIntegrity {
   /// Asset ids referenced via `System.assets['id']` / `System.assets["id"]`.
   static Set<String> referencedAssetIds(String script) {
     final ids = <String>{};
-    final re = RegExp(
-      r'''System\.assets\s*\[\s*(['"])([^'"]+)\1\s*\]''',
-    );
+    final re = RegExp(r'''System\.assets\s*\[\s*(['"])([^'"]+)\1\s*\]''');
     for (final m in re.allMatches(script)) {
       ids.add(m.group(2)!);
     }
@@ -61,12 +59,14 @@ class BroCodePlatformIntegrity {
     for (final entry in assets.entries) {
       final key = entry.key;
       final kl = key.toLowerCase();
-      final isHtml = kl.endsWith('.html') ||
+      final isHtml =
+          kl.endsWith('.html') ||
           kl.endsWith('.htm') ||
           entry.value.trimLeft().toLowerCase().startsWith('<!doctype') ||
           entry.value.trimLeft().toLowerCase().startsWith('<html');
       final isManifest = kl.contains('manifest') || kl.endsWith('.webmanifest');
-      final isSw = kl.endsWith('.sw.js') ||
+      final isSw =
+          kl.endsWith('.sw.js') ||
           kl.contains('service-worker') ||
           kl.contains('serviceworker');
       if (!isHtml && !isManifest && !isSw) continue;
@@ -146,17 +146,12 @@ class BroCodePlatformIntegrity {
     final halfThin = isHalfThinScript(script);
 
     // Orphan HTML assets are always a platform wiring failure when present.
-    final htmlOrphans = orphans
-        .where((k) {
-          final kl = k.toLowerCase();
-          return kl.endsWith('.html') ||
-              kl.endsWith('.htm') ||
-              (assets[k] ?? '')
-                  .trimLeft()
-                  .toLowerCase()
-                  .startsWith('<!doctype');
-        })
-        .toList();
+    final htmlOrphans = orphans.where((k) {
+      final kl = k.toLowerCase();
+      return kl.endsWith('.html') ||
+          kl.endsWith('.htm') ||
+          (assets[k] ?? '').trimLeft().toLowerCase().startsWith('<!doctype');
+    }).toList();
 
     if (htmlOrphans.isNotEmpty) {
       findings.add(
@@ -188,7 +183,8 @@ class BroCodePlatformIntegrity {
       suggested = htmlOrphans.first;
     } else {
       for (final k in assets.keys) {
-        if (k.toLowerCase().endsWith('.html') || k.toLowerCase().endsWith('.htm')) {
+        if (k.toLowerCase().endsWith('.html') ||
+            k.toLowerCase().endsWith('.htm')) {
           suggested = k;
           break;
         }

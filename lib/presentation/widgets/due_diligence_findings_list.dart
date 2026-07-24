@@ -16,8 +16,9 @@ class DueDiligenceFindingsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final policy = scan.findings.where((f) => f.category == 'policy').toList();
-    final blocking =
-        policy.where((f) => f.severity == 'blocking' && !f.likelyFalsePositive);
+    final blocking = policy.where(
+      (f) => f.severity == 'blocking' && !f.likelyFalsePositive,
+    );
     final warnings = policy.where(
       (f) => f.severity != 'blocking' || f.likelyFalsePositive,
     );

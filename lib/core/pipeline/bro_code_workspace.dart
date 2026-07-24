@@ -15,12 +15,12 @@ class BroCodeWorkspace {
   }) : assets = Map<String, String>.from(assets ?? const {});
 
   BroCodeWorkspace copy() => BroCodeWorkspace(
-        name: name,
-        description: description,
-        inputSchema: Map<String, dynamic>.from(inputSchema),
-        script: script,
-        assets: Map<String, String>.from(assets),
-      );
+    name: name,
+    description: description,
+    inputSchema: Map<String, dynamic>.from(inputSchema),
+    script: script,
+    assets: Map<String, String>.from(assets),
+  );
 
   int get scriptCharCount => script.length;
 

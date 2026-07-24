@@ -42,7 +42,10 @@ class OpenAiProvider extends LlmProvider {
 
   String get _transcriptionsUrl {
     if (isCustom && config.customUrl.isNotEmpty) {
-      return config.customUrl.replaceAll('/chat/completions', '/audio/transcriptions');
+      return config.customUrl.replaceAll(
+        '/chat/completions',
+        '/audio/transcriptions',
+      );
     }
     return 'https://api.openai.com/v1/audio/transcriptions';
   }
@@ -62,21 +65,23 @@ class OpenAiProvider extends LlmProvider {
     int maxTokens = 4000,
   }) async {
     final url = Uri.parse(_chatCompletionsUrl);
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${config.apiKey}',
-      },
-      body: jsonEncode({
-        'model': config.model,
-        'messages': [
-          {'role': 'user', 'content': prompt},
-        ],
-        'max_tokens': maxTokens,
-        if (jsonMode) 'response_format': {'type': 'json_object'},
-      }),
-    ).timeout(timeout);
+    final response = await http
+        .post(
+          url,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${config.apiKey}',
+          },
+          body: jsonEncode({
+            'model': config.model,
+            'messages': [
+              {'role': 'user', 'content': prompt},
+            ],
+            'max_tokens': maxTokens,
+            if (jsonMode) 'response_format': {'type': 'json_object'},
+          }),
+        )
+        .timeout(timeout);
 
     if (response.statusCode != 200) {
       throw Exception('OpenAI status ${response.statusCode}');
@@ -112,19 +117,21 @@ class OpenAiProvider extends LlmProvider {
     Duration timeout = const Duration(seconds: 20),
   }) async {
     final uri = Uri.parse(_speechUrl);
-    final response = await http.post(
-      uri,
-      headers: {
-        'Authorization': 'Bearer ${config.apiKey}',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'model': 'tts-1',
-        'input': text,
-        'voice': voice,
-        'response_format': 'aac',
-      }),
-    ).timeout(timeout);
+    final response = await http
+        .post(
+          uri,
+          headers: {
+            'Authorization': 'Bearer ${config.apiKey}',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'model': 'tts-1',
+            'input': text,
+            'voice': voice,
+            'response_format': 'aac',
+          }),
+        )
+        .timeout(timeout);
 
     if (response.statusCode != 200) {
       throw Exception('OpenAI TTS status ${response.statusCode}');

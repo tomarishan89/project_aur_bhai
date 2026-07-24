@@ -31,10 +31,7 @@ void main() {
 
     final n = await feed.consume('Accountant');
     expect(n, 2);
-    expect(
-      await feed.readInbox('Accountant', unreadOnly: true),
-      isEmpty,
-    );
+    expect(await feed.readInbox('Accountant', unreadOnly: true), isEmpty);
   });
 
   test('marketplace pickup installs at C4', () async {
@@ -43,8 +40,9 @@ void main() {
     await container.read(telemetryBusProvider).initialize();
     final catalog = container.read(marketplaceCatalogProvider);
     final registry = container.read(jsAgentRegistryProvider);
-    final listing =
-        catalog.listings().firstWhere((l) => l.name == 'HelloCounter');
+    final listing = catalog.listings().firstWhere(
+      (l) => l.name == 'HelloCounter',
+    );
     // Shared FFI DB may already contain a prior pickup — make the test idempotent.
     await registry.deleteAgent('HelloCounter');
     expect(await catalog.pickup(listing), isTrue);
