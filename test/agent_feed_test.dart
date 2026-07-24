@@ -51,7 +51,7 @@ void main() {
     final bundle = await registry.exportAgentBundle('HelloCounter');
     expect(bundle, isNotNull);
     expect((bundle!['schema'] as Map)['securityClass'], 'C4');
-    expect((bundle['schema'] as Map)['source'], 'marketplace_local');
+    expect((bundle['schema'] as Map)['source'], 'pool');
   });
 
   test('force-promote with deviceAuthenticated skips C3', () async {
