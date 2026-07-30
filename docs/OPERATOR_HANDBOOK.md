@@ -100,7 +100,48 @@ Do **not** put LLM API keys in the friend APK workflow unless you later implemen
 
 ---
 
-## 2. (Append next process here)
+## 2. Bluetooth wake / handshake smoke test
+
+**Goal:** Verify wake + tap/hold acks on a Bluetooth headset (primary test surface).
+
+**When to use:** After installing a build that includes WAKE & HANDSHAKE settings.
+
+### 2.1 Settings checklist (on phone)
+
+1. Connect the Bluetooth headset; confirm Command Center shows **Bluetooth**.
+2. Settings → **WAKE & HANDSHAKE**:
+   - **Listen:** Always-on (for wake word) or On-demand (UI / media controls only)
+   - **Wake word library:** default **Hey Mycroft** (bundled, free openWakeWord). Optional: Download **Hey Rhasspy**, set **Use**, or **Delete** dormant downloads to free space.
+   - No Picovoice AccessKey (Porcupine deferred until scale).
+   - **Tap ack:** Spoken (Response word e.g. Haan bhai) / Sound / Silent
+   - **Hold ack:** Haptic / Beep / Silent (never spoken)
+   - **Media controls → Aur Bhai** (Android): on = buds/car Play-Pause-Next → handshake
+3. Save credentials / behavior.
+4. Optional: set Command Center **Default** Mere Bhai for short prompts without “Ask …”.
+
+### 2.2 Always-on path
+
+1. Keep the wake notification visible (“Listening for wake word…”).
+2. Say the **active** wake phrase (e.g. “Hey Mycroft”) → Command Center may flash **Heard:** → wait for tap ack → speak command.
+3. With Spotify/YouTube playing: music should duck/pause during the turn, then resume.
+4. During a phone call: handshake should refuse (busy message).
+
+### 2.3 On-demand / headset buttons
+
+1. Set Listen = On-demand (openWakeWord stopped — battery).
+2. With **Media controls → Aur Bhai** on: headset **short press** → same as mic tap.
+3. Headset **long press** → hold ack then record until release (only if the device sends media keys; ANC long-press on some buds never reaches apps).
+4. OEM bike kits / car wheels use the same media-control path on Android.
+
+### 2.4 Extra free wake models
+
+1. Settings → Wake word library → **Download** (needs network once).
+2. **Use** to make it active (only one active; others stay dormant on disk).
+3. **Delete** a dormant download to reclaim space (cannot delete bundled Hey Mycroft or the active model).
+
+---
+
+## 3. (Append next process here)
 
 **Template for new sections**
 
@@ -123,7 +164,7 @@ Do **not** put LLM API keys in the friend APK workflow unless you later implemen
 Notes: …
 ```
 
-Suggested future sections (not written yet):
+Suggested future sections:
 
 - Circle repo check / ensure (`friend_share_ops.dart --check` / `--ensure-repo`)
 - Pull Bro Code fixture from device

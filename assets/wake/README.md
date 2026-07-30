@@ -1,9 +1,7 @@
-# Custom wake keyword (S16)
+﻿# openWakeWord ONNX (Apache-2.0)
 
-Place a Picovoice Porcupine keyword file named `aur_bhai.ppn` here **or** under
-the app documents directory at `wake/aur_bhai.ppn`.
+Bundled from https://github.com/dscripka/openWakeWord/releases/tag/v0.5.1
+- melspectrogram.onnx, embedding_model.onnx (shared)
+- hey_mycroft_v0.1.onnx (default wake)
 
-Until that file exists, wake listen uses the interim built-in **Jarvis**.
-
-After adding `assets/wake/aur_bhai.ppn`, declare it under `flutter: assets:` in
-`pubspec.yaml` and rebuild.
+Optional models (e.g. hey_rhasspy) download at runtime into app documents.

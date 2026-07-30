@@ -15,6 +15,7 @@ import '../../core/services/agent_service.dart';
 import '../../core/agents/agent_base.dart';
 import '../../core/agents/js_agent_adapter.dart';
 import '../../core/services/llm_service.dart';
+import '../../core/services/llm/llm_capability_catalog.dart';
 import '../../core/services/llm/llm_provider.dart';
 import '../../core/services/llm/llm_provider_factory.dart';
 import '../../core/services/local_server_service.dart';
@@ -38,16 +39,22 @@ import '../../core/pipeline/context_estimate.dart';
 import '../widgets/context_usage_gauge.dart';
 import '../widgets/due_diligence_findings_list.dart';
 import '../widgets/ambient_capture_panel.dart';
+import '../widgets/llm_capability_knobs.dart';
+import '../widgets/llm_model_picker.dart';
+import '../widgets/llm_provider_capability_notice.dart';
 import '../widgets/llm_slot_editors.dart';
 import '../widgets/circle_marketplace_tab.dart';
 import '../widgets/bhai_code_preview_sheet.dart';
 import '../widgets/sandbox_queue_tab.dart';
 import '../widgets/publish_to_circle_dialog.dart';
 import '../../core/config/app_config.dart';
+import '../../core/config/wake_handshake_config.dart';
 import '../../core/services/wake_word_service.dart';
 import '../../core/services/bro_call_service.dart';
 import '../../core/services/circle_registry_service.dart';
 import '../../core/services/bhai_code_origin.dart';
+import '../../core/services/default_mere_bhai.dart';
+import '../../core/services/headset_media_keys.dart';
 import '../../core/services/issue_report_service.dart';
 import 'package:flutter_riverpod/legacy.dart' show ChangeNotifierProvider;
 import 'package:url_launcher/url_launcher.dart';
@@ -374,6 +381,7 @@ class _AmbientHubScreenState extends ConsumerState<AmbientHubScreen>
     with WidgetsBindingObserver {
   final PageController _pageController = PageController(initialPage: 1);
   TelemetryCollector? _collector;
+  HeadsetMediaKeys? _headsetKeys;
 
   @override
   void initState() {
@@ -385,20 +393,40 @@ class _AmbientHubScreenState extends ConsumerState<AmbientHubScreen>
       _collector = ref.read(telemetryCollectorProvider);
       unawaited(_collector!.start());
       final wake = ref.read(wakeWordServiceProvider);
+      final engine = ref.read(voiceHandshakeProvider);
       wake.onWakeDetected = () {
-        final engine = ref.read(voiceHandshakeProvider);
         unawaited(engine.onMicSingleTap());
       };
+      engine.onLoudPlaybackStarting = () {
+        final w = ref.read(wakeWordServiceProvider);
+        return w.yieldMicForLoudPlayback();
+      };
+      void resumeWakeIfIdle() {
+        final w = ref.read(wakeWordServiceProvider);
+        final eng = ref.read(voiceHandshakeProvider);
+        if (eng.state == VoiceState.idle &&
+            w.isAlwaysOn &&
+            w.listenEnabled &&
+            w.privacyAcknowledged) {
+          unawaited(w.startListening());
+        }
+      }
+      engine.onReturnedToIdle = resumeWakeIfIdle;
+      engine.onLoudPlaybackFinished = resumeWakeIfIdle;
+      _ensureHeadsetKeys();
+      _syncHeadsetCapture(
+        ref.read(byokServiceProvider).mediaControlsToAurBhai,
+      );
       final calls = ref.read(broCallServiceProvider);
       calls.onDeliverPayload = (call) {
-        final engine = ref.read(voiceHandshakeProvider);
+        final eng = ref.read(voiceHandshakeProvider);
         unawaited(
-          engine.speak(call.speakText.isEmpty ? call.body : call.speakText),
+          eng.speak(call.speakText.isEmpty ? call.body : call.speakText),
         );
       };
       calls.onCallQueued = (call) {
-        final engine = ref.read(voiceHandshakeProvider);
-        unawaited(engine.speak(AppConfig.broCallCuePhrase));
+        final eng = ref.read(voiceHandshakeProvider);
+        unawaited(eng.speak(AppConfig.broCallCuePhrase));
       };
       unawaited(ref.read(issueReportServiceProvider).load());
     });
@@ -415,13 +443,36 @@ class _AmbientHubScreenState extends ConsumerState<AmbientHubScreen>
       unawaited(c.resume());
       unawaited(ref.read(issueReportServiceProvider).refreshStatuses());
       final wake = ref.read(wakeWordServiceProvider);
-      if (wake.listenEnabled) unawaited(wake.startListening());
+      if (wake.isAlwaysOn && wake.listenEnabled) {
+        unawaited(wake.startListening());
+      }
+    }
+  }
+
+  void _ensureHeadsetKeys() {
+    if (_headsetKeys != null) return;
+    final engine = ref.read(voiceHandshakeProvider);
+    _headsetKeys = HeadsetMediaKeys(
+      onShortPress: () => unawaited(engine.onMicSingleTap()),
+      onLongPressStart: () => unawaited(engine.onMicHoldStart()),
+      onLongPressEnd: () => unawaited(engine.onMicHoldEnd()),
+      onCancel: () => unawaited(engine.onMicDoubleTap()),
+    );
+  }
+
+  void _syncHeadsetCapture(bool enabled) {
+    _ensureHeadsetKeys();
+    if (enabled) {
+      _headsetKeys!.attach();
+    } else {
+      _headsetKeys!.detach();
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _headsetKeys?.detach();
     // Do not ref.read after unmount — widget_test dispose crash.
     unawaited(_collector?.stop() ?? Future<void>.value());
     _pageController.dispose();
@@ -430,6 +481,13 @@ class _AmbientHubScreenState extends ConsumerState<AmbientHubScreen>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<bool>(
+      byokServiceProvider.select((b) => b.mediaControlsToAurBhai),
+      (prev, next) {
+        if (prev == next) return;
+        _syncHeadsetCapture(next);
+      },
+    );
     return _PromotionDialogHost(
       child: Scaffold(
         backgroundColor: Colors.black,
@@ -524,9 +582,6 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage>
   final _simulatorCtrl = TextEditingController();
   bool _simulatorBusy = false;
 
-  /// Optional Mere Bhai target for text send (`null` = Any / auto).
-  String? _textTargetBhai;
-
   @override
   void initState() {
     super.initState();
@@ -547,27 +602,148 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage>
     super.dispose();
   }
 
-  String _audioCueLabel(String source) {
-    final s = source.toLowerCase();
-    if (s.contains('bluetooth')) return 'Bluetooth';
-    if (s.contains('headset') || s.contains('headphones')) return 'Headset';
-    return 'Mic ready';
+  /// Ultra-short bar label (device name lives in the tap explanation).
+  String _wakeMicBarLabel(WakeWordService wake) {
+    if (wake.isHandingOff || wake.inputRouteKind == 'handoff') return 'Cmd';
+    if (!wake.isListening) return 'Off';
+    switch (wake.inputRouteKind) {
+      case 'bluetooth':
+        return 'BT';
+      case 'wired':
+        return 'Wire';
+      case 'phone':
+        return 'Phone';
+      default:
+        return 'Mic';
+    }
+  }
+
+  IconData _wakeMicIcon(WakeWordService wake) {
+    if (wake.isHandingOff || wake.inputRouteKind == 'handoff') {
+      return Icons.record_voice_over;
+    }
+    if (!wake.isListening) return Icons.mic_off;
+    switch (wake.inputRouteKind) {
+      case 'bluetooth':
+        return Icons.bluetooth_audio;
+      case 'wired':
+        return Icons.headphones;
+      case 'phone':
+        return Icons.phone_android;
+      default:
+        return Icons.mic;
+    }
+  }
+
+  String _wakeMatchBarLabel(WakeWordService wake) {
+    // Activate outruns the live meter (logs: 2% → 100% hit → "Heard" in <400ms).
+    if (wake.heardWakeRecently()) {
+      final pct = wake.lastWakeMatchPercent;
+      return pct > 0 ? 'Heard·$pct%' : 'Heard';
+    }
+    if (!wake.isListening) {
+      return wake.isHandingOff ? 'Cmd' : '—';
+    }
+    final pct = (wake.liveMatch * 100).clamp(0, 100).round();
+    // Second part is mic loudness (not match). mute/low/ok/loud.
+    final lvl = switch (wake.levelCue) {
+      'silent' => 'mute',
+      'low' => 'low',
+      'loud' => 'loud',
+      _ => 'ok',
+    };
+    return '$pct%·$lvl';
+  }
+
+  String _wakeMicExplain(WakeWordService wake) {
+    if (wake.isHandingOff) {
+      return 'Wake mic paused so the command turn can use the mic.';
+    }
+    if (!wake.isListening) {
+      return 'Wake listen is off. Set Listen to Always-on in Settings.';
+    }
+    return 'Wake is listening on ${wake.inputRouteLabel}.';
+  }
+
+  String _wakeMatchExplain(WakeWordService wake) {
+    if (wake.heardWakeRecently()) {
+      final pct = wake.lastWakeMatchPercent;
+      return 'Heard “${wake.lastWakeLabel ?? wake.activePhraseLabel}”'
+          '${pct > 0 ? ' at $pct%' : ''}. Say your command now.';
+    }
+    if (!wake.isListening) {
+      return 'No live wake match while listen is off.';
+    }
+    final pct = (wake.liveMatch * 100).clamp(0, 100).round();
+    final need = wake.matchThresholdPercent;
+    final level = switch (wake.levelCue) {
+      'silent' => 'no audio from this mic (buds may be silent / SCO idle)',
+      'low' => 'quiet — speak closer or louder',
+      'loud' => 'mic input is very loud (clipping risk)',
+      _ => 'level looks ok',
+    };
+    return 'Wake match $pct% (trigger at ≥$need%) for “${wake.activePhraseLabel}”. '
+        'Mic level: $level. Match jumps when the phrase completes — it is not a '
+        'smooth 0→100 progress bar. Tiny 1% blips are noise. '
+        'Change the trigger in Settings → Wake match threshold.';
+  }
+
+  void _showStatusExplain(
+    BuildContext context, {
+    required String title,
+    required String body,
+  }) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$title\n$body'),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  Widget _statusCue(
+    BuildContext context, {
+    required IconData icon,
+    required Color color,
+    String? label,
+    required String title,
+    required String explain,
+  }) {
+    return Tooltip(
+      message: '$title — tap for details',
+      child: InkWell(
+        onTap: () => _showStatusExplain(context, title: title, body: explain),
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 14),
+              if (label != null && label.isNotEmpty) ...[
+                const SizedBox(width: 3),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _runSimulator() async {
     var text = _simulatorCtrl.text.trim();
     if (text.isEmpty || _simulatorBusy) return;
 
-    final target = _textTargetBhai;
-    if (target != null && target.isNotEmpty) {
-      final lower = text.toLowerCase();
-      final named =
-          lower.contains(target.toLowerCase()) ||
-          lower.startsWith('ask ${target.toLowerCase()}');
-      if (!named) {
-        text = 'Ask $target: $text';
-      }
-    }
+    text = ref.read(defaultMereBhaiProvider).applyTextPrefix(text);
 
     setState(() => _simulatorBusy = true);
     try {
@@ -578,24 +754,18 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage>
     }
   }
 
-  IconData _getAudioIcon(String source) {
-    final s = source.toLowerCase();
-    if (s.contains('bluetooth')) return Icons.bluetooth_audio;
-    if (s.contains('headset') || s.contains('headphones'))
-      return Icons.headphones;
-    return Icons.mic_none;
-  }
-
   @override
   Widget build(BuildContext context) {
     final eng = ref.watch(voiceHandshakeProvider);
     final byok = ref.watch(byokServiceProvider);
     final server = ref.watch(localServerProvider);
     final session = ref.watch(conversationalSessionProvider);
+    final wake = ref.watch(wakeWordServiceProvider);
+    final defaultBhai = ref.watch(defaultMereBhaiProvider);
 
     return SafeArea(
       child: ListenableBuilder(
-        listenable: Listenable.merge([eng, byok, server]),
+        listenable: Listenable.merge([eng, byok, server, wake, defaultBhai]),
         builder: (context, _) {
           final isListening =
               eng.state == VoiceState.listening ||
@@ -605,71 +775,101 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage>
                     ? 'AUTHOR SESSION'
                     : 'REFINE SESSION')
               : null;
-          final audioLabel = _audioCueLabel(eng.audioSource);
           final mereBhai = ref.watch(agentServiceProvider).agents.where((a) {
             if (a is! JsAgentAdapter) return true;
             return a.securityClass == AgentSecurityClass.c2Verified;
           }).toList();
+          final defaultName = defaultBhai.name;
+          final defaultValid =
+              defaultName != null && mereBhai.any((a) => a.name == defaultName);
+          final micColor = wake.isHandingOff
+              ? Colors.amberAccent
+              : wake.isListening
+              ? (wake.inputRouteKind == 'bluetooth'
+                    ? Colors.lightBlueAccent
+                    : Colors.greenAccent)
+              : Colors.grey;
+          final matchColor = wake.heardWakeRecently()
+              ? Colors.amberAccent
+              : wake.isListening && wake.levelCue == 'silent'
+              ? Colors.redAccent
+              : wake.isListening && wake.liveMatch >= 0.45
+              ? Colors.orangeAccent
+              : wake.isListening && wake.levelCue == 'low'
+              ? Colors.orangeAccent
+              : wake.isListening
+              ? Colors.white70
+              : Colors.white38;
           return Column(
             children: [
-              // User-facing status cues (no IP / raw audio route names)
+              // Compact status cues — tap any chip for a plain-language explain.
               Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 10,
+                  horizontal: 12,
+                  vertical: 8,
                 ),
                 child: Row(
                   children: [
                     Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            Icon(
-                              _getAudioIcon(eng.audioSource),
-                              color: Colors.grey,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              audioLabel,
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Icon(
-                              Icons.dns,
-                              color: server.isRunning
-                                  ? Colors.green
-                                  : Colors.red,
-                              size: 14,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              server.isRunning ? 'Edge on' : 'Edge off',
-                              style: TextStyle(
-                                color: server.isRunning
-                                    ? Colors.green
-                                    : Colors.red,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
+                      child: Wrap(
+                        spacing: 2,
+                        runSpacing: 2,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _statusCue(
+                            context,
+                            icon: _wakeMicIcon(wake),
+                            color: micColor,
+                            label: _wakeMicBarLabel(wake),
+                            title: 'Wake mic',
+                            explain: _wakeMicExplain(wake),
+                          ),
+                          _statusCue(
+                            context,
+                            icon: Icons.graphic_eq,
+                            color: matchColor,
+                            label: _wakeMatchBarLabel(wake),
+                            title: 'Wake match',
+                            explain: _wakeMatchExplain(wake),
+                          ),
+                          _statusCue(
+                            context,
+                            icon: Icons.record_voice_over_outlined,
+                            color: wake.isListening
+                                ? Colors.white54
+                                : Colors.white24,
+                            label: wake.activePhraseLabel,
+                            title: 'Wake phrase',
+                            explain:
+                                'Say “${wake.activePhraseLabel}” to wake. '
+                                'Change the model in Settings → Wake word library.',
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      byok.hasApiKey ? 'AI key set' : 'AI key needed',
-                      style: TextStyle(
-                        color: byok.hasApiKey ? Colors.green : Colors.amber,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    _statusCue(
+                      context,
+                      icon: Icons.dashboard_outlined,
+                      color: server.isRunning ? Colors.green : Colors.red,
+                      label: null,
+                      title: 'Dashboard',
+                      explain: server.isRunning
+                          ? 'Local vault dashboard server is on — open vault '
+                              'pages from Settings / Plugins on this phone.'
+                          : 'Dashboard server is off. Turn it on in Settings '
+                              'when you want local vault pages.',
+                    ),
+                    _statusCue(
+                      context,
+                      icon: byok.hasApiKey
+                          ? Icons.key
+                          : Icons.key_off_outlined,
+                      color: byok.hasApiKey ? Colors.green : Colors.amber,
+                      label: byok.hasApiKey ? null : 'Key',
+                      title: 'AI key',
+                      explain: byok.hasApiKey
+                          ? 'API key is saved for model calls.'
+                          : 'No API key yet — add one in Settings to talk to the AI.',
                     ),
                   ],
                 ),
@@ -871,9 +1071,9 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage>
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
                 child: Row(
                   children: [
-                    const Text(
-                      'Bhai:',
-                      style: TextStyle(color: Colors.white38, fontSize: 11),
+                    Text(
+                      defaultValid ? 'Default:' : 'Bhai:',
+                      style: const TextStyle(color: Colors.white38, fontSize: 11),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -881,11 +1081,7 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage>
                         child: DropdownButton<String?>(
                           isExpanded: true,
                           dropdownColor: const Color(0xFF1E1E1E),
-                          value:
-                              _textTargetBhai != null &&
-                                  mereBhai.any((a) => a.name == _textTargetBhai)
-                              ? _textTargetBhai
-                              : null,
+                          value: defaultValid ? defaultName : null,
                           hint: const Text(
                             'Any / auto',
                             style: TextStyle(
@@ -923,7 +1119,11 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage>
                               ),
                             ),
                           ],
-                          onChanged: (v) => setState(() => _textTargetBhai = v),
+                          onChanged: (v) {
+                            unawaited(
+                              ref.read(defaultMereBhaiProvider).setDefault(v),
+                            );
+                          },
                         ),
                       ),
                     ),
@@ -981,6 +1181,158 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage>
   }
 }
 
+/// Free openWakeWord catalog: download / set active / delete dormant.
+class _WakeModelLibraryPanel extends ConsumerWidget {
+  const _WakeModelLibraryPanel({
+    required this.activeId,
+    required this.onActiveChanged,
+  });
+
+  final String activeId;
+  final ValueChanged<String> onActiveChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final wake = ref.watch(wakeWordServiceProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Wake word library',
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 6),
+        ...WakeHandshakeConfig.wakeCatalog.map((spec) {
+          return FutureBuilder<bool>(
+            future: wake.library.isInstalled(spec.id),
+            builder: (context, snap) {
+              final installed = snap.data ?? spec.bundled;
+              final isActive = activeId == spec.id;
+              final downloading = wake.downloadingId == spec.id;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Say “${spec.label}”',
+                            style: TextStyle(
+                              color: isActive
+                                  ? Colors.greenAccent
+                                  : Colors.white,
+                              fontSize: 13,
+                              fontWeight: isActive
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                          Text(
+                            spec.bundled
+                                ? 'Bundled · ${isActive ? "active phrase" : "installed"}'
+                                : installed
+                                ? (isActive
+                                      ? 'Active phrase'
+                                      : 'Installed (dormant)')
+                                : 'Not installed — free download',
+                            style: const TextStyle(
+                              color: Colors.white38,
+                              fontSize: 10,
+                            ),
+                          ),
+                          if (downloading)
+                            LinearProgressIndicator(
+                              value: wake.downloadProgress > 0
+                                  ? wake.downloadProgress
+                                  : null,
+                              backgroundColor: Colors.white12,
+                              color: Colors.greenAccent,
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (!installed && !spec.bundled)
+                      TextButton(
+                        onPressed: downloading
+                            ? null
+                            : () async {
+                                try {
+                                  await wake.downloadModel(spec.id);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '${spec.label} downloaded',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('$e')),
+                                    );
+                                  }
+                                }
+                              },
+                        child: const Text('Download'),
+                      ),
+                    if (installed) ...[
+                      TextButton(
+                        onPressed: isActive
+                            ? null
+                            : () async {
+                                try {
+                                  await wake.setActiveWakeModel(spec.id);
+                                  onActiveChanged(spec.id);
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('$e')),
+                                    );
+                                  }
+                                }
+                              },
+                        child: Text(isActive ? 'Active' : 'Use'),
+                      ),
+                      if (!spec.bundled && !isActive)
+                        IconButton(
+                          tooltip: 'Delete to free space',
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.white38,
+                            size: 20,
+                          ),
+                          onPressed: () async {
+                            try {
+                              await wake.deleteModel(spec.id);
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('$e')),
+                                );
+                              }
+                            }
+                          },
+                        ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          );
+        }),
+      ],
+    );
+  }
+}
+
 class _SettingsPage extends ConsumerStatefulWidget {
   const _SettingsPage();
   @override
@@ -992,7 +1344,6 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
   final _modCtrl = TextEditingController();
   final _urlCtrl = TextEditingController();
   final _respWordCtrl = TextEditingController(text: "Haan bhai");
-  final _picovoiceCtrl = TextEditingController();
   final _circleOwnerCtrl = TextEditingController();
   final _circleRepoCtrl = TextEditingController();
   final _circleTokenCtrl = TextEditingController();
@@ -1000,6 +1351,8 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
   String _circleStatus = 'Loading circle settings…';
   bool _circleBusy = false;
   String _provider = "Google Gemini";
+  String? _thinkingLevel;
+  int? _maxOutputTokens;
   bool _obscure = true;
   String _gender = "Male";
   bool _isGeneratingTTS = false;
@@ -1009,8 +1362,12 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
   };
 
   double _maxRecSecs = 10;
-  String _responseMode = "Spoken Word";
+  String _tapAck = WakeHandshakeConfig.tapSpoken;
+  String _holdAck = WakeHandshakeConfig.holdHaptic;
+  String _listenMode = WakeHandshakeConfig.listenOnDemand;
+  String _wakeBuiltin = WakeHandshakeConfig.defaultWakeModelId;
   bool _vibrate = false;
+  bool _mediaControlsToAurBhai = true;
 
   @override
   void initState() {
@@ -1020,9 +1377,16 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
     _modCtrl.text = byok.modelName;
     _urlCtrl.text = byok.customUrl;
     _provider = byok.apiProvider;
+    _thinkingLevel = byok.thinkingLevel;
+    _maxOutputTokens = byok.maxOutputTokens;
     _maxRecSecs = byok.maxRecordingSeconds.toDouble();
-    _responseMode = byok.responseMode;
+    _tapAck = byok.tapResponseMode;
+    _holdAck = byok.holdResponseMode;
     _vibrate = byok.vibrateOnWake;
+    _mediaControlsToAurBhai = byok.mediaControlsToAurBhai;
+    final wake = ref.read(wakeWordServiceProvider);
+    _listenMode = wake.listenMode;
+    _wakeBuiltin = wake.builtinKeywordId;
     _respWordCtrl.text = byok.responseWord;
     _gender = byok.voiceGender;
     for (final platform in ExternalPlatform.values) {
@@ -1045,15 +1409,50 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
             : 'Not configured — enter owner, repo, PAT, then SAVE';
       });
     });
+    _modCtrl.addListener(_onModelOrUrlChanged);
+    _urlCtrl.addListener(_onModelOrUrlChanged);
+  }
+
+  void _onModelOrUrlChanged() {
+    if (!mounted) return;
+    setState(() {
+      _thinkingLevel = LlmCapabilityCatalog.clampThinking(
+        _provider,
+        _modCtrl.text.trim(),
+        _thinkingLevel,
+      );
+    });
+    _autoSaveLlmConfig();
+  }
+
+  void _autoSaveLlmConfig() {
+    if (!mounted) return;
+    ref.read(byokServiceProvider).updateConfig(
+          provider: _provider,
+          apiKey: _keyCtrl.text.trim(),
+          modelName: _modCtrl.text.trim(),
+          customUrl: _urlCtrl.text.trim(),
+          thinkingLevel: _thinkingLevel,
+          maxOutputTokens: _maxOutputTokens,
+          maxRecordingSeconds: _maxRecSecs.toInt(),
+          responseMode: _tapAck,
+          tapResponseMode: _tapAck,
+          holdResponseMode: _holdAck,
+          vibrateOnWake: _vibrate,
+          responseWord: _respWordCtrl.text.trim(),
+          voiceGender: _gender,
+          mediaControlsToAurBhai: _mediaControlsToAurBhai,
+        );
   }
 
   @override
   void dispose() {
+    _modCtrl.removeListener(_onModelOrUrlChanged);
+    _urlCtrl.removeListener(_onModelOrUrlChanged);
     _keyCtrl.dispose();
     _modCtrl.dispose();
     _urlCtrl.dispose();
     _respWordCtrl.dispose();
-    _picovoiceCtrl.dispose();
     _circleOwnerCtrl.dispose();
     _circleRepoCtrl.dispose();
     _circleTokenCtrl.dispose();
@@ -1095,29 +1494,71 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
   }
 
   void _save() async {
+    final wake = ref.read(wakeWordServiceProvider);
+    // Persist wake first so credential/BYOK failures cannot leave listen unset.
+    try {
+      if (!wake.privacyAcknowledged &&
+          _listenMode == WakeHandshakeConfig.listenAlwaysOn) {
+        await wake.acknowledgePrivacy();
+      }
+      try {
+        await wake.setActiveWakeModel(_wakeBuiltin);
+      } catch (_) {
+        // Active model may not be installed yet; listen mode still saves.
+      }
+      await wake.setListenMode(_listenMode);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Wake save failed: $e')),
+        );
+      }
+    }
+
     final externalKeys = <String, String>{};
     for (final platform in ExternalPlatform.values) {
       final value = _externalKeyCtrls[platform.name]?.text.trim() ?? '';
       if (value.isNotEmpty) externalKeys[platform.name] = value;
     }
-    await ref
-        .read(byokServiceProvider)
-        .updateConfig(
-          provider: _provider,
-          apiKey: _keyCtrl.text.trim(),
-          modelName: _modCtrl.text.trim(),
-          customUrl: _urlCtrl.text.trim(),
-          maxRecordingSeconds: _maxRecSecs.toInt(),
-          responseMode: _responseMode,
-          vibrateOnWake: _vibrate,
-          responseWord: _respWordCtrl.text.trim(),
-          voiceGender: _gender,
-          externalPlatformKeys: externalKeys,
+    try {
+      await ref
+          .read(byokServiceProvider)
+          .updateConfig(
+            provider: _provider,
+            apiKey: _keyCtrl.text.trim(),
+            modelName: _modCtrl.text.trim(),
+            customUrl: _urlCtrl.text.trim(),
+            thinkingLevel: _thinkingLevel,
+            maxOutputTokens: _maxOutputTokens,
+            maxRecordingSeconds: _maxRecSecs.toInt(),
+            responseMode: _tapAck,
+            tapResponseMode: _tapAck,
+            holdResponseMode: _holdAck,
+            vibrateOnWake: _vibrate,
+            responseWord: _respWordCtrl.text.trim(),
+            voiceGender: _gender,
+            mediaControlsToAurBhai: _mediaControlsToAurBhai,
+            externalPlatformKeys: externalKeys,
+          );
+      await ref.read(voiceHandshakeProvider).setTtsGender(_gender);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Credentials save failed: $e')),
         );
-    await ref.read(voiceHandshakeProvider).setTtsGender(_gender);
+      }
+      return;
+    }
     if (mounted) {
+      final listening = wake.isListening;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Credentials & voice settings saved")),
+        SnackBar(
+          content: Text(
+            listening
+                ? 'Saved — listening for “${wake.activePhraseLabel}”'
+                : 'Saved — wake listen off (set Listen to Always-on)',
+          ),
+        ),
       );
     }
   }
@@ -1223,17 +1664,34 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
                       setState(() {
                         _provider = val;
                         _modCtrl.text = LlmProviderFactory.defaultModelFor(val);
+                        _thinkingLevel = LlmCapabilityCatalog.clampThinking(
+                          val,
+                          _modCtrl.text.trim(),
+                          null,
+                        );
+                        _maxOutputTokens = LlmCapabilityCatalog.forModel(
+                          val,
+                          _modCtrl.text.trim(),
+                        ).maxTokensDefault;
                       });
+                      _autoSaveLlmConfig();
                     }
                   },
                 ),
+                LlmProviderCapabilityNotice(providerId: _provider),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _keyCtrl,
                   obscureText: _obscure,
+                  onSubmitted: (_) => _autoSaveLlmConfig(),
                   style: const TextStyle(color: Colors.white, fontSize: 13),
                   decoration: InputDecoration(
                     labelText: "API Key",
+                    helperText: LlmProviderFactory.apiKeyHint(_provider),
+                    helperStyle: const TextStyle(
+                      color: Colors.white38,
+                      fontSize: 11,
+                    ),
                     labelStyle: const TextStyle(
                       color: Colors.white54,
                       fontSize: 12,
@@ -1249,13 +1707,27 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                TextField(
+                LlmModelPicker(
+                  providerId: _provider,
                   controller: _modCtrl,
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                  decoration: const InputDecoration(
-                    labelText: "Model Name",
-                    labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
+                ),
+                LlmCapabilityKnobs(
+                  providerId: _provider,
+                  modelId: _modCtrl.text.trim(),
+                  apiKey: _keyCtrl.text.trim(),
+                  thinkingLevel: _thinkingLevel,
+                  maxOutputTokens: _maxOutputTokens,
+                  onChanged: ({thinkingLevel, maxOutputTokens}) {
+                    setState(() {
+                      if (thinkingLevel != null) {
+                        _thinkingLevel = thinkingLevel;
+                      }
+                      if (maxOutputTokens != null) {
+                        _maxOutputTokens = maxOutputTokens;
+                      }
+                    });
+                    _autoSaveLlmConfig();
+                  },
                 ),
                 if (LlmProviderFactory.requiresCustomUrl(_provider)) ...[
                   const SizedBox(height: 16),
@@ -1299,6 +1771,8 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
                               apiKey: _keyCtrl.text.trim(),
                               modelName: _modCtrl.text.trim(),
                               customUrl: _urlCtrl.text.trim(),
+                              thinkingLevel: _thinkingLevel,
+                              maxOutputTokens: _maxOutputTokens,
                             ),
                           );
                     }
@@ -1321,28 +1795,235 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
               ],
             ),
             _settingsSection(
-              title: 'WAKE WORD (ON-DEVICE)',
+              title: 'WAKE & HANDSHAKE',
+              initiallyExpanded: true,
               children: [
                 Text(
                   AppConfig.wakePrivacyBody,
                   style: const TextStyle(color: Colors.white38, fontSize: 11),
                 ),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: _picovoiceCtrl,
-                  obscureText: true,
+                DropdownButtonFormField<String>(
+                  initialValue: _listenMode,
+                  dropdownColor: const Color(0xFF1E1E1E),
                   style: const TextStyle(color: Colors.white, fontSize: 13),
                   decoration: const InputDecoration(
-                    labelText: 'Picovoice AccessKey',
+                    labelText: 'Listen',
                     labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
                   ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: WakeHandshakeConfig.listenAlwaysOn,
+                      child: Text('Always-on'),
+                    ),
+                    DropdownMenuItem(
+                      value: WakeHandshakeConfig.listenOnDemand,
+                      child: Text('On-demand (UI / headset)'),
+                    ),
+                  ],
+                  onChanged: (v) async {
+                    if (v == null) return;
+                    setState(() => _listenMode = v);
+                    final wake = ref.read(wakeWordServiceProvider);
+                    try {
+                      if (v == WakeHandshakeConfig.listenAlwaysOn &&
+                          !wake.privacyAcknowledged) {
+                        await wake.acknowledgePrivacy();
+                      }
+                      await wake.setListenMode(v);
+                      if (!mounted) return;
+                      final msg = wake.isListening
+                          ? 'Listening for “${wake.activePhraseLabel}”'
+                          : v == WakeHandshakeConfig.listenAlwaysOn
+                          ? (wake.lastError ??
+                                'Always-on saved but mic not listening yet')
+                          : 'Wake listen off';
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(msg)),
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Wake listen failed: $e')),
+                      );
+                    }
+                  },
                 ),
+                Builder(
+                  builder: (context) {
+                    final wake = ref.watch(wakeWordServiceProvider);
+                    final phrase = wake.activePhraseLabel;
+                    final pct = (wake.liveMatch * 100).clamp(0, 100).round();
+                    final need = wake.matchThresholdPercent;
+                    final lvl = wake.levelCue == 'loud'
+                        ? 'loud'
+                        : wake.levelCue;
+                    final hitPct = wake.lastWakeMatchPercent;
+                    final line = wake.isListening
+                        ? 'Listening (${wake.inputRouteShort}) — “$phrase” · $pct% (need ≥$need%) · mic $lvl'
+                        : wake.heardWakeRecently()
+                        ? 'Wake heard at $hitPct% — mic freed for your command'
+                        : wake.isHandingOff
+                        ? 'Wake heard — mic freed for your command'
+                        : 'Not listening. Phrase when on: “$phrase”';
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8, bottom: 4),
+                      child: Text(
+                        line,
+                        style: TextStyle(
+                          color: wake.isListening
+                              ? (wake.inputRouteKind == 'bluetooth'
+                                    ? Colors.lightBlueAccent
+                                    : Colors.greenAccent)
+                              : Colors.amberAccent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                Builder(
+                  builder: (context) {
+                    final wake = ref.watch(wakeWordServiceProvider);
+                    final pct = wake.matchThresholdPercent.toDouble();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Wake match threshold: ${pct.round()}%',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                        Slider(
+                          value: pct,
+                          min: 35,
+                          max: 90,
+                          divisions: 11,
+                          activeColor: Colors.greenAccent,
+                          label: '${pct.round()}%',
+                          onChanged: (v) {
+                            unawaited(wake.setMatchThreshold(v / 100));
+                          },
+                        ),
+                        const Text(
+                          'Lower = easier wake (more false triggers). '
+                          'Match % is not 100% — a flash of 96% can miss if the mic was mute.',
+                          style: TextStyle(color: Colors.white30, fontSize: 10),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 4),
                 Text(
-                  'Interim wake phrase: ${AppConfig.wakeWordInterimBuiltIn} '
-                  '(target: ${AppConfig.wakeWordPhraseLabel}). ${AppConfig.wakeCustomPpnHint}',
+                  AppConfig.wakeCustomPpnHint,
                   style: const TextStyle(color: Colors.white30, fontSize: 10),
                 ),
                 const SizedBox(height: 4),
+                Text(
+                  AppConfig.wakeModelLibraryHint,
+                  style: const TextStyle(color: Colors.white24, fontSize: 10),
+                ),
+                const SizedBox(height: 8),
+                _WakeModelLibraryPanel(
+                  activeId: _wakeBuiltin,
+                  onActiveChanged: (id) => setState(() => _wakeBuiltin = id),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _tapAck,
+                        dropdownColor: const Color(0xFF1E1E1E),
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        decoration: const InputDecoration(
+                          labelText: 'Tap ack',
+                          labelStyle: TextStyle(
+                            color: Colors.white54,
+                            fontSize: 12,
+                          ),
+                        ),
+                        items: WakeHandshakeConfig.tapAckModes
+                            .map(
+                              (m) => DropdownMenuItem(
+                                value: m,
+                                child: Text(
+                                  m == WakeHandshakeConfig.tapSpoken
+                                      ? 'Spoken'
+                                      : m == WakeHandshakeConfig.tapSound
+                                      ? 'Sound'
+                                      : 'Silent',
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) {
+                          if (v != null) setState(() => _tapAck = v);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _holdAck,
+                        dropdownColor: const Color(0xFF1E1E1E),
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        decoration: const InputDecoration(
+                          labelText: 'Hold ack',
+                          labelStyle: TextStyle(
+                            color: Colors.white54,
+                            fontSize: 12,
+                          ),
+                        ),
+                        items: WakeHandshakeConfig.holdAckModes
+                            .map(
+                              (m) => DropdownMenuItem(value: m, child: Text(m)),
+                            )
+                            .toList(),
+                        onChanged: (v) {
+                          if (v != null) setState(() => _holdAck = v);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                if (_tapAck == WakeHandshakeConfig.tapSpoken) ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _respWordCtrl,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: const InputDecoration(
+                      labelText: 'Response word',
+                      labelStyle: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    AppConfig.mediaControlsToggleLabel,
+                    style: TextStyle(color: Colors.white, fontSize: 13),
+                  ),
+                  subtitle: const Text(
+                    AppConfig.mediaControlsToggleSubtitle,
+                    style: TextStyle(color: Colors.white38, fontSize: 10),
+                  ),
+                  value: _mediaControlsToAurBhai,
+                  activeThumbColor: Colors.greenAccent,
+                  onChanged: (v) async {
+                    setState(() => _mediaControlsToAurBhai = v);
+                    await ref
+                        .read(byokServiceProvider)
+                        .setMediaControlsToAurBhai(v);
+                  },
+                ),
                 Text(
                   AppConfig.headsetRidingHint,
                   style: const TextStyle(color: Colors.white24, fontSize: 10),
@@ -1350,51 +2031,37 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
                 Builder(
                   builder: (context) {
                     final wake = ref.watch(wakeWordServiceProvider);
-                    return Column(
-                      children: [
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          dense: true,
-                          title: Text(
-                            AppConfig.wakeListenEnabledLabel,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                            ),
-                          ),
-                          subtitle: Text(
-                            wake.isListening
-                                ? AppConfig.wakeListeningIndicator
-                                : AppConfig.wakeListenSubtitle,
-                            style: const TextStyle(
-                              color: Colors.white54,
-                              fontSize: 11,
-                            ),
-                          ),
-                          value: wake.listenEnabled,
-                          activeThumbColor: Colors.greenAccent,
-                          onChanged: (v) async {
-                            if (v && !wake.privacyAcknowledged) {
-                              await wake.acknowledgePrivacy();
-                            }
-                            if (_picovoiceCtrl.text.trim().isNotEmpty) {
-                              await wake.setAccessKey(
-                                _picovoiceCtrl.text.trim(),
-                              );
-                            }
-                            await wake.setListenEnabled(v);
-                            setState(() {});
-                          },
+                    final status = wake.isListening
+                        ? 'Mic armed — say “${wake.activePhraseLabel}”'
+                        : wake.isAlwaysOn && wake.listenEnabled
+                        ? 'Always-on set but mic stopped${wake.lastError != null ? ": ${wake.lastError}" : ""}'
+                        : 'Wake listen off (openWakeWord idle)';
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        status,
+                        style: TextStyle(
+                          color: wake.isListening
+                              ? Colors.greenAccent
+                              : Colors.white38,
+                          fontSize: 11,
                         ),
-                        if (wake.lastError != null)
-                          Text(
-                            wake.lastError!,
-                            style: const TextStyle(
-                              color: Colors.redAccent,
-                              fontSize: 11,
-                            ),
-                          ),
-                      ],
+                      ),
+                    );
+                  },
+                ),
+                Builder(
+                  builder: (context) {
+                    final wake = ref.watch(wakeWordServiceProvider);
+                    if (wake.lastError == null) {
+                      return const SizedBox.shrink();
+                    }
+                    return Text(
+                      wake.lastError!,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 11,
+                      ),
                     );
                   },
                 ),
@@ -1693,24 +2360,9 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
                     ),
                   ],
                 ),
-                DropdownButtonFormField<String>(
-                  initialValue: _responseMode,
-                  dropdownColor: const Color(0xFF1E1E1E),
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                  decoration: const InputDecoration(
-                    labelText: "Wake Response Mode",
-                    labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                  items: ["Spoken Word", "System Sound", "Silent"]
-                      .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                      .toList(),
-                  onChanged: (val) {
-                    if (val != null) setState(() => _responseMode = val);
-                  },
-                ),
                 SwitchListTile(
                   title: const Text(
-                    "Vibrate on Wake",
+                    "Vibrate on tap wake",
                     style: TextStyle(color: Colors.white, fontSize: 13),
                   ),
                   contentPadding: EdgeInsets.zero,
@@ -1736,7 +2388,7 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Saves API keys, recording/wake behavior, Response Word, and Voice Gender.',
+                  'Saves API keys, WAKE & HANDSHAKE prefs, Response Word, and Voice Gender.',
                   style: TextStyle(color: Colors.white38, fontSize: 10),
                 ),
               ],
@@ -1744,15 +2396,6 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
             _settingsSection(
               title: 'AI VOICE RESPONSE GENERATOR',
               children: [
-                TextField(
-                  controller: _respWordCtrl,
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                  decoration: const InputDecoration(
-                    labelText: "Response Word",
-                    labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                ),
-                const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   initialValue: _gender,
                   dropdownColor: const Color(0xFF1E1E1E),

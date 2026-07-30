@@ -8,11 +8,11 @@ class AppConfig {
   static const bool circleRegistryFeatureEnabled = true;
   static const bool issueReportsFeatureEnabled = true;
 
-  // --- Wake / privacy (MS-OFFLINE-WAKE) ---
-  static const String wakeWordPhraseLabel = 'Aur Bhai';
+  // --- Wake / privacy (MS-OFFLINE-WAKE, free openWakeWord) ---
+  static const String wakeWordPhraseLabel = 'Hey Mycroft';
 
-  /// Interim Porcupine built-in until custom .ppn ships.
-  static const String wakeWordInterimBuiltIn = 'Jarvis';
+  /// Default free pretrained openWakeWord model label.
+  static const String wakeWordInterimBuiltIn = 'Hey Mycroft';
   static const String wakePrivacyTitle = 'Wake listen privacy';
   static const String wakePrivacyBody =
       'While looking for the wake word, Aur Bhai processes mic audio in memory only. '
@@ -20,13 +20,19 @@ class AppConfig {
       'Optional wake-word training samples are a separate, explicit action.';
   static const String wakeListenEnabledLabel = 'Listen for wake word';
   static const String wakeListenSubtitle =
-      'Hands-free wake (earphone/mic). No recordings stored while listening.';
+      'Hands-free wake (Bluetooth headset / mic). No recordings stored while listening.';
   static const String wakeListeningIndicator = 'Listening for wake word…';
   static const String wakeNeedsAccessKey =
-      'Add a Picovoice AccessKey in Settings to enable on-device wake detection.';
+      'Wake listen needs a free wake model installed (default Hey Mycroft is bundled).';
   static const String wakeCustomPpnHint =
-      'For real “Aur Bhai” wake: put Picovoice aur_bhai.ppn in app documents/wake/ '
-      'or assets/wake/ (rebuild). Until then listen uses interim Jarvis.';
+      'Free pretrained models from openWakeWord. Download extras in Settings; '
+      'only one model is active at a time. Custom “Aur Bhai” training is later.';
+  static const String wakeModelLibraryHint =
+      'Android/iOS on-device. Bundled models stay; downloaded models can be deleted '
+      'to free space (switch active first).';
+  static const String wakeCallBusyMessage =
+      'Phone call in progress — wake and mic handshake are paused.';
+  static const String defaultMereBhaiPrefsKey = 'default_mere_bhai';
 
   // --- Circle registry (MVP-S10) ---
   static const String circlePrefsOwnerKey = 'circle_github_owner';
@@ -80,11 +86,15 @@ class AppConfig {
   static const String broCallChannelId = 'aur_bhai_bro_call';
   static const String broCallChannelName = 'Bhai Code calls';
 
-  // --- Headset (S18) ---
+  // --- Media controls (Android MediaSession) ---
+  static const String mediaControlsToggleLabel = 'Media controls → Aur Bhai';
+  static const String mediaControlsToggleSubtitle =
+      'Android only. When on, Play/Pause/Next from earbuds, car wheel, or headset '
+      'remotes start handshake and do not control music. Off leaves those buttons '
+      'with the music app. Earbud ANC long-press (firmware) never reaches apps.';
   static const String headsetRidingHint =
-      'For riding: connect a Bluetooth headset, enable wake listen, keep the wake '
-      'notification visible. Say Aur Bhai → wait for Haan Bhai → speak. '
-      'OEM battery killers may stop background mic — exempt Aur Bhai if needed.';
+      'Always-on: say the wake word → Haan bhai → speak. On-demand: use the mic '
+      'or Android media controls (if the toggle above is on).';
 
   // --- Vault keys ---
   static const String vaultAmbientCandidates =

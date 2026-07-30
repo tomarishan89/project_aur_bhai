@@ -4,15 +4,19 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:audio_session/audio_session.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:audio_session/audio_session.dart' hide AndroidAudioFocus;
+import 'package:audioplayers/audioplayers.dart' hide AVAudioSessionCategory;
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import '../agents/agent_base.dart';
 import '../agents/js_agent_adapter.dart';
+import '../config/app_config.dart';
+import '../config/wake_handshake_config.dart';
 import 'llm_service.dart';
 import 'agent_service.dart';
 import 'byok_service.dart';
+import 'call_busy_guard.dart';
+import 'default_mere_bhai.dart';
 import 'llm/llm_slot.dart';
 import 'author_prompts.dart';
 import 'app_spec.dart';
@@ -815,15 +819,78 @@ class VoiceHandshakeEngine extends ChangeNotifier {
   Future<void> _initAudioSession() async {
     try {
       _audioSession = await AudioSession.instance;
-      await _audioSession?.configure(const AudioSessionConfiguration.speech());
+      // Speech + BT-friendly; duck music during handshake turns.
+      await _audioSession?.configure(
+        AudioSessionConfiguration(
+          avAudioSessionCategory: AVAudioSessionCategory.playAndRecord,
+          avAudioSessionCategoryOptions:
+              AVAudioSessionCategoryOptions.allowBluetooth |
+              AVAudioSessionCategoryOptions.defaultToSpeaker,
+          avAudioSessionMode: AVAudioSessionMode.spokenAudio,
+          androidAudioAttributes: const AndroidAudioAttributes(
+            contentType: AndroidAudioContentType.speech,
+            flags: AndroidAudioFlags.none,
+            usage: AndroidAudioUsage.voiceCommunication,
+          ),
+          androidAudioFocusGainType:
+              AndroidAudioFocusGainType.gainTransientMayDuck,
+          // Duck must not become a hard pause — that was aborting mic turns.
+          androidWillPauseWhenDucked: false,
+        ),
+      );
 
       _audioSession?.devicesChangedEventStream.listen((event) {
         _updateAudioSource();
+      });
+      _audioSession?.interruptionEventStream.listen((event) {
+        if (!event.begin) return;
+        // Duck / TTS / record focus handoffs look like LOSS to audio_session.
+        // Ending the turn here was aborting our own mic (~300ms). Only bail on call.
+        if (event.type == AudioInterruptionType.duck) return;
+        if (_state != VoiceState.listening &&
+            _state != VoiceState.processing) {
+          return;
+        }
+        unawaited(() async {
+          if (!await CallBusyGuard.isBusy()) return;
+          if (_state != VoiceState.listening &&
+              _state != VoiceState.processing) {
+            return;
+          }
+          _addLog('Audio', 'Call busy — ending turn.', isError: true);
+          await _audioRecorder.stop();
+          await _endSpeechTurn();
+          _fallbackToIdleSnooze();
+        }());
       });
       _updateAudioSource();
     } catch (e) {
       debugPrint('[VoiceHandshake] AudioSession error: $e');
     }
+  }
+
+  Future<bool> _beginSpeechTurn() async {
+    if (await CallBusyGuard.isBusy()) {
+      _addLog('Busy', AppConfig.wakeCallBusyMessage, isError: true);
+      micStatusMessage = AppConfig.wakeCallBusyMessage;
+      notifyListeners();
+      try {
+        await speak(AppConfig.wakeCallBusyMessage);
+      } catch (_) {}
+      return false;
+    }
+    try {
+      await _audioSession?.setActive(true);
+    } catch (e) {
+      debugPrint('[VoiceHandshake] setActive: $e');
+    }
+    return true;
+  }
+
+  Future<void> _endSpeechTurn() async {
+    try {
+      await _audioSession?.setActive(false);
+    } catch (_) {}
   }
 
   AudioSession? _audioSession;
@@ -929,16 +996,84 @@ class VoiceHandshakeEngine extends ChangeNotifier {
     }
   }
 
+  /// Called when a speech turn returns to idle (e.g. restart wake listen).
+  VoidCallback? onReturnedToIdle;
+
+  /// Wake must drop SCO before ack/TTS media playback (avoids reclaim race).
+  Future<void> Function()? onLoudPlaybackStarting;
+
+  /// After TTS/ack, resume wake if still idle (late playback can abort reclaim).
+  VoidCallback? onLoudPlaybackFinished;
+
   void resumeAmbientListening() {
     micStatusMessage = "Tap for Haan Bhai · Hold to speak";
     notifyListeners();
   }
 
   void updateState(VoiceState newState) {
+    final wasIdle = _state == VoiceState.idle;
     _state = newState;
     notifyListeners();
     if (newState == VoiceState.idle) {
       resumeAmbientListening();
+      if (!wasIdle) onReturnedToIdle?.call();
+    }
+  }
+
+  /// Leave Bluetooth SCO / call-mode so acks & TTS use A2DP media volume
+  /// (media slider). Wake listen forces MODE_IN_COMMUNICATION + SCO, which
+  /// routes playback to the quieter in-call stream even when media is maxed.
+  Future<void> _prepareLoudPlayback() async {
+    try {
+      await onLoudPlaybackStarting?.call();
+    } catch (_) {}
+    try {
+      if (!kIsWeb && Platform.isAndroid) {
+        final am = AndroidAudioManager();
+        try {
+          await am.clearCommunicationDevice();
+        } catch (_) {}
+        try {
+          await am.stopBluetoothSco();
+        } catch (_) {}
+        try {
+          await am.setBluetoothScoOn(false);
+        } catch (_) {}
+        try {
+          await am.setMode(AndroidAudioHardwareMode.normal);
+        } catch (_) {}
+      }
+      await _audioSession?.configure(
+        AudioSessionConfiguration(
+          avAudioSessionCategory: AVAudioSessionCategory.playback,
+          avAudioSessionCategoryOptions:
+              AVAudioSessionCategoryOptions.allowBluetoothA2dp,
+          avAudioSessionMode: AVAudioSessionMode.spokenAudio,
+          androidAudioAttributes: const AndroidAudioAttributes(
+            contentType: AndroidAudioContentType.speech,
+            usage: AndroidAudioUsage.media,
+          ),
+          androidAudioFocusGainType:
+              AndroidAudioFocusGainType.gainTransientMayDuck,
+          androidWillPauseWhenDucked: false,
+        ),
+      );
+      await _audioSession?.setActive(true);
+      await _audioPlayer.setVolume(1.0);
+      await _audioPlayer.setAudioContext(
+        AudioContext(
+          android: const AudioContextAndroid(
+            isSpeakerphoneOn: false,
+            audioMode: AndroidAudioMode.normal,
+            stayAwake: true,
+            contentType: AndroidContentType.speech,
+            usageType: AndroidUsageType.media,
+            audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('[VoiceHandshake] prepareLoudPlayback: $e');
     }
   }
 
@@ -951,20 +1086,31 @@ class VoiceHandshakeEngine extends ChangeNotifier {
       );
     }
     try {
+      await _prepareLoudPlayback();
       // Re-apply Settings gender on every utterance (wake, errors, replies).
       final gender = _ref.read(byokServiceProvider).voiceGender;
       await setTtsGender(gender);
+      await _tts.setVolume(1.0);
       await _tts.speak(text);
     } catch (e) {
       debugPrint('[VoiceHandshake TTS Error] $e');
+    } finally {
+      if (_state == VoiceState.idle) {
+        onLoudPlaybackFinished?.call();
+      }
     }
   }
 
+  /// Tap / wake ack (Spoken / Sound / Silent). Never used for hold.
   Future<void> playCustomResponseOrFallback() async {
     final byok = _ref.read(byokServiceProvider);
-    if (byok.responseMode == "Silent") return;
+    final mode = byok.tapResponseMode;
+    if (mode == WakeHandshakeConfig.tapSilent) return;
 
-    if (byok.responseMode == "System Sound") {
+    await _prepareLoudPlayback();
+
+    if (mode == WakeHandshakeConfig.tapSound) {
+      await SystemSound.play(SystemSoundType.click);
       return;
     }
 
@@ -972,7 +1118,6 @@ class VoiceHandshakeEngine extends ChangeNotifier {
         ? "Haan bhai"
         : byok.responseWord.trim();
     try {
-      // speak() already applies voiceGender from Settings.
       await speak(word);
     } catch (e) {
       try {
@@ -985,17 +1130,45 @@ class VoiceHandshakeEngine extends ChangeNotifier {
     }
   }
 
+  /// Hold ack: Haptic / Beep / Silent — never spoken Response Word.
+  Future<void> playHoldAck() async {
+    final mode = _ref.read(byokServiceProvider).holdResponseMode;
+    switch (mode) {
+      case WakeHandshakeConfig.holdSilent:
+        return;
+      case WakeHandshakeConfig.holdBeep:
+        await SystemSound.play(SystemSoundType.click);
+        return;
+      case WakeHandshakeConfig.holdHaptic:
+      default:
+        await HapticFeedback.mediumImpact();
+    }
+  }
+
+  DateTime? _listeningStartedAt;
+
   Future<void> onMicSingleTap() async {
     if (_state == VoiceState.idle || _state == VoiceState.awaitingHandshake) {
+      if (!await _beginSpeechTurn()) return;
       _handshakeTimer?.cancel();
       updateState(VoiceState.listening);
+      _listeningStartedAt = DateTime.now();
 
-      _addLog("Wake Word", "Triggered manually via UI tap.");
+      _addLog("Wake Word", "Triggered via tap / wake / headset short.");
       await playCustomResponseOrFallback();
+      if (_ref.read(byokServiceProvider).vibrateOnWake) {
+        await HapticFeedback.lightImpact();
+      }
 
       onFlashGlanceTriggered?.call();
       _startAudioCommandRecording();
     } else if (_state == VoiceState.listening) {
+      final started = _listeningStartedAt;
+      final ms = started == null
+          ? 9999
+          : DateTime.now().difference(started).inMilliseconds;
+      // Ignore bounce from MediaSession onPlay + UI tap within the same press.
+      if (ms < 800) return;
       _addLog("Recording", "Ended early by user tap.");
       await _audioRecorder.stop();
     }
@@ -1005,6 +1178,7 @@ class VoiceHandshakeEngine extends ChangeNotifier {
     if (_state == VoiceState.listening) {
       _addLog("Recording", "Cancelled by user double tap.", isError: true);
       await _audioRecorder.cancel();
+      await _endSpeechTurn();
       _fallbackToIdleSnooze();
     }
   }
@@ -1013,13 +1187,14 @@ class VoiceHandshakeEngine extends ChangeNotifier {
     if (_state != VoiceState.idle && _state != VoiceState.awaitingHandshake) {
       return;
     }
+    if (!await _beginSpeechTurn()) return;
     _handshakeTimer?.cancel();
     isHoldToTalk = true;
     _stopHoldRequested = false;
     updateState(VoiceState.listening);
 
     _addLog("Wake Word", "Hold-to-talk engaged.");
-    HapticFeedback.mediumImpact();
+    await playHoldAck();
     onFlashGlanceTriggered?.call();
     await _startHoldToTalkRecording();
   }
@@ -1073,11 +1248,13 @@ class VoiceHandshakeEngine extends ChangeNotifier {
       if (await file.exists() && _state == VoiceState.listening) {
         _processAudioCommand(path);
       } else if (_state == VoiceState.listening) {
+        await _endSpeechTurn();
         _fallbackToIdleSnooze();
       }
     } catch (e) {
       debugPrint('[VoiceHandshake] Hold record error: $e');
       isHoldToTalk = false;
+      await _endSpeechTurn();
       _fallbackToIdleSnooze();
     }
   }
@@ -1135,6 +1312,7 @@ class VoiceHandshakeEngine extends ChangeNotifier {
   }
 
   Future<void> _processTurn(TurnParsedResponse turn) async {
+    turn = _ref.read(defaultMereBhaiProvider).applyToTurn(turn);
     lastTranscribedWords = turn.transcription.isNotEmpty
         ? turn.transcription
         : 'Processed command';
@@ -1180,32 +1358,41 @@ class VoiceHandshakeEngine extends ChangeNotifier {
     _addLog("Audio Recorded", "Single-call parseTurn (Arch v3.7)...");
     notifyListeners();
 
-    final llmService = _ref.read(llmServiceProvider);
-    final turn = await llmService.parseTurn(
-      audioFilePath: audioPath,
-      existingSpec: _session.isActive ? _session.appSpec : null,
-      authorSessionActive:
-          _session.isActive && _session.kind == SessionKind.author,
-    );
+    try {
+      final llmService = _ref.read(llmServiceProvider);
+      final turn = await llmService.parseTurn(
+        audioFilePath: audioPath,
+        existingSpec: _session.isActive ? _session.appSpec : null,
+        authorSessionActive:
+            _session.isActive && _session.kind == SessionKind.author,
+      );
 
-    await _processTurn(turn);
-    updateState(VoiceState.idle);
+      await _processTurn(turn);
+    } finally {
+      await _endSpeechTurn();
+      updateState(VoiceState.idle);
+    }
   }
 
   Future<void> processVoiceCommand(String command) async {
     if (command.trim().isEmpty) return;
+    if (!await _beginSpeechTurn()) return;
     updateState(VoiceState.processing);
 
-    final llmService = _ref.read(llmServiceProvider);
-    final turn = await llmService.parseTurn(
-      text: command.trim(),
-      existingSpec: _session.isActive ? _session.appSpec : null,
-      authorSessionActive:
-          _session.isActive && _session.kind == SessionKind.author,
-    );
+    try {
+      final llmService = _ref.read(llmServiceProvider);
+      final turn = await llmService.parseTurn(
+        text: command.trim(),
+        existingSpec: _session.isActive ? _session.appSpec : null,
+        authorSessionActive:
+            _session.isActive && _session.kind == SessionKind.author,
+      );
 
-    await _processTurn(turn);
-    updateState(VoiceState.idle);
+      await _processTurn(turn);
+    } finally {
+      await _endSpeechTurn();
+      updateState(VoiceState.idle);
+    }
   }
 
   Future<void> triggerPluginAlert(String alertMessage) async {

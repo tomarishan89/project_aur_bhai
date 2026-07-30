@@ -49,6 +49,14 @@
             android:foregroundServiceType="microphone"
             android:exported="false"
             android:stopWithTask="true" />
+        <!-- Route BT earbud media buttons into our MediaSession while Aur Bhai is active. -->
+        <receiver
+            android:name="androidx.media.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

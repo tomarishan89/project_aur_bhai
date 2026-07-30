@@ -118,6 +118,7 @@ The Core is a verb-first intent dispatcher with multi-turn conversational state.
 7. **Refinement Loop:** "Fix <agent>" (voice) or **Improve** (Agents page) loads vault source, gathers change, proposes patch, applies on confirm, re-registers at C4 on material change per §2.7. Bound models are not silently discarded for new hardcoded thresholds.
 8. **Core Agents as JS Vault Agents:** Calculator, DrivingCoach remain refinable JS vault agents; native Dart reserved for Class 1 hardware shells.
 9. **Path H / Path L authoring fork (Arch v3.9):** When the ask smells like continuous noisy sensor classification (e.g. pothole detection), the Coder always emits a working Path H Bro Code; Path L is opt-in with ambient capture expectations (e.g. ~30–60s fine windows) and proposed `labelSchema`, `datasets`, `triggerHints`, and `splitPolicy`. Prefer qualitative severity labels over fake physical depth/breadth unless the user insists. Standard label-template libraries are deferred.
+10. **Direct Bro Code prompting (future — brainstorm):** Users may eventually give a natural prompt without “Ask …” / “Tell …” verbs; the Core resolves target Bro Code + EXECUTE vs FEED. High-level only today — see deferred `[MS-DIRECT-BROCODE-PROMPT]`. Must not weaken C3 delegated scoping (§2.1 / §2.7).
 
 ### 2.9 Model Studio & Ambient Path L Loop (Arch v3.9)
 Class 1 platform capability so non–data-scientists can grow a model while living with heuristics. Pixel-perfect UX is milestone work; **states and rules** are frozen here.
@@ -195,7 +196,7 @@ Evidence states (independent of parent `[x]`): **impl** (code exists) · **auto*
 3. **S3 — Green suite + device acceptance:** keep suite green; CI + non-skipping QuickJS; accept Bridge → Core JS → LLM → Intent → Author → Refine → Dashboard.
 4. **S4 — Trust lifecycle then expand:** C4→C3→C2; structured due diligence; capability judge; Feed + marketplace shell landed in later sprints — device Accept still open.
 
-**Deferred unless you ask:** Model Studio Label/Train/Runtime, paid/public Commons, data market, chaining. Offline wake custom `.ppn` is ops (Picovoice file), not Eng.
+**Deferred unless you ask:** Model Studio Label/Train/Runtime, paid/public Commons, data market, chaining, **direct Bro Code prompt** (`[MS-DIRECT-BROCODE-PROMPT]` — brainstorm). Offline wake custom `.ppn` is ops (Picovoice file), not Eng.
 
 **Locator reconciliation (2026-07-18):** Accepted (underline) Bro Code agent/fixtures/dev-loop, platform ENG1–3, agent-refine IMPROVE path, vault dashboard BUILD/URL/RENDER/PERF, live-vs-sandbox. **Still In Review:** JS Bridge, User Ecosystem, Telemetry Dashboard (browser gate), Core Intent, Conv Author, Core JS Migration, LLM Agnostic. Run §5.1 post-sprint review tables after each sprint before flipping more italics → underlines.
 
@@ -501,6 +502,17 @@ Use Kanban: **Bold (targeted) → *Italic* (in review) → <u>Underline</u> (acc
     *   [x] *`[MS-AGENT-FEED-ENG1]` Persistent per-agent inbox in the vault plus a `System` bridge read API for agents to consume it. [IN REVIEW]*
 *   **Ecosystem & Agents:**
     *   [x] *`[MS-AGENT-FEED-AGT1]` Reference `AccountantAgent` consuming voice-"tell" cash entries as an authoring/refinement exemplar (SMS ingest later). [IN REVIEW]*
+
+### - [ ] `[MS-DIRECT-BROCODE-PROMPT]` MILESTONE: ~~Direct Bro Code Prompting (bypass Ask/Tell verbs) [DEFERRED — BRAINSTORM; not scheduled]~~
+*   **Intent (high-level):** Let the user speak or type a natural prompt that goes to the app without requiring “Ask [Bro Code] to…” or “Tell [Bro Code] that…”. The Core still classifies EXECUTE vs FEED vs AUTHOR/REFINE/DIRECT and picks a target Bro Code when unambiguous. Design needs brainstorm time (disambiguation UX, focus/sticky target, conflict with C3 “must Ask…” delegated scoping, false routing to wrong Bro Code).
+*   **User Perspective (UI/UX):**
+    *   [ ] ~~`[MS-DIRECT-BROCODE-PROMPT-UX1]` Natural prompt reaches the right Bro Code without mandatory Ask/Tell phrasing; clear feedback when target is ambiguous.~~
+    *   [ ] ~~`[MS-DIRECT-BROCODE-PROMPT-UX2]` Optional sticky “talking to [Bro Code]” focus mode vs global router (brainstorm which default).~~
+*   **Engineering & Architecture:**
+    *   [ ] ~~`[MS-DIRECT-BROCODE-PROMPT-ENG1]` Extend single-call intent parse (§2.8) to resolve target + EXECUTE/FEED from unconstrained wording; keep Ask/Tell as explicit overrides.~~
+    *   [ ] ~~`[MS-DIRECT-BROCODE-PROMPT-ENG2]` Preserve C3 delegated-scoping rules — direct routing must not wake unverified Bro Code on ambient speech.~~
+*   **Ecosystem & Agents:**
+    *   [ ] ~~`[MS-DIRECT-BROCODE-PROMPT-AGT1]` Golden utterances: Calculator/Accountant-style without Ask/Tell; ambiguity and AUTHOR/REFINE not misrouted as EXECUTE.~~
 
 ### - [ ] `[MS-AGENTIC-EXTRACT]` MILESTONE: ~~Agentic Sovereign Data Export [DEFERRED — user-created via Path A/B, not platform-built; user-authorized transfer is legitimate per §2.6]~~
 *   **User Perspective (UI/UX):**

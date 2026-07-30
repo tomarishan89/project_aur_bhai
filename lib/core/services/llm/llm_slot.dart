@@ -27,11 +27,19 @@ class ByokSlotConfig {
   final String modelName;
   final String customUrl;
 
+  /// Gemini thinking level when supported (e.g. minimal / low / medium / high).
+  final String? thinkingLevel;
+
+  /// Max output tokens for completions; null ⇒ provider/call-site default.
+  final int? maxOutputTokens;
+
   const ByokSlotConfig({
     this.provider = 'Google Gemini',
     this.apiKey = '',
-    this.modelName = 'gemini-2.0-flash',
+    this.modelName = 'gemini-3.5-flash',
     this.customUrl = '',
+    this.thinkingLevel,
+    this.maxOutputTokens,
   });
 
   bool get hasKey => apiKey.trim().isNotEmpty;
@@ -41,11 +49,21 @@ class ByokSlotConfig {
     String? apiKey,
     String? modelName,
     String? customUrl,
+    String? thinkingLevel,
+    int? maxOutputTokens,
+    bool clearThinkingLevel = false,
+    bool clearMaxOutputTokens = false,
   }) => ByokSlotConfig(
     provider: provider ?? this.provider,
     apiKey: apiKey ?? this.apiKey,
     modelName: modelName ?? this.modelName,
     customUrl: customUrl ?? this.customUrl,
+    thinkingLevel: clearThinkingLevel
+        ? null
+        : (thinkingLevel ?? this.thinkingLevel),
+    maxOutputTokens: clearMaxOutputTokens
+        ? null
+        : (maxOutputTokens ?? this.maxOutputTokens),
   );
 
   Map<String, dynamic> toJson() => {
@@ -53,15 +71,22 @@ class ByokSlotConfig {
     'apiKey': apiKey,
     'modelName': modelName,
     'customUrl': customUrl,
+    if (thinkingLevel != null) 'thinkingLevel': thinkingLevel,
+    if (maxOutputTokens != null) 'maxOutputTokens': maxOutputTokens,
   };
 
   factory ByokSlotConfig.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const ByokSlotConfig();
+    final maxRaw = json['maxOutputTokens'];
     return ByokSlotConfig(
       provider: json['provider'] as String? ?? 'Google Gemini',
       apiKey: json['apiKey'] as String? ?? '',
-      modelName: json['modelName'] as String? ?? 'gemini-2.0-flash',
+      modelName: json['modelName'] as String? ?? 'gemini-3.5-flash',
       customUrl: json['customUrl'] as String? ?? '',
+      thinkingLevel: json['thinkingLevel'] as String?,
+      maxOutputTokens: maxRaw is int
+          ? maxRaw
+          : (maxRaw is num ? maxRaw.toInt() : null),
     );
   }
 }

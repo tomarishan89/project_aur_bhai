@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import 'llm_http_errors.dart';
 import 'llm_provider.dart';
 
 /// OpenAI-compatible BYOK provider (ChatGPT + Custom OpenAI endpoints).
@@ -77,14 +78,14 @@ class OpenAiProvider extends LlmProvider {
             'messages': [
               {'role': 'user', 'content': prompt},
             ],
-            'max_tokens': maxTokens,
+            'max_tokens': config.maxOutputTokens ?? maxTokens,
             if (jsonMode) 'response_format': {'type': 'json_object'},
           }),
         )
         .timeout(timeout);
 
     if (response.statusCode != 200) {
-      throw Exception('OpenAI status ${response.statusCode}');
+      throw Exception(llmHttpError('OpenAI', response));
     }
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return data['choices'][0]['message']['content'] as String;

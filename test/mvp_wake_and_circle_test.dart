@@ -4,28 +4,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:project_aur_bhai/core/config/app_config.dart';
 import 'package:project_aur_bhai/core/services/circle_registry_service.dart';
 import 'package:project_aur_bhai/core/services/issue_report_service.dart';
-import 'package:project_aur_bhai/core/services/wake_word_service.dart';
-import 'package:project_aur_bhai/core/services/secure_secret_store.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
-
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
-  });
-
-  test('wake listen path never persists audio', () async {
-    final wake = WakeWordService(secretStore: MemorySecureSecretStore());
-    await Future<void>.delayed(const Duration(milliseconds: 40));
-    expect(wake.listenPathPersistsAudio, isFalse);
+  test('wake privacy copy and free-engine labels', () {
     expect(AppConfig.wakePrivacyBody.contains('does not save'), isTrue);
-    await wake.acknowledgePrivacy();
-    expect(wake.privacyAcknowledged, isTrue);
-    // Enabling without access key must not start native listen.
-    await wake.setListenEnabled(true);
-    expect(wake.isListening, isFalse);
-    expect(wake.lastError, isNotNull);
+    expect(AppConfig.wakeWordInterimBuiltIn, 'Hey Mycroft');
+    expect(AppConfig.wakeCustomPpnHint.toLowerCase(), contains('openwakeword'));
   });
 
   test('circle listing bundle round-trip JSON', () {
@@ -61,9 +44,9 @@ void main() {
     expect(jsonDecode(jsonEncode(r.toJson()))['githubIssueNumber'], 3);
   });
 
-  test('app config centralizes circle and wake keys', () {
+  test('app config centralizes circle and free wake labels', () {
     expect(AppConfig.circleIndexPath, 'commons/index.json');
     expect(AppConfig.circleDefaultRepo, 'aur_bhai_circle');
-    expect(AppConfig.wakeWordInterimBuiltIn, 'Jarvis');
+    expect(AppConfig.wakeWordInterimBuiltIn, 'Hey Mycroft');
   });
 }

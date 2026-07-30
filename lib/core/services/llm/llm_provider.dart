@@ -5,11 +5,15 @@ class LlmProviderConfig {
   final String apiKey;
   final String model;
   final String customUrl;
+  final String? thinkingLevel;
+  final int? maxOutputTokens;
 
   const LlmProviderConfig({
     required this.apiKey,
     required this.model,
     this.customUrl = '',
+    this.thinkingLevel,
+    this.maxOutputTokens,
   });
 }
 

@@ -34,6 +34,41 @@ void main() {
     expect(byok.configForSlot(LlmSlot.author).apiKey, 'default-key');
   });
 
+  test('main form save syncs Default slot model when multi-slot on', () async {
+    final byok = ByokService(secretStore: MemorySecureSecretStore());
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await byok.updateConfig(
+      provider: 'Google Gemini',
+      apiKey: 'default-key',
+      modelName: 'gemini-2.0-flash',
+      customUrl: '',
+    );
+    await byok.setMultiSlotEnabled(true);
+    await byok.updateSlot(
+      LlmSlot.defaultSlot,
+      const ByokSlotConfig(
+        provider: 'Google Gemini',
+        apiKey: 'default-key',
+        modelName: 'gemini-2.0-flash',
+      ),
+    );
+    await byok.updateConfig(
+      provider: 'Google Gemini',
+      apiKey: 'default-key',
+      modelName: 'gemini-3.5-flash',
+      customUrl: '',
+    );
+    expect(byok.modelName, 'gemini-3.5-flash');
+    expect(
+      byok.configForSlot(LlmSlot.language).modelName,
+      'gemini-3.5-flash',
+    );
+    expect(
+      byok.dedicatedSlotOrNull(LlmSlot.defaultSlot)?.modelName,
+      'gemini-3.5-flash',
+    );
+  });
+
   test('multi-slot fallback + dedicated routing', () async {
     final byok = ByokService(secretStore: MemorySecureSecretStore());
     await Future<void>.delayed(const Duration(milliseconds: 50));

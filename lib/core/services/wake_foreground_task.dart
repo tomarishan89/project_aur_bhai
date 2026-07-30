@@ -5,7 +5,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 import '../config/app_config.dart';
 
-/// Keeps the process eligible for background mic while Porcupine listens
+/// Keeps the process eligible for background mic while openWakeWord listens
 /// (MS-OFFLINE-WAKE). Does not capture or persist audio itself.
 @pragma('vm:entry-point')
 void wakeForegroundStartCallback() {

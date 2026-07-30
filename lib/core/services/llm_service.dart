@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'byok_service.dart';
 import 'agent_service.dart';
 import '../agents/agent_base.dart';
+import 'llm/llm_http_errors.dart';
 import 'llm/llm_provider.dart';
 import 'llm/llm_provider_factory.dart';
 import 'llm/llm_slot.dart';
@@ -268,6 +269,8 @@ class LlmService {
     final byok = _ref.read(byokServiceProvider);
     final slot = audioFilePath != null ? LlmSlot.language : LlmSlot.intent;
 
+    final slotCfg = byok.configForSlot(slot);
+
     if (!byok.hasKeyForSlot(slot)) {
       return TurnParsedResponse.fallback(
         'Please configure your API Key (${slot.label}) in Settings to enable AI.',
@@ -295,7 +298,8 @@ class LlmService {
         }
         if (!provider.supportsAudioInput) {
           return TurnParsedResponse.fallback(
-            '${provider.id} does not support direct audio. Please use Gemini or OpenAI.',
+            '${provider.id} cannot hear voice. '
+            'Set Language (or default) LLM to Google Gemini or OpenAI ChatGPT in Settings.',
           );
         }
         if (provider.prefersAudioDirect) {
@@ -303,7 +307,7 @@ class LlmService {
             prompt: prompt,
             audio: file,
             jsonMode: true,
-            timeout: const Duration(seconds: 20),
+            timeout: const Duration(seconds: 45),
           );
         } else {
           final transcript = await provider.transcribe(file);
@@ -320,7 +324,7 @@ class LlmService {
         responseBody = await provider.complete(
           prompt: prompt,
           jsonMode: true,
-          timeout: const Duration(seconds: 15),
+          timeout: const Duration(seconds: 45),
         );
       }
 
@@ -329,9 +333,7 @@ class LlmService {
       return _turnFromDecoded(decoded);
     } catch (e) {
       debugPrint('[LlmService parseTurn] Error: $e');
-      return TurnParsedResponse.fallback(
-        'I had trouble communicating with the AI. Check connection and keys.',
-      );
+      return TurnParsedResponse.fallback(llmUserFacingError(e));
     }
   }
 
@@ -359,7 +361,7 @@ class LlmService {
 You are the central AI intent router for 'Project Aur Bhai', a Mobile Agentic OS.
 Respond in English only.
 Classify the user's utterance into EXACTLY ONE intent:
-- "execute": user wants an existing registered agent to run. Cue: "Ask <agent> to ...", or a direct request matching a registered agent.
+- "execute": user wants an existing registered agent to run. Cue: "Ask <agent> …", "Tell <agent> …", or a direct request matching a registered agent.
 - "feed": user pushes runtime data into an agent. Cue: "Tell <agent> that ...".
 - "author": user wants to CREATE a new agent/app/tool/dashboard/bot. Cue (treat ALL of these as author, even if details are sparse):
   "Build / Make / Create / Get me / I want / I need … an agent / app / tool / dashboard / bot",

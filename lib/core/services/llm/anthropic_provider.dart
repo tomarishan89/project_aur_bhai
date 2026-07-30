@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'llm_http_errors.dart';
 import 'llm_provider.dart';
 
 /// Anthropic Claude BYOK provider — text completion only.
@@ -48,7 +49,7 @@ class AnthropicProvider extends LlmProvider {
           },
           body: jsonEncode({
             'model': config.model,
-            'max_tokens': maxTokens,
+            'max_tokens': config.maxOutputTokens ?? maxTokens,
             'messages': [
               {'role': 'user', 'content': prompt},
             ],
@@ -57,7 +58,7 @@ class AnthropicProvider extends LlmProvider {
         .timeout(timeout);
 
     if (response.statusCode != 200) {
-      throw Exception('Anthropic status ${response.statusCode}');
+      throw Exception(llmHttpError('Anthropic', response));
     }
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return data['content'][0]['text'] as String;

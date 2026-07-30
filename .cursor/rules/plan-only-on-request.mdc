@@ -1,0 +1,32 @@
+---
+description: Do not create or write plans unless the user explicitly asks to plan
+alwaysApply: true
+---
+
+# Plan only on explicit request
+
+Do **not** enter Plan mode, call `CreatePlan`, write or amend `*.plan.md` files, or invent a planning gate unless the user **explicitly** asks to plan.
+
+## Trigger phrases (examples) — only these count
+
+- "lets plan" / "let's plan"
+- "ok create a plan" / "create a plan"
+- "write a plan" / "plan this"
+- "make a plan for …"
+
+## Not plan requests (answer or implement per their ask)
+
+- Feature ideas, UX questions, “is it possible…”, “what do you suggest”
+- Bug reports and debug work
+- “add X”, “fix Y”, “can we have a dropdown”
+- Feasibility / architecture chat without the word plan
+
+Brainstorming is **not** permission to create a plan document.
+
+## If you almost plan by habit
+
+Stop. Answer in chat (or implement if they asked to build). Only plan after an explicit trigger above.
+
+## When planning is requested
+
+Follow project `plan-built-status` and related plan rules as usual.
