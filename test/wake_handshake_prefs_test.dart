@@ -39,12 +39,14 @@ void main() {
     expect(byok.responseMode, byok.tapResponseMode);
   });
 
-  test('free wake catalog excludes trademark assistants', () {
-    final ids = WakeHandshakeConfig.wakeCatalog.map((s) => s.id);
-    expect(ids, isNot(contains('hey_jarvis')));
+  test('free wake catalog prefers Jarvis and excludes Alexa', () {
+    final ids = WakeHandshakeConfig.wakeCatalog.map((s) => s.id).toList();
+    expect(ids.first, 'hey_jarvis');
+    expect(ids, contains('hey_rhasspy'));
+    expect(ids, contains('hey_mycroft'));
     expect(ids, isNot(contains('alexa')));
-    expect(WakeHandshakeConfig.defaultWakeModelId, 'hey_mycroft');
-    expect(AppConfig.wakeWordInterimBuiltIn, 'Hey Mycroft');
+    expect(WakeHandshakeConfig.defaultWakeModelId, 'hey_jarvis');
+    expect(AppConfig.wakeWordInterimBuiltIn, 'Hey Jarvis');
   });
 
   test('hold ack modes never include Spoken Word', () {

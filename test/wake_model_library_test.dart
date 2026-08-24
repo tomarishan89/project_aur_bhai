@@ -3,13 +3,11 @@ import 'package:project_aur_bhai/core/config/wake_handshake_config.dart';
 import 'package:project_aur_bhai/core/services/wake_model_library.dart';
 
 void main() {
-  test('catalog excludes trademark assistants', () {
+  test('catalog order Jarvis then Rhasspy then Mycroft', () {
     final ids = WakeHandshakeConfig.wakeCatalog.map((s) => s.id).toList();
-    expect(ids, contains('hey_mycroft'));
-    expect(ids, contains('hey_rhasspy'));
+    expect(ids, ['hey_jarvis', 'hey_rhasspy', 'hey_mycroft']);
     expect(ids, isNot(contains('alexa')));
-    expect(ids, isNot(contains('hey_jarvis')));
-    expect(WakeHandshakeConfig.defaultWakeModelId, 'hey_mycroft');
+    expect(WakeHandshakeConfig.defaultWakeModelId, 'hey_jarvis');
   });
 
   test('normalize migrates old Porcupine ids to default', () {
@@ -21,16 +19,25 @@ void main() {
       WakeHandshakeConfig.normalizeWakeModelId('hey_rhasspy'),
       'hey_rhasspy',
     );
+    expect(
+      WakeHandshakeConfig.normalizeWakeModelId('hey_mycroft'),
+      'hey_mycroft',
+    );
   });
 
-  test('bundled model cannot be deleted', () async {
+  test('bundled Jarvis cannot be deleted', () async {
     final lib = WakeModelLibrary();
-    await expectLater(lib.delete('hey_mycroft'), throwsA(isA<StateError>()));
+    await expectLater(lib.delete('hey_jarvis'), throwsA(isA<StateError>()));
   });
 
-  test('hey_rhasspy is downloadable not bundled', () {
-    final spec = WakeHandshakeConfig.specForId('hey_rhasspy')!;
-    expect(spec.bundled, isFalse);
-    expect(spec.downloadUrl, isNotNull);
+  test('Rhasspy and Mycroft are downloadable not bundled', () {
+    final rhasspy = WakeHandshakeConfig.specForId('hey_rhasspy')!;
+    expect(rhasspy.bundled, isFalse);
+    expect(rhasspy.downloadUrl, isNotNull);
+
+    final mycroft = WakeHandshakeConfig.specForId('hey_mycroft')!;
+    expect(mycroft.bundled, isFalse);
+    expect(mycroft.downloadUrl, isNotNull);
+    expect(mycroft.assetPath, isNull);
   });
 }

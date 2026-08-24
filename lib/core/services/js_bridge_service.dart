@@ -9,6 +9,7 @@ import 'package:quickjs_engine/quickjs_engine.dart';
 import '../pipeline/bro_code_capability_judge.dart';
 import 'agent_feed_service.dart';
 import 'bro_call_service.dart';
+import 'local_server_service.dart';
 import 'telemetry_bus.dart';
 
 /// Outcome of a single JS agent sandbox run.
@@ -42,11 +43,13 @@ class JsBridgeService {
   final TelemetryBusService _telemetry;
   final AgentFeedService? _feed;
   final BroCallService? _broCalls;
+  final LocalServerService? _localServer;
 
   JsBridgeService(
     this._telemetry, {
-    AgentFeedService? this._feed,
-    BroCallService? this._broCalls,
+    this._feed,
+    this._broCalls,
+    this._localServer,
   });
 
   /// Parses [script] without calling execute — blocks save of broken JS.
@@ -235,6 +238,11 @@ $script
         mimeType: mimeType,
         ttl: isHtml ? const Duration(hours: 24) : null,
       );
+      // Auto-enable LAN when any Bro Code publishes an HTML dashboard.
+      // The act of writing a dashboard implies intent to open it in a browser.
+      if (isHtml) {
+        _localServer?.setLanExposureEnabled(true);
+      }
       if (mimeType.toLowerCase().contains('html') ||
           key.toLowerCase().endsWith('.html')) {
         htmlKeysOut.add(key);
@@ -248,6 +256,21 @@ $script
       );
       onStepLog?.call('System.writeVault ← ok');
       return {'success': true, 'key': key};
+    });
+
+    runtime.onMessage('AurBhai_readVault', (dynamic args) async {
+      final key = args['key'] as String? ?? '';
+      onStepLog?.call('System.readVault → $key');
+      final entry = await _telemetry.readVaultData(key);
+      eventsOut.add(
+        BroCodeExecutionEvent(
+          kind: 'readVault',
+          data: {'key': key, 'found': entry != null},
+          summary: 'readVault $key (${entry != null ? 'found' : 'not found'})',
+        ),
+      );
+      if (entry == null) return null;
+      return entry['value'];
     });
 
     runtime.onMessage('AurBhai_sendHTTP', (dynamic args) async {
@@ -382,6 +405,11 @@ const System = {
       mimeType: mimeType || 'text/plain'
     }));
   },
+  readVault: function(key) {
+    return sendMessage('AurBhai_readVault', JSON.stringify({
+      key: String(key)
+    }));
+  },
   sendHTTP: function(url, payload) {
     return sendMessage('AurBhai_sendHTTP', JSON.stringify({
       url: String(url),
@@ -412,6 +440,9 @@ const System = {
   // Read-only sidecars (HTML / manifest / SW). Do not mutate.
   assets: Object.freeze(${jsonEncode(assets)})
 };
+
+// Backwards compatibility for older Bro Codes that expected VAULT_ASSETS
+const VAULT_ASSETS = System.assets;
 ''';
 
   String _parseJsResult(JsEvalResult result) {
@@ -432,5 +463,11 @@ final jsBridgeServiceProvider = Provider<JsBridgeService>((ref) {
   final telemetry = ref.watch(telemetryBusProvider);
   final feed = ref.watch(agentFeedServiceProvider);
   final broCalls = ref.watch(broCallServiceProvider);
-  return JsBridgeService(telemetry, feed: feed, broCalls: broCalls);
+  final localServer = ref.watch(localServerProvider);
+  return JsBridgeService(
+    telemetry,
+    feed: feed,
+    broCalls: broCalls,
+    localServer: localServer,
+  );
 });

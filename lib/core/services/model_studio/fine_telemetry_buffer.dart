@@ -8,6 +8,11 @@ class FineTelemetrySample {
   final double longitude;
   final double accelerometerZ;
   final double compassDirection;
+  // Extended sensor fields (optional — absent if sensor not available)
+  final double? accelMagnitude;
+  final double? gyroMagnitude;
+  final double? pressure;
+  final double? altitude;
 
   const FineTelemetrySample({
     required this.at,
@@ -15,6 +20,10 @@ class FineTelemetrySample {
     required this.longitude,
     required this.accelerometerZ,
     required this.compassDirection,
+    this.accelMagnitude,
+    this.gyroMagnitude,
+    this.pressure,
+    this.altitude,
   });
 
   /// Lossy write-time compression: round coords / accel for storage.
@@ -24,6 +33,14 @@ class FineTelemetrySample {
     'lng': double.parse(longitude.toStringAsFixed(5)),
     'z': double.parse(accelerometerZ.toStringAsFixed(2)),
     'h': double.parse(compassDirection.toStringAsFixed(1)),
+    if (accelMagnitude != null)
+      'am': double.parse(accelMagnitude!.toStringAsFixed(2)),
+    if (gyroMagnitude != null)
+      'gm': double.parse(gyroMagnitude!.toStringAsFixed(3)),
+    if (pressure != null)
+      'p': double.parse(pressure!.toStringAsFixed(1)),
+    if (altitude != null)
+      'alt': double.parse(altitude!.toStringAsFixed(1)),
   };
 
   factory FineTelemetrySample.fromCompressedJson(Map<String, dynamic> json) {
@@ -36,6 +53,10 @@ class FineTelemetrySample {
       longitude: (json['lng'] as num?)?.toDouble() ?? 0,
       accelerometerZ: (json['z'] as num?)?.toDouble() ?? 0,
       compassDirection: (json['h'] as num?)?.toDouble() ?? 0,
+      accelMagnitude: (json['am'] as num?)?.toDouble(),
+      gyroMagnitude: (json['gm'] as num?)?.toDouble(),
+      pressure: (json['p'] as num?)?.toDouble(),
+      altitude: (json['alt'] as num?)?.toDouble(),
     );
   }
 }

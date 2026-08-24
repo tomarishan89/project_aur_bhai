@@ -436,11 +436,15 @@ class _AmbientHubScreenState extends ConsumerState<AmbientHubScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final c = _collector;
     if (c == null) return;
+    final serverRunning = ref.read(localServerProvider).isRunning;
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
-      unawaited(c.pause());
+      if (!serverRunning) {
+        unawaited(c.pause());
+      }
     } else if (state == AppLifecycleState.resumed) {
       unawaited(c.resume());
+      c.resubscribeSensors();
       unawaited(ref.read(issueReportServiceProvider).refreshStatuses());
       final wake = ref.read(wakeWordServiceProvider);
       if (wake.isAlwaysOn && wake.listenEnabled) {
@@ -757,6 +761,9 @@ class _CommandCenterPageState extends ConsumerState<_CommandCenterPage>
   @override
   Widget build(BuildContext context) {
     final eng = ref.watch(voiceHandshakeProvider);
+    eng.onAutoLaunchDashboard ??= (url) {
+      if (mounted) launchInBrowser(context, url);
+    };
     final byok = ref.watch(byokServiceProvider);
     final server = ref.watch(localServerProvider);
     final session = ref.watch(conversationalSessionProvider);
@@ -2591,6 +2598,44 @@ class _EdgeServerPanel extends ConsumerWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'DEVELOPER MODE (MCP BRIDGE)',
+                      style: TextStyle(
+                        color: Colors.amber,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Connect Antigravity, Cursor, or Claude Desktop to this phone to author Bhai Code over Wi-Fi.',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
+                    SelectableText(
+                      'python tool/mcp_proxy.py --url ${server.lanServerAddress}/api/mcp --token ${server.pairingToken}',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        color: Colors.greenAccent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
             ],
             ListenableBuilder(
               listenable: ref.watch(telemetryCollectorProvider),
@@ -3815,6 +3860,7 @@ class _AgentAuthoringSheetState extends ConsumerState<_AgentAuthoringSheet> {
   bool _aiMode = true;
   bool _busy = false;
   String? _error;
+  AuthoredAgentDraft? _draft; // retains assetUpdates from the last AI generation
 
   final _promptCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
@@ -3843,6 +3889,7 @@ class _AgentAuthoringSheetState extends ConsumerState<_AgentAuthoringSheet> {
       final draft = await ref
           .read(llmServiceProvider)
           .authorAgent(_promptCtrl.text.trim());
+      _draft = draft; // keep the full draft so _save() can forward assetUpdates
       _nameCtrl.text = draft.name;
       _descCtrl.text = draft.description;
       _scriptCtrl.text = draft.script;
@@ -3891,6 +3938,10 @@ class _AgentAuthoringSheetState extends ConsumerState<_AgentAuthoringSheet> {
       final verification = ref.read(agentVerificationProvider);
       final scan = verification.scanScript(script);
 
+      // Forward any LLM-generated vault assets (e.g. dashboard HTML) into the
+      // registry so they are persisted alongside the script in the vault.
+      final assets = _draft?.assetUpdates;
+
       await ref
           .read(jsAgentRegistryProvider)
           .saveAndRegisterAgent(
@@ -3900,6 +3951,7 @@ class _AgentAuthoringSheetState extends ConsumerState<_AgentAuthoringSheet> {
                 : _descCtrl.text.trim(),
             inputSchema: schema,
             script: script,
+            vaultAssets: assets != null && assets.isNotEmpty ? assets : null,
             securityClass: AgentSecurityClass.c4Unverified,
             source: BhaiCodeOrigin.self,
           );
@@ -4168,10 +4220,18 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
     final bus = ref.read(telemetryBusProvider);
     final entries = await bus.listVaultEntries(mimeType: 'text/html');
     final name = widget.agent.name.toLowerCase();
+    final seen = <String>{};
     final related = entries.where((e) {
       final key = (e['key'] ?? '').toLowerCase();
-      return key.contains(name) ||
-          key.contains('agent:${widget.agent.name}'.toLowerCase());
+      // Skip internal scoped asset keys (agent:<Name>:asset:<file>) — these are
+      // vault-delivery keys, not URLs the local server actually serves.
+      if (key.startsWith('agent:') && key.contains(':asset:')) return false;
+      final matches = key.contains(name);
+      if (!matches) return false;
+      // Deduplicate by URL so the same HTML stored under multiple bare keys
+      // (e.g. telemeter.html + telemetry_dashboard.html) shows as separate entries.
+      final url = e['url'] ?? key;
+      return seen.add(url);
     }).toList();
     if (mounted) setState(() => _relatedDashboards = related);
   }

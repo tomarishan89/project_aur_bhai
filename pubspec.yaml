@@ -95,7 +95,11 @@ flutter:
   assets:
     - assets/wake/melspectrogram.onnx
     - assets/wake/embedding_model.onnx
-    - assets/wake/hey_mycroft_v0.1.onnx
+    - assets/wake/hey_jarvis_v0.1.onnx
+    - assets/bro_code/telemeter/script.js
+    - assets/bro_code/telemeter/dashboard.html
+    - assets/bro_code/accountant/script.js
+    - assets/bro_code/accountant/dashboard.html
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

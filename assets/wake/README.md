@@ -2,6 +2,6 @@
 
 Bundled from https://github.com/dscripka/openWakeWord/releases/tag/v0.5.1
 - melspectrogram.onnx, embedding_model.onnx (shared)
-- hey_mycroft_v0.1.onnx (default wake)
+- hey_jarvis_v0.1.onnx (default wake)
 
-Optional models (e.g. hey_rhasspy) download at runtime into app documents.
+Optional models (hey_rhasspy, hey_mycroft) download at runtime into app documents.

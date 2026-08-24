@@ -276,4 +276,88 @@ void main() {
 
     bus.dispose();
   });
+
+  test('resume resets backoff streak and restarts collection immediately', () async {
+    final bus = _freshBus();
+    await bus.initialize();
+
+    var reads = 0;
+    final collector = TelemetryCollector(
+      bus: bus,
+      sampleInterval: const Duration(milliseconds: 30),
+      forceMobilePlatform: true,
+      requestLocationPermission: () async => true,
+      accelerometerEvents: () => const Stream.empty(),
+      readPosition: () async {
+        reads++;
+        if (reads == 1) throw TimeoutException('first read timeout');
+        return Position(
+          longitude: 77.0,
+          latitude: 28.0,
+          timestamp: DateTime.now(),
+          accuracy: 5,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          headingAccuracy: 0,
+          speed: 0,
+          speedAccuracy: 0,
+        );
+      },
+    );
+
+    await collector.start();
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(collector.status, TelemetryCollectorStatus.backoff);
+
+    // Upon phone unlock / resume, backoff is cleared and sampling happens immediately
+    await collector.resume();
+    expect(collector.status, TelemetryCollectorStatus.running);
+    expect(collector.currentBackoff, Duration.zero);
+
+    final rows = await bus.getRecentRecords(5);
+    expect(rows, isNotEmpty);
+    expect(rows.first.latitude, closeTo(28.0, 0.001));
+
+    await collector.stop();
+    bus.dispose();
+  });
+
+  test('resubscribeSensors reconnects streams while running', () async {
+    final bus = _freshBus();
+    await bus.initialize();
+
+    var streamCreations = 0;
+    final collector = TelemetryCollector(
+      bus: bus,
+      sampleInterval: const Duration(hours: 1),
+      forceMobilePlatform: true,
+      requestLocationPermission: () async => true,
+      accelerometerEvents: () {
+        streamCreations++;
+        return Stream.value(AccelerometerEvent(1.0, 2.0, 9.8, DateTime.now()));
+      },
+      readPosition: () async => Position(
+        longitude: 0,
+        latitude: 0,
+        timestamp: DateTime.now(),
+        accuracy: 0,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0,
+      ),
+    );
+
+    await collector.start();
+    expect(streamCreations, 1);
+
+    collector.resubscribeSensors();
+    expect(streamCreations, 2);
+
+    await collector.stop();
+    bus.dispose();
+  });
 }

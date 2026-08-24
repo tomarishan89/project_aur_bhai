@@ -24,6 +24,7 @@ import 'conversational_session_service.dart';
 import 'agent_verification_service.dart';
 import 'js_agent_registry.dart';
 import 'agent_feed_service.dart';
+import 'local_server_service.dart';
 import 'model_studio/bro_code_ml_meta.dart';
 import 'telemetry_bus.dart';
 import 'bro_call_service.dart';
@@ -54,6 +55,7 @@ class VoiceHandshakeEngine extends ChangeNotifier {
 
   VoidCallback? onFlashGlanceTriggered;
   VoidCallback? onWakeWordDetected;
+  void Function(String url)? onAutoLaunchDashboard;
 
   bool isMicListening = false;
   String lastTranscribedWords = "";
@@ -236,6 +238,30 @@ class VoiceHandshakeEngine extends ChangeNotifier {
         'Stored inbox entry ${entry.id} for $name: $payload',
       );
       notifyListeners();
+
+      // Check if target agent is available to process feed immediately for smart confirmation
+      final agentService = _ref.read(agentServiceProvider);
+      final agent = agentService.findAgent(name);
+      if (agent != null && (agent is! JsAgentAdapter || agent.canExecute)) {
+        try {
+          final runResult = await _runAgent(agent, {'text': payload, 'feedEntryId': entry.id});
+          if (runResult.isNotEmpty && !runResult.toLowerCase().contains('error')) {
+            await speak(runResult);
+            if (agent is JsAgentAdapter && agent.lastExecutionResult != null) {
+              final keys = agent.lastExecutionResult!.vaultHtmlKeysWritten;
+              if (keys.isNotEmpty) {
+                final server = _ref.read(localServerProvider);
+                final url = server.vaultUrl(keys.first);
+                onAutoLaunchDashboard?.call(url);
+              }
+            }
+            return;
+          }
+        } catch (e) {
+          debugPrint('[VoiceHandshake] Auto-run agent on feed failed: $e');
+        }
+      }
+
       await speak('Got it. Told $name: $payload');
     } catch (e) {
       _addLog('Feed Intent', 'Failed: $e', isError: true);
@@ -287,6 +313,15 @@ class VoiceHandshakeEngine extends ChangeNotifier {
 
     await speak(result);
     onFlashGlanceTriggered?.call();
+
+    if (agent is JsAgentAdapter && agent.lastExecutionResult != null) {
+      final keys = agent.lastExecutionResult!.vaultHtmlKeysWritten;
+      if (keys.isNotEmpty) {
+        final server = _ref.read(localServerProvider);
+        final url = server.vaultUrl(keys.first);
+        onAutoLaunchDashboard?.call(url);
+      }
+    }
   }
 
   Future<void> _beginAuthorSession(TurnParsedResponse turn) async {
@@ -549,6 +584,7 @@ class VoiceHandshakeEngine extends ChangeNotifier {
         description: spec.name.hasValue ? displayName : draft.description,
         inputSchema: schemaParams,
         script: draft.script,
+        vaultAssets: draft.assetUpdates.isNotEmpty ? draft.assetUpdates : null,
         securityClass: AgentSecurityClass.c4Unverified,
         mlMeta: mlMeta,
       );

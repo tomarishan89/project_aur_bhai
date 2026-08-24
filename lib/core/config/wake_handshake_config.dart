@@ -18,15 +18,15 @@ class WakeHandshakeConfig {
   static const List<String> listenModes = [listenAlwaysOn, listenOnDemand];
 
   /// Default free pretrained wake (bundled in APK).
-  static const String defaultWakeModelId = 'hey_mycroft';
+  static const String defaultWakeModelId = 'hey_jarvis';
 
-  /// Catalog of free openWakeWord models (no trademark assistant brands).
+  /// Catalog of free openWakeWord models (preference: Jarvis → Rhasspy → Mycroft).
   static const List<WakeModelSpec> wakeCatalog = [
     WakeModelSpec(
-      id: 'hey_mycroft',
-      label: 'Hey Mycroft',
-      fileName: 'hey_mycroft_v0.1.onnx',
-      assetPath: 'assets/wake/hey_mycroft_v0.1.onnx',
+      id: 'hey_jarvis',
+      label: 'Hey Jarvis',
+      fileName: 'hey_jarvis_v0.1.onnx',
+      assetPath: 'assets/wake/hey_jarvis_v0.1.onnx',
       downloadUrl: null,
       bundled: true,
     ),
@@ -37,6 +37,15 @@ class WakeHandshakeConfig {
       assetPath: null,
       downloadUrl:
           'https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_rhasspy_v0.1.onnx',
+      bundled: false,
+    ),
+    WakeModelSpec(
+      id: 'hey_mycroft',
+      label: 'Hey Mycroft',
+      fileName: 'hey_mycroft_v0.1.onnx',
+      assetPath: null,
+      downloadUrl:
+          'https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_mycroft_v0.1.onnx',
       bundled: false,
     ),
   ];

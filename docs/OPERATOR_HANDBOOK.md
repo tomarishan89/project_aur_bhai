@@ -111,7 +111,7 @@ Do **not** put LLM API keys in the friend APK workflow unless you later implemen
 1. Connect the Bluetooth headset; confirm Command Center shows **Bluetooth**.
 2. Settings → **WAKE & HANDSHAKE**:
    - **Listen:** Always-on (for wake word) or On-demand (UI / media controls only)
-   - **Wake word library:** default **Hey Mycroft** (bundled, free openWakeWord). Optional: Download **Hey Rhasspy**, set **Use**, or **Delete** dormant downloads to free space.
+   - **Wake word library:** default **Hey Jarvis** (bundled, free openWakeWord). Optional: Download **Hey Rhasspy** / **Hey Mycroft**, set **Use**, or **Delete** dormant downloads to free space.
    - No Picovoice AccessKey (Porcupine deferred until scale).
    - **Tap ack:** Spoken (Response word e.g. Haan bhai) / Sound / Silent
    - **Hold ack:** Haptic / Beep / Silent (never spoken)
@@ -122,7 +122,7 @@ Do **not** put LLM API keys in the friend APK workflow unless you later implemen
 ### 2.2 Always-on path
 
 1. Keep the wake notification visible (“Listening for wake word…”).
-2. Say the **active** wake phrase (e.g. “Hey Mycroft”) → Command Center may flash **Heard:** → wait for tap ack → speak command.
+2. Say the **active** wake phrase (e.g. “Hey Jarvis”) → Command Center may flash **Heard:** → wait for tap ack → speak command.
 3. With Spotify/YouTube playing: music should duck/pause during the turn, then resume.
 4. During a phone call: handshake should refuse (busy message).
 
@@ -137,7 +137,7 @@ Do **not** put LLM API keys in the friend APK workflow unless you later implemen
 
 1. Settings → Wake word library → **Download** (needs network once).
 2. **Use** to make it active (only one active; others stay dormant on disk).
-3. **Delete** a dormant download to reclaim space (cannot delete bundled Hey Mycroft or the active model).
+3. **Delete** a dormant download to reclaim space (cannot delete bundled Hey Jarvis or the active model).
 
 ---
 

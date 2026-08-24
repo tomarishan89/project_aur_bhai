@@ -7,6 +7,7 @@ import 'core/services/telemetry_bus.dart';
 import 'core/services/voice_handshake_engine.dart';
 import 'core/services/local_server_service.dart';
 import 'core/services/js_agent_registry.dart';
+import 'core/services/marketplace_catalog.dart';
 import 'presentation/screens/ambient_hub.dart';
 
 void main() async {
@@ -43,10 +44,14 @@ void main() async {
   await jsRegistry
       .seedCoreAgentsIfMissing(); // MS-CORE-JS-MIGRATION: Calculator + DrivingCoach as C2 JS agents
   await jsRegistry.seedDemoAgentIfMissing();
-  await jsRegistry
-      .consumeFriendInstallQueueIfPresent(); // S15 friend fixture replay
+  await jsRegistry.consumeFriendInstallQueueIfPresent(); // S15 friend fixture replay
   final jsAgentCount = await jsRegistry.loadAndRegisterAgents();
   debugPrint('[Main] JS Bridge: $jsAgentCount vault agent(s) registered.');
+
+  // Auto-upgrade any installed seed-catalog agent whose script has changed.
+  // This means users never have to delete + re-pick Telemeter etc. after updates.
+  await container.read(marketplaceCatalogProvider).upgradeSeedListings();
+  debugPrint('[Main] Seed catalog upgrade check complete.');
 
   // Live GPS/accel → sovereign vault starts after first UI frame (AmbientHub).
   // Sandbox / due-diligence Bro Code never receives that stream.

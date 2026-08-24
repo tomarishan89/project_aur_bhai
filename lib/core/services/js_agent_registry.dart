@@ -181,11 +181,12 @@ class JsAgentRegistry {
   ///
   /// This is the shared sink for both LLM authoring (Path A) and manual
   /// import (Path B). Vault convention: `agent:<Name>` + `agent:<Name>:schema`.
-  Future<JsAgentAdapter> saveAndRegisterAgent({
+    Future<JsAgentAdapter> saveAndRegisterAgent({
     required String name,
     required String description,
     required Map<String, AgentParameter> inputSchema,
     required String script,
+    Map<String, String>? vaultAssets,
     AgentSecurityClass securityClass = AgentSecurityClass.c4Unverified,
     String? source,
     bool? diligencePassed,
@@ -237,6 +238,20 @@ class JsAgentRegistry {
       script,
       mimeType: 'application/javascript',
     );
+    if (vaultAssets != null && vaultAssets.isNotEmpty) {
+      for (final entry in vaultAssets.entries) {
+        final mime = entry.key.endsWith('.html') ? 'text/html' : 'text/plain';
+        // Write under scoped key so readAgentAssets() can find it on reload.
+        await telemetry.writeVaultData(
+          '${vaultKeyFor(name)}:asset:${entry.key}',
+          entry.value,
+          mimeType: mime,
+        );
+        // Also write the bare key so scripts that do writeVault('telemeter.html', ...)
+        // via System.writeVault still work and the local server can serve them.
+        await telemetry.writeVaultData(entry.key, entry.value, mimeType: mime);
+      }
+    }
     var schemaMap = <String, dynamic>{
       'name': name,
       'description': description,
@@ -249,6 +264,9 @@ class JsAgentRegistry {
         (key, param) => MapEntry(key, param.toJson()),
       ),
     };
+    if (vaultAssets != null && vaultAssets.isNotEmpty) {
+      schemaMap['vaultAssets'] = vaultAssets;
+    }
     if (mlMeta != null) {
       schemaMap = BroCodeMlMeta.mergeIntoSchema(schemaMap, mlMeta);
     } else if (priorMl != null) {

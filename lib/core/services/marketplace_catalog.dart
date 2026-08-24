@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../agents/agent_base.dart';
@@ -7,6 +9,7 @@ import '../agents/js_agent_adapter.dart';
 import 'bhai_code_access.dart';
 import 'bhai_code_origin.dart';
 import 'js_agent_registry.dart';
+import 'js_bridge_service.dart';
 import 'telemetry_bus.dart';
 
 /// Local Sabke Bhai pool listing (seed catalog; Friend Circle is remote).
@@ -19,6 +22,8 @@ class MarketplaceListing {
   final String license;
   final String author;
   final BhaiCodeAccess access;
+  final Map<String, String> vaultAssets;
+  final String? assetBundleDir;
 
   const MarketplaceListing({
     required this.id,
@@ -29,6 +34,8 @@ class MarketplaceListing {
     this.license = 'remix_free',
     this.author = '',
     this.access = BhaiCodeAccess.defaults,
+    this.vaultAssets = const {},
+    this.assetBundleDir,
   });
 }
 
@@ -40,58 +47,67 @@ class MarketplaceCatalog {
 
   static final List<MarketplaceListing> seedListings = [
     MarketplaceListing(
-      id: 'pool-tip-jar',
-      name: 'TipJar',
+      id: 'pool-accountant',
+      name: 'Accountant',
       description:
-          'Tracks cash tips told via voice feed. Uses System.readInbox.',
+          'Sovereign expenditure logger & PWA dashboard. Multi-item voice feed, spend Q&A, and category charts.',
       license: 'remix_free',
-      script: r'''
-async function execute(params) {
-  System.log('TipJar reading inbox…');
-  const items = await System.readInbox({ unreadOnly: true, limit: 20 });
-  if (!items || items.length === 0) {
-    return 'No new tip entries. Tell TipJar that you received an amount.';
-  }
-  let total = 0;
-  const ids = [];
-  for (const item of items) {
-    ids.push(item.id);
-    const m = String(item.text).match(/(\d+(?:\.\d+)?)/);
-    if (m) total += Number(m[1]);
-  }
-  await System.consumeInbox({ ids: ids });
-  return 'Logged ' + items.length + ' tip(s); sum about ' + total + '.';
-}
-''',
+      script: '',
+      assetBundleDir: 'assets/bro_code/accountant',
+      inputSchema: {
+        'text': {'type': 'string', 'description': 'Expense statement or question'},
+        'action': {'type': 'string', 'description': 'Action such as "dashboard"'},
+      },
     ),
     MarketplaceListing(
-      id: 'pool-hello-counter',
-      name: 'HelloCounter',
-      description: 'Sandbox-friendly counter that writes a tiny HTML note.',
+      id: 'pool-telemeter',
+      name: 'Telemeter',
+      description:
+          'Sovereign PWA telemetry dashboard for live motion, map, and CSV/GeoJSON exports.',
       license: 'remix_free',
-      script: r'''
-async function execute(params) {
-  const n = (params && params.count) ? Number(params.count) : 1;
-  const html = '<!DOCTYPE html><html><body style="background:#111;color:#eee;font-family:sans-serif;padding:24px">'
-    + '<h1>Hello Counter</h1><p>Count: ' + n + '</p></body></html>';
-  await System.writeVault('hello_counter.html', html, 'text/html');
-  return 'Hello counter updated to ' + n + '. Open from Vault Dashboards.';
-}
-''',
-      inputSchema: {
-        'count': {'type': 'number', 'description': 'Display count'},
-      },
+      script: '',
+      assetBundleDir: 'assets/bro_code/telemeter',
     ),
   ];
 
   List<MarketplaceListing> listings() => List.unmodifiable(seedListings);
 
   /// Install listing into vault at C4 and register. Returns false if name taken.
-  Future<bool> pickup(MarketplaceListing listing) async {
+  Future<bool> pickup(
+    MarketplaceListing listing, {
+    AgentSecurityClass securityClass = AgentSecurityClass.c4Unverified,
+  }) async {
     final registry = _ref.read(jsAgentRegistryProvider);
     final existing = await registry.exportAgentBundle(listing.name);
     if (existing != null) return false;
 
+    await _installListing(registry, listing, securityClass: securityClass);
+    return true;
+  }
+
+  /// Silently upgrade any installed seed-catalog agent whose script has changed or asset is missing.
+  Future<void> upgradeSeedListings() async {
+    final registry = _ref.read(jsAgentRegistryProvider);
+    final telemetry = _ref.read(telemetryBusProvider);
+    for (final listing in seedListings) {
+      final bundle = await registry.exportAgentBundle(listing.name);
+      if (bundle == null) {
+        await _installListing(registry, listing);
+        continue;
+      }
+      final storedScript = bundle['script'] as String? ?? '';
+      final vaultAsset = await telemetry.readVaultData('telemeter.html');
+      if (storedScript != listing.script || vaultAsset == null) {
+        await _installListing(registry, listing);
+      }
+    }
+  }
+
+  Future<void> _installListing(
+    JsAgentRegistry registry,
+    MarketplaceListing listing, {
+    AgentSecurityClass securityClass = AgentSecurityClass.c4Unverified,
+  }) async {
     final schema = <String, BroCodeParameter>{};
     listing.inputSchema.forEach((key, value) {
       if (value is Map) {
@@ -102,13 +118,29 @@ async function execute(params) {
       }
     });
 
+    var finalScript = listing.script;
+    var finalAssets = Map<String, String>.from(listing.vaultAssets);
+    
+    if (listing.assetBundleDir != null) {
+      try {
+        final scriptJs = await rootBundle.loadString('${listing.assetBundleDir}/script.js');
+        final dashboardHtml = await rootBundle.loadString('${listing.assetBundleDir}/dashboard.html');
+        finalScript = scriptJs;
+        finalAssets['telemeter.html'] = dashboardHtml;
+        finalAssets['dashboard.html'] = dashboardHtml;
+      } catch (e) {
+        debugPrint('[MarketplaceCatalog] Error loading bundle assets for ${listing.name}: $e');
+      }
+    }
+
     await registry.saveAndRegisterAgent(
       name: listing.name,
       description: '${listing.description} [marketplace:${listing.id}]',
-      script: listing.script,
+      script: finalScript,
       inputSchema: schema,
-      securityClass: AgentSecurityClass.c4Unverified,
+      securityClass: securityClass,
       source: BhaiCodeOrigin.pool,
+      vaultAssets: finalAssets,
     );
 
     final telemetry = _ref.read(telemetryBusProvider);
@@ -119,7 +151,7 @@ async function execute(params) {
         ? Map<String, dynamic>.from(jsonDecode(schemaEntry['value']!) as Map)
         : <String, dynamic>{
             'name': listing.name,
-            'securityClass': AgentSecurityClass.c4Unverified.id,
+            'securityClass': securityClass.id,
           };
     schemaMap['license'] = listing.license;
     schemaMap['marketplaceId'] = listing.id;
@@ -129,7 +161,20 @@ async function execute(params) {
       jsonEncode(schemaMap),
       mimeType: 'application/json',
     );
-    return true;
+    
+    // Automatically execute the agent in sovereign mode so vault HTML is published.
+    try {
+      final bridge = _ref.read(jsBridgeServiceProvider);
+      await bridge.executeAgentScript(
+        agentName: listing.name,
+        script: finalScript,
+        parameters: {},
+        sandboxMode: false,
+        assets: finalAssets,
+      );
+    } catch (e) {
+      debugPrint('[MarketplaceCatalog] Execution error on install: $e');
+    }
   }
 }
 

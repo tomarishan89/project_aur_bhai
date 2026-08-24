@@ -4,13 +4,16 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
 import 'sql_query_guard.dart';
 import 'telemetry_bus.dart';
+import 'telemetry_collector.dart';
 import 'vault_build_stamp.dart';
 import 'vault_dashboard_url.dart';
+import 'mcp_handler_service.dart';
 
 class LocalServerService extends ChangeNotifier {
   static const int defaultPort = 8080;
@@ -57,7 +60,10 @@ class LocalServerService extends ChangeNotifier {
   /// Full URL for a vault asset. [key] must be non-empty (never bare server root).
   String vaultUrl(String key) {
     final k = normalizeVaultKeyForUrl(key);
-    final url = '$serverAddress/vault/$k';
+    var url = '$serverAddress/vault/$k';
+    if (_lanExposureEnabled && _pairingToken.isNotEmpty) {
+      url += '?pair=$_pairingToken';
+    }
     assert(
       isVaultDashboardUrl(url),
       'vaultUrl produced non-dashboard URL: $url',
@@ -116,6 +122,27 @@ self.addEventListener('fetch', (event) => {
     debugPrint(
       '[LocalServer] LAN exposure ${enabled ? "ON (pair=$_pairingToken)" : "OFF"}',
     );
+    // Persist for next app launch (ignore errors in headless test runners).
+    try {
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setBool('lan_exposure_enabled', enabled);
+      }).catchError((dynamic _) {});
+    } catch (_) {}
+  }
+
+  /// Restores the LAN exposure flag from SharedPreferences.
+  Future<void> _loadPersistedLanSetting() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getBool('lan_exposure_enabled');
+      if (stored != null && stored != _lanExposureEnabled) {
+        _lanExposureEnabled = stored;
+        if (stored) _pairingToken = _generatePairToken();
+        debugPrint('[LocalServer] Restored LAN exposure=$stored from prefs');
+      }
+    } catch (e) {
+      debugPrint('[LocalServer] Could not load LAN pref: $e');
+    }
   }
 
   void rotatePairingToken() {
@@ -129,12 +156,14 @@ self.addEventListener('fetch', (event) => {
     return List.generate(6, (_) => chars[rnd.nextInt(chars.length)]).join();
   }
 
-  /// Loopback always allowed. LAN requires exposure + matching pair token.
+  /// Loopback always allowed (or requests from device's own LAN IP). LAN requires exposure + matching pair token.
   Response? _authorizeLan(Request request) {
     final info =
         request.context['shelf.io.connection_info'] as HttpConnectionInfo?;
     final remote = info?.remoteAddress;
-    final isLoopback = remote == null || remote.isLoopback;
+    final isLoopback = remote == null ||
+        remote.isLoopback ||
+        (_lanIp != null && remote.address == _lanIp);
     if (isLoopback) return null;
 
     if (!_lanExposureEnabled) {
@@ -298,6 +327,31 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
       }
     });
 
+    _router.post('/api/mcp', (Request request) async {
+      final denied = _authorizeLan(request);
+      if (denied != null) return denied;
+      try {
+        final body = await request.readAsString();
+        final payload = jsonDecode(body) as Map<String, dynamic>;
+        
+        final handler = _ref.read(mcpHandlerServiceProvider);
+        final result = await handler.handleJsonRpc(payload);
+        
+        return Response.ok(
+          jsonEncode(result),
+          headers: {'Content-Type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({
+            'jsonrpc': '2.0',
+            'error': {'code': -32603, 'message': e.toString()}
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+    });
+
     // Root /sw.js — common bad register path; kill stuck workers.
     _router.get('/sw.js', (Request request) {
       return _killerServiceWorkerResponse();
@@ -371,6 +425,35 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
       }
     });
 
+    // IMU settings endpoint — called by dashboard ⚙ popover.
+    // Body: { "cadenceMs": 500, "retentionMs": 1800000 }
+    _router.post('/api/imu-settings', (Request request) async {
+      try {
+        final body = jsonDecode(await request.readAsString()) as Map;
+        final cadenceMs = (body['cadenceMs'] as num?)?.toInt();
+        final retentionMs = (body['retentionMs'] as num?)?.toInt();
+        final collector = _ref.read(telemetryCollectorProvider);
+        if (cadenceMs != null && cadenceMs > 0) {
+          collector.setImuCadence(Duration(milliseconds: cadenceMs));
+        }
+        if (retentionMs != null && retentionMs > 0) {
+          collector.setImuRetention(Duration(milliseconds: retentionMs));
+        } else if (retentionMs == 0) {
+          // 0 = never purge (∞ mode)
+          collector.setImuRetention(const Duration(days: 365));
+        }
+        return Response.ok(
+          jsonEncode({'success': true}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'success': false, 'error': '$e'}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+    });
+
     _router.all('/<ignored|.*>', (Request request) {
       final path = request.url.path;
       final dynamicHandler = _dynamicRoutes['/$path'];
@@ -383,6 +466,9 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
 
   Future<void> startServer({int? preferredPort}) async {
     if (_server != null || _disposed) return;
+
+    // Restore persisted LAN exposure setting before binding.
+    await _loadPersistedLanSetting();
 
     _lanIp = await resolveLanIpv4();
 

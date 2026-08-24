@@ -125,7 +125,7 @@ class LlmProviderFactory {
     if (supportsVoiceAudio(providerId)) return null;
     if (openRouterBackedProvider(providerId)) {
       return 'Voice commands need Gemini or OpenAI. '
-          '$providerId (via OpenRouter) is text-only — spoken “Hey Mycroft” '
+          '$providerId (via OpenRouter) is text-only — spoken “Hey Jarvis” '
           'turns will not work with this as the Language/default provider. '
           'Use text, or turn on per-function slots and set Language to Gemini/OpenAI.';
     }

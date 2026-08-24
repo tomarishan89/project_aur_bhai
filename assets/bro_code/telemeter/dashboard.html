@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cyber">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Telemeter — Sovereign Telemetry Dashboard</title>
+<link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22Telemeter%22%2C%22short_name%22%3A%22Telemeter%22%2C%22start_url%22%3A%22%2Fvault%2Ftelemeter.html%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230f172a%22%2C%22theme_color%22%3A%22%2306b6d4%22%7D" />
+<meta name="theme-color" content="#06b6d4" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<style>
+  :root[data-theme="cyber"]  { --bg: #0f172a; --card: #1e293b; --border: #334155; --text: #f8fafc; --muted: #94a3b8; --accent: #06b6d4; --glow: rgba(6,182,212,.25); --sec: #10b981; --grid: #334155; }
+  :root[data-theme="oled"]   { --bg: #000000; --card: #111111; --border: #222222; --text: #ffffff; --muted: #888888; --accent: #6366f1; --glow: rgba(99,102,241,.25); --sec: #f59e0b; --grid: #222222; }
+  :root[data-theme="light"]  { --bg: #f8fafc;  --card: #ffffff;  --border: #e2e8f0; --text: #0f172a; --muted: #64748b; --accent: #2563eb; --glow: rgba(37,99,235,.15); --sec: #e11d48; --grid: #e2e8f0; }
+  :root[data-theme="nordic"] { --bg: #1e1e2e;  --card: #2b2b3d;  --border: #3b3b4f; --text: #cdd6f4; --muted: #a6adc8; --accent: #89dceb; --glow: rgba(137,220,235,.2); --sec: #f38ba8; --grid: #3b3b4f; }
+  /* Palette for 4 sensor axes */
+  :root { --c0:#06b6d4; --c1:#10b981; --c2:#f59e0b; --c3:#f43f5e; }
+
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden}
+
+  /* ── Header ── */
+  header{background:var(--card);border-bottom:1px solid var(--border);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:8px}
+  .brand-logo{width:28px;height:28px;background:var(--accent);border-radius:6px;display:grid;place-content:center;font-weight:900;color:#fff;font-size:14px}
+  .brand-title h1{font-size:14px;letter-spacing:.5px}
+  .brand-title .sub{font-size:10px;color:var(--sec);display:flex;align-items:center;gap:4px}
+  .live-dot{width:6px;height:6px;background:var(--sec);border-radius:50%;display:inline-block;animation:pulse 1.5s infinite}
+  @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+  .header-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .btn{background:var(--card);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:all .2s}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-accent{background:var(--accent);color:#fff;border:none}
+  select.btn{outline:none}
+
+  /* ── Sensor Health Row ── */
+  .health-row{display:flex;gap:12px;padding:6px 12px;background:var(--card);border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .health-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted)}
+  .health-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .health-dot.on{background:var(--sec)}
+  .health-dot.off{background:#444}
+
+  /* ── KPI Bar ── */
+  .kpi-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px 12px}
+  @media(min-width:600px){.kpi-bar{grid-template-columns:repeat(6,1fr)}}
+  .kpi-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+  .kpi-card.na{opacity:.4}
+  .kpi-label{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+  .kpi-val{font-size:16px;font-weight:800;margin-top:2px}
+  .kpi-unit{font-size:10px;font-weight:400;color:var(--muted);margin-left:2px}
+
+  /* ── Dual Range Slider ── */
+  .window-bar{padding:10px 14px;background:var(--card);border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center}
+  .time-badge{font-family:monospace;font-size:11px;font-weight:600;color:var(--accent);background:rgba(6,182,212,.1);padding:4px 8px;border-radius:6px;border:1px solid var(--glow);white-space:nowrap;min-width:68px;text-align:center}
+  .dual-range-container{position:relative;flex:1;height:24px;display:flex;align-items:center}
+  .dual-range-track{position:absolute;height:6px;width:100%;background:var(--border);border-radius:3px;pointer-events:none}
+  .dual-range-container input[type=range]{position:absolute;width:100%;height:100%;margin:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none;outline:none}
+  .dual-range-container input[type=range]::-webkit-slider-thumb{pointer-events:auto;width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid var(--card);box-shadow:0 0 6px var(--glow);cursor:pointer;-webkit-appearance:none;appearance:none}
+  .dual-range-container input[type=range]::-moz-range-thumb{pointer-events:auto;width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid var(--card);box-shadow:0 0 6px var(--glow);cursor:pointer}
+
+  /* ── ⚙ Settings Popover ── */
+  .popover-wrap{position:relative}
+  .popover{position:absolute;top:calc(100% + 6px);right:0;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;width:260px;z-index:999;display:none;flex-direction:column;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .popover.open{display:flex}
+  .popover-title{font-size:12px;font-weight:700}
+  .popover-row{display:flex;justify-content:space-between;align-items:center;font-size:11px;gap:8px}
+  .popover-row label{color:var(--muted)}
+  .popover-row select{background:var(--card);border:1px solid var(--border);color:var(--text);font-size:11px;border-radius:6px;padding:2px 6px;cursor:pointer}
+  .popover-updated{font-size:9px;color:var(--muted);text-align:right}
+
+  /* ── Main Grid ── */
+  .main-grid{display:grid;grid-template-columns:1fr;gap:10px;padding:0 12px 12px;flex:1}
+  @media(min-width:850px){.main-grid{grid-template-columns:1fr 340px}}
+
+  /* ── Charts Pane ── */
+  .charts-pane{display:flex;flex-direction:column;gap:8px}
+
+  /* ── Accordion Panel ── */
+  .accordion{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+  .accordion-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;cursor:pointer;user-select:none}
+  .accordion-head:hover{background:rgba(255,255,255,.03)}
+  .accordion-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  .accordion-right{display:flex;align-items:center;gap:8px;font-size:10px}
+  .accordion-na{font-size:10px;color:var(--muted);background:var(--border);border-radius:12px;padding:2px 8px}
+  .accordion-body{display:none;padding:0 10px 10px}
+  .accordion.open .accordion-body{display:block}
+  .accordion-chevron{font-size:10px;transition:transform .2s}
+  .accordion.open .accordion-chevron{transform:rotate(180deg)}
+
+  /* ── Canvas ── */
+  .canvas-wrap{position:relative;width:100%;height:180px}
+  @media(min-width:600px){.canvas-wrap{height:220px}}
+  canvas{width:100%;height:100%;display:block;border-radius:6px}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:4px}
+  .legend-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted)}
+  .legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+  /* ── Map Pane ── */
+  .map-pane{height:220px;position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--border)}
+  @media(min-width:850px){.map-pane{height:100%;min-height:400px}}
+  #map{width:100%;height:100%;min-height:220px}
+
+  /* ── GPS Table Drawer ── */
+  .drawer{background:var(--card);border-top:1px solid var(--border);max-height:240px;overflow-y:auto;padding:8px 12px;display:none}
+  .drawer.open{display:block}
+  table{width:100%;border-collapse:collapse;font-size:11px;text-align:left}
+  th,td{padding:6px 8px;border-bottom:1px solid var(--border)}
+  th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:9px}
+
+  /* ── Modal ── */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:none;place-content:center;z-index:9999}
+  .modal-overlay.active{display:grid}
+  .modal{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:90%;max-width:400px;display:flex;flex-direction:column;gap:14px}
+  .modal-title{font-size:15px;font-weight:700}
+  .modal-options{display:flex;flex-direction:column;gap:8px}
+  .radio-opt{display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer}
+  /* ── Spin Animation ── */
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .btn-spin { animation: spin 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+</style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-logo">T</div>
+      <div class="brand-title">
+        <h1>TELEMETER</h1>
+        <div class="sub" id="status-sub"><span class="live-dot"></span> <span id="status-text">Live</span></div>
+      </div>
+    </div>
+    <div class="header-controls">
+      <select id="preset-selector" class="btn" onchange="onPresetChange(this.value)">
+        <option value="5m">5m</option>
+        <option value="30m">30m</option>
+        <option value="1h" selected>1H</option>
+        <option value="6h">6H</option>
+        <option value="24h">24H</option>
+        <option value="all">All</option>
+      </select>
+      <button class="btn" onclick="cycleTheme()" title="Theme">🎨</button>
+      <button class="btn" onclick="openExportModal()" title="Export">💾</button>
+      <button class="btn" onclick="toggleTableDrawer()" title="GPS Table">📊</button>
+      <button class="btn btn-accent" id="btn-refresh" onclick="refreshAll(true)" title="Refresh">🔄</button>
+      <div class="popover-wrap">
+        <button class="btn" onclick="toggleSettings()" title="Settings">⚙</button>
+        <div class="popover" id="settingsPopover">
+          <div class="popover-title">Dashboard Settings</div>
+          <div class="popover-row">
+            <label>Refresh interval</label>
+            <select id="refreshIntervalSel" onchange="onRefreshIntervalChange(this.value)">
+              <option value="1000">1 s</option>
+              <option value="3000" selected>3 s</option>
+              <option value="10000">10 s</option>
+              <option value="30000">30 s</option>
+              <option value="0">Pause</option>
+            </select>
+          </div>
+          <div class="popover-row">
+            <label>IMU cadence</label>
+            <select id="imuCadenceSel" onchange="onImuCadenceChange(this.value)">
+              <option value="250">250 ms</option>
+              <option value="500" selected>500 ms</option>
+              <option value="1000">1 s</option>
+              <option value="2000">2 s</option>
+            </select>
+          </div>
+          <div class="popover-row">
+            <label>IMU retention</label>
+            <select id="imuRetentionSel" onchange="onImuRetentionChange(this.value)">
+              <option value="900000">15 min</option>
+              <option value="1800000" selected>30 min</option>
+              <option value="3600000">1 hr</option>
+              <option value="0">∞ Forever</option>
+            </select>
+          </div>
+          <div class="popover-updated" id="lastUpdatedLabel">Last updated: —</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Sensor Health Row -->
+  <div class="health-row" id="healthRow">
+    <div class="health-item"><span class="health-dot off" id="hd-accel"></span> Accelerometer</div>
+    <div class="health-item"><span class="health-dot off" id="hd-useraccel"></span> User-Accel</div>
+    <div class="health-item"><span class="health-dot off" id="hd-gyro"></span> Gyroscope</div>
+    <div class="health-item"><span class="health-dot off" id="hd-mag"></span> Magnetometer</div>
+    <div class="health-item"><span class="health-dot off" id="hd-baro"></span> Barometer</div>
+    <div class="health-item"><span class="health-dot off" id="hd-gps"></span> GPS</div>
+  </div>
+
+  <!-- KPI Bar -->
+  <div class="kpi-bar">
+    <div class="kpi-card"><div class="kpi-label">Distance</div><div class="kpi-val" id="kpi-dist">—<span class="kpi-unit">km</span></div></div>
+    <div class="kpi-card"><div class="kpi-label">Peak G</div><div class="kpi-val" id="kpi-gforce">—<span class="kpi-unit">G</span></div></div>
+    <div class="kpi-card"><div class="kpi-label">Speed</div><div class="kpi-val" id="kpi-speed">—<span class="kpi-unit">m/s</span></div></div>
+    <div class="kpi-card"><div class="kpi-label">Altitude</div><div class="kpi-val" id="kpi-alt">—<span class="kpi-unit">m</span></div></div>
+    <div class="kpi-card"><div class="kpi-label">Heading</div><div class="kpi-val" id="kpi-heading">—<span class="kpi-unit" id="kpi-deg"></span></div></div>
+    <div class="kpi-card"><div class="kpi-label">Samples</div><div class="kpi-val" id="kpi-samples">0<span class="kpi-unit">pts</span></div></div>
+  </div>
+
+  <!-- Dual Time Range Slider -->
+  <div class="window-bar">
+    <span id="win-start" class="time-badge">—</span>
+    <div class="dual-range-container">
+      <div class="dual-range-track" id="rangeTrack"></div>
+      <input type="range" id="panSliderStart" oninput="onPanSlider(event)" />
+      <input type="range" id="panSliderEnd" oninput="onPanSlider(event)" />
+    </div>
+    <span id="win-end" class="time-badge">—</span>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="main-grid">
+    <div class="charts-pane">
+
+      <!-- 1. Raw Accelerometer -->
+      <div class="accordion open" id="panel-accel">
+        <div class="accordion-head" onclick="toggleAccordion('panel-accel')">
+          <div class="accordion-title">🔵 Raw Accelerometer</div>
+          <div class="accordion-right">
+            <span class="accordion-na" id="accel-na" style="display:none">No data</span>
+            <span class="accordion-chevron">▼</span>
+          </div>
+        </div>
+        <div class="accordion-body">
+          <div class="canvas-wrap"><canvas id="c-accel"></canvas></div>
+          <div class="legend">
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c0)"></span>X</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c1)"></span>Y</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c2)"></span>Z</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c3)"></span>|G|</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. User Accelerometer -->
+      <div class="accordion" id="panel-useraccel">
+        <div class="accordion-head" onclick="toggleAccordion('panel-useraccel')">
+          <div class="accordion-title">🟢 User Acceleration</div>
+          <div class="accordion-right">
+            <span class="accordion-na" id="useraccel-na" style="display:none">No data</span>
+            <span class="accordion-chevron">▼</span>
+          </div>
+        </div>
+        <div class="accordion-body">
+          <div class="canvas-wrap"><canvas id="c-useraccel"></canvas></div>
+          <div class="legend">
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c0)"></span>X</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c1)"></span>Y</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c2)"></span>Z</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Gyroscope -->
+      <div class="accordion" id="panel-gyro">
+        <div class="accordion-head" onclick="toggleAccordion('panel-gyro')">
+          <div class="accordion-title">🔴 Gyroscope</div>
+          <div class="accordion-right">
+            <span class="accordion-na" id="gyro-na" style="display:none">No sensor</span>
+            <span class="accordion-chevron">▼</span>
+          </div>
+        </div>
+        <div class="accordion-body">
+          <div class="canvas-wrap"><canvas id="c-gyro"></canvas></div>
+          <div class="legend">
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c0)"></span>X</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c1)"></span>Y</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c2)"></span>Z</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c3)"></span>|ω|</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Magnetometer -->
+      <div class="accordion" id="panel-mag">
+        <div class="accordion-head" onclick="toggleAccordion('panel-mag')">
+          <div class="accordion-title">🟡 Magnetometer</div>
+          <div class="accordion-right">
+            <span class="accordion-na" id="mag-na" style="display:none">No sensor</span>
+            <span class="accordion-chevron">▼</span>
+          </div>
+        </div>
+        <div class="accordion-body">
+          <div class="canvas-wrap"><canvas id="c-mag"></canvas></div>
+          <div class="legend" style="font-size: 9px;">
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c0)"></span>X (East/West)</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c1)"></span>Y (North/South)</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c2)"></span>Z (Vertical)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Environment (Barometer + Altitude) -->
+      <div class="accordion" id="panel-env">
+        <div class="accordion-head" onclick="toggleAccordion('panel-env')">
+          <div class="accordion-title">⚪ Environment</div>
+          <div class="accordion-right">
+            <span class="accordion-na" id="env-na" style="display:none">No sensor</span>
+            <span class="accordion-chevron">▼</span>
+          </div>
+        </div>
+        <div class="accordion-body">
+          <div class="canvas-wrap"><canvas id="c-env"></canvas></div>
+          <div class="legend">
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c0)"></span>Pressure (hPa)</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--c1)"></span>Altitude (m)</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Map Pane -->
+    <div class="map-pane">
+      <button class="btn" id="recenterMapBtn" onclick="recenterMap()" style="position:absolute;top:10px;right:10px;z-index:1000;background:var(--card);box-shadow:0 2px 8px rgba(0,0,0,.4)">📍 Center Map</button>
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <!-- GPS Table Drawer -->
+  <div class="drawer" id="tableDrawer">
+    <table>
+      <thead>
+        <tr><th>Time</th><th>Lat</th><th>Lng</th><th>Alt</th><th>Spd</th><th>AccelZ</th><th>Compass</th></tr>
+      </thead>
+      <tbody id="tableBody"><tr><td colspan="7" style="text-align:center">Waiting for GPS telemetry...</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- Export Modal -->
+  <div class="modal-overlay" id="exportModal">
+    <div class="modal">
+      <div class="modal-title">Export Telemetry Dataset</div>
+      <div class="modal-options">
+        <label class="radio-opt"><input type="radio" name="exportScope" value="window" checked /> Current Window</label>
+        <label class="radio-opt"><input type="radio" name="exportScope" value="full" /> Full Vault History</label>
+      </div>
+      <div style="display:flex;gap:8px;width:100%">
+        <button class="btn btn-accent" style="flex:1" onclick="doExport('csv')">CSV</button>
+        <button class="btn btn-accent" style="flex:1" onclick="doExport('geojson')">GeoJSON</button>
+        <button class="btn btn-accent" style="flex:1" onclick="doExport('json')">JSON</button>
+      </div>
+      <button class="btn" style="width:100%" onclick="closeExportModal()">Cancel</button>
+    </div>
+  </div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let gpsRecords = [];    // from telemetry table (4s GPS)
+  let imuRecords = [];    // from imu_telemetry table (0.5s high-freq)
+  let windowRecords = []; // current GPS window slice
+  let windowImu = [];     // current IMU window slice
+  let currentWinStart = 0;
+  let currentWinEnd = 0;
+  let map, pathPolyline, latestMarker;
+  const THEMES = ['cyber','oled','light','nordic'];
+  let themeIdx = 0;
+  let refreshTimer = null;
+  let refreshMs = 3000;
+  // Sensor availability detected from data
+  const avail = {accel:false, useraccel:false, gyro:false, mag:false, baro:false, gps:false};
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  async function querySQL(sql) {
+    const r = await fetch('/api/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sql})});
+    const j = await r.json();
+    if(!j.success) throw new Error(j.error||'SQL error');
+    return j.data||[];
+  }
+
+  function haversine(la1,lo1,la2,lo2){
+    const R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180;
+    const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  }
+
+  function cardinalDir(deg){return['N','NE','E','SE','S','SW','W','NW'][Math.round(deg/45)%8]||'N'}
+
+  function fmt(v,decimals=2){return v!=null&&isFinite(v)?Number(v).toFixed(decimals):'—'}
+
+  function setHealth(id,on){
+    const el=document.getElementById(id);
+    if(el){el.className='health-dot '+(on?'on':'off')}
+  }
+
+  // ── Dual Range Slider Logic ───────────────────────────────────────────────
+  function applyWindow(){
+    if(!gpsRecords.length && !imuRecords.length){
+      windowRecords=[]; windowImu=[];
+      currentWinStart = 0; currentWinEnd = 0;
+      const sl=document.getElementById('win-start'), el=document.getElementById('win-end');
+      if(sl) sl.textContent='—';
+      if(el) el.textContent='—';
+      return;
+    }
+    
+    const allTs=[
+      ...gpsRecords.map(r=>Number(r.timestamp)),
+      ...imuRecords.map(r=>Number(r.timestamp_ms))
+    ].filter(t=>t>0);
+    if(!allTs.length){
+      windowRecords=[]; windowImu=[];
+      currentWinStart = 0; currentWinEnd = 0;
+      return;
+    }
+    
+    const minTs = Math.min(...allTs);
+    const maxDataTs = Math.max(...allTs);
+    const now = Date.now();
+    const isLiveStream = (now - maxDataTs < 15000);
+    let maxTs = isLiveStream ? now : maxDataTs;
+    if (maxTs <= minTs) {
+      maxTs = minTs + 1000;
+    }
+
+    const startSlider = document.getElementById('panSliderStart');
+    const endSlider = document.getElementById('panSliderEnd');
+    const track = document.getElementById('rangeTrack');
+    if(!startSlider || !endSlider) return;
+
+    const isInitialized = startSlider.dataset.initialized === "true";
+
+    if (!isInitialized) {
+      // First load or reset: start at minTs, end at maxTs (end time at the end)
+      startSlider.min = minTs;
+      startSlider.max = maxTs;
+      endSlider.min = minTs;
+      endSlider.max = maxTs;
+      startSlider.value = minTs;
+      endSlider.value = maxTs;
+      endSlider.dataset.wasPinned = "true";
+      startSlider.dataset.wasAtStart = "true";
+      startSlider.dataset.initialized = "true";
+    } else {
+      const prevMax = Number(endSlider.max) || maxTs;
+      const diff = maxTs - prevMax;
+
+      startSlider.min = minTs;
+      startSlider.max = maxTs;
+      endSlider.min = minTs;
+      endSlider.max = maxTs;
+
+      // Auto-advance if pinned to live stream
+      if (endSlider.dataset.wasPinned === "true") {
+        endSlider.value = maxTs;
+        if (startSlider.dataset.wasAtStart === "true") {
+          startSlider.value = minTs;
+        } else if (diff > 0) {
+          startSlider.value = Number(startSlider.value) + diff;
+        }
+      }
+    }
+
+    let winStart = Math.max(minTs, Math.min(maxTs, Number(startSlider.value)));
+    let winEnd = Math.max(minTs, Math.min(maxTs, Number(endSlider.value)));
+
+    // Enforce winStart <= winEnd
+    if (winStart > winEnd) {
+      winStart = winEnd;
+    }
+
+    startSlider.value = winStart;
+    endSlider.value = winEnd;
+    currentWinStart = winStart;
+    currentWinEnd = winEnd;
+
+    // Track states for next tick
+    endSlider.dataset.wasPinned = (winEnd >= maxTs - 2000) ? "true" : "false";
+    startSlider.dataset.wasAtStart = (winStart <= minTs + 2000) ? "true" : "false";
+
+    // Update visual gradient track
+    if (track && maxTs > minTs) {
+      const p1 = Math.max(0, Math.min(100, ((winStart - minTs) / (maxTs - minTs)) * 100));
+      const p2 = Math.max(0, Math.min(100, ((winEnd - minTs) / (maxTs - minTs)) * 100));
+      track.style.background = `linear-gradient(to right, var(--border) 0%, var(--border) ${p1}%, var(--accent) ${p1}%, var(--accent) ${p2}%, var(--border) ${p2}%, var(--border) 100%)`;
+    }
+
+    windowRecords = gpsRecords.filter(r => { const t = Number(r.timestamp); return t >= winStart && t <= winEnd; });
+    windowImu = imuRecords.filter(r => { const t = Number(r.timestamp_ms); return t >= winStart && t <= winEnd; });
+    
+    const sl = document.getElementById('win-start'), el = document.getElementById('win-end');
+    if(sl) sl.textContent = new Date(winStart).toLocaleTimeString();
+    if(el) el.textContent = new Date(winEnd).toLocaleTimeString();
+  }
+
+  function onPanSlider(e){
+    const startSlider = document.getElementById('panSliderStart');
+    const endSlider = document.getElementById('panSliderEnd');
+    if(!startSlider || !endSlider) return;
+
+    let v1 = Number(startSlider.value);
+    let v2 = Number(endSlider.value);
+    const minTs = Number(startSlider.min);
+    const maxTs = Number(endSlider.max);
+
+    if (v1 > v2) {
+      if (e && e.target === startSlider) {
+        startSlider.value = v2;
+        v1 = v2;
+      } else {
+        endSlider.value = v1;
+        v2 = v1;
+      }
+    }
+
+    startSlider.dataset.wasAtStart = (v1 <= minTs + 2000) ? "true" : "false";
+    endSlider.dataset.wasPinned = (v2 >= maxTs - 2000) ? "true" : "false";
+
+    // Dynamic z-index so overlapping thumbs remain draggable
+    if (v1 > (minTs + maxTs) / 2) {
+      startSlider.style.zIndex = '5';
+      endSlider.style.zIndex = '4';
+    } else {
+      startSlider.style.zIndex = '4';
+      endSlider.style.zIndex = '5';
+    }
+
+    applyWindow();
+    renderAll();
+  }
+
+  function parseTs(t){
+    if(!t)return 0;
+    if(typeof t==='number')return t;
+    if(!isNaN(t)&&!isNaN(parseFloat(t)))return Number(t);
+    let s=String(t);
+    if(s.includes('.')){
+      const parts=s.split('.');
+      if(parts[1].length>3)s=parts[0]+'.'+parts[1].slice(0,3);
+    }
+    const parsed=new Date(s).getTime();
+    return isNaN(parsed)?0:parsed;
+  }
+
+  // ── Data Fetch ─────────────────────────────────────────────────────────────
+  async function fetchGPS(){
+    const preset=document.getElementById('preset-selector').value;
+    const now=Date.now();
+    const presetMap={'5m':300000,'30m':1800000,'1h':3600000,'6h':21600000,'24h':86400000};
+    const minTs=presetMap[preset]?now-presetMap[preset]:0;
+    // telemetry.timestamp is stored as ISO-8601 TEXT in LOCAL TIME (without Z).
+    // Get the local time string for minTs by adding the timezone offset.
+    const tzOffsetMs = new Date().getTimezoneOffset() * 60000;
+    const minIsoLocal = new Date(minTs - tzOffsetMs).toISOString().slice(0, -1); 
+    const sql = "SELECT id, timestamp, latitude, longitude, accel_z, accel_magnitude, user_accel_z, gyro_magnitude, mag_x, mag_y, mag_z, pressure, altitude, speed, heading_accuracy, compassDirection FROM telemetry WHERE timestamp >= '" + minIsoLocal + "' ORDER BY timestamp DESC LIMIT 2000";
+    gpsRecords=await querySQL(sql);
+    gpsRecords.reverse();
+    // Convert local string back to standard unix timestamp in milliseconds
+    gpsRecords.forEach(r => { r.timestamp = parseTs(r.timestamp); });
+  }
+
+  async function fetchIMU(){
+    const preset=document.getElementById('preset-selector').value;
+    const now=Date.now();
+    const presetMap={'5m':300000,'30m':1800000,'1h':3600000,'6h':21600000,'24h':86400000};
+    const minTs=presetMap[preset]?now-presetMap[preset]:0;
+    // Downsample IMU to max 2000 pts for canvas performance
+    const countRows=await querySQL('SELECT COUNT(*) as cnt FROM imu_telemetry WHERE timestamp>= ' + minTs);
+    const cnt=countRows[0]?.cnt||0;
+    let sql;
+    if(cnt<=2000){
+      sql='SELECT timestamp AS timestamp_ms,accel_x,accel_y,accel_z,accel_magnitude,user_accel_x,user_accel_y,user_accel_z,gyro_x,gyro_y,gyro_z,gyro_magnitude,mag_x,mag_y,mag_z,pressure FROM imu_telemetry WHERE timestamp>= ' + minTs + ' ORDER BY timestamp DESC LIMIT 2000';
+    } else {
+      const step=Math.ceil(cnt/2000);
+      sql='SELECT timestamp AS timestamp_ms,accel_x,accel_y,accel_z,accel_magnitude,user_accel_x,user_accel_y,user_accel_z,gyro_x,gyro_y,gyro_z,gyro_magnitude,mag_x,mag_y,mag_z,pressure FROM imu_telemetry WHERE timestamp>= ' + minTs + ' AND (CAST(rowid AS INT) % ' + step + ' = 0) ORDER BY timestamp DESC LIMIT 2000';
+    }
+    imuRecords=await querySQL(sql);
+    imuRecords.reverse();
+  }
+
+  async function refreshAll(isManual){
+    if(isManual){
+      const btn=document.getElementById('btn-refresh');
+      if(btn){
+        btn.classList.remove('btn-spin');
+        void btn.offsetWidth;
+        btn.classList.add('btn-spin');
+        setTimeout(()=>btn.classList.remove('btn-spin'),600);
+      }
+    }
+    try{
+      await Promise.all([fetchGPS(),fetchIMU()]);
+      detectAvailability();
+
+      applyWindow();
+      renderAll();
+      const now=new Date().toLocaleTimeString();
+      const lu=document.getElementById('lastUpdatedLabel');
+      if(lu)lu.textContent='Last updated: '+now;
+      
+      const allTs=[
+        ...gpsRecords.map(r=>Number(r.timestamp)),
+        ...imuRecords.map(r=>Number(r.timestamp_ms))
+      ].filter(t=>t>0);
+      const maxDataTs = allTs.length ? Math.max(...allTs) : 0;
+      const isLive = maxDataTs > 0 && (Math.abs(Date.now() - maxDataTs) < 60000);
+      
+      const statusText = document.getElementById('status-text');
+      const liveDot = document.querySelector('.live-dot');
+      if (statusText) {
+        if (refreshMs === 0) {
+          statusText.textContent = 'Paused';
+          if (liveDot) liveDot.style.background = 'var(--muted)';
+        } else if (isLive) {
+          statusText.textContent = 'Live (' + (refreshMs/1000+'s') + ')';
+          if (liveDot) liveDot.style.background = 'var(--accent-sec)';
+        } else {
+          statusText.textContent = 'Idle (last ' + (maxDataTs > 0 ? new Date(maxDataTs).toLocaleTimeString() : 'no data') + ')';
+          if (liveDot) liveDot.style.background = 'var(--c1, #eab308)';
+        }
+      }
+    }catch(e){
+      document.getElementById('status-text').textContent='⚠ '+e.message;
+    }
+  }
+
+  // ── Sensor Availability ────────────────────────────────────────────────────
+  function detectAvailability(){
+    if(!imuRecords.length&&!gpsRecords.length){
+      setHealth('hd-gps', false);
+      setHealth('hd-accel', false);
+      setHealth('hd-useraccel', false);
+      setHealth('hd-gyro', false);
+      setHealth('hd-mag', false);
+      setHealth('hd-baro', false);
+      return;
+    }
+    const now = Date.now();
+    const isRecent = (ts) => Math.abs(now - Number(ts)) < 60000;
+    avail.gps = gpsRecords.some(r => isRecent(r.timestamp) && r.latitude != null);
+    avail.accel = imuRecords.some(r => isRecent(r.timestamp_ms) && (r.accel_x != null || r.accel_z != null)) || gpsRecords.some(r => isRecent(r.timestamp) && r.accel_z != null);
+    avail.useraccel = imuRecords.some(r => isRecent(r.timestamp_ms) && r.user_accel_x != null);
+    avail.gyro = imuRecords.some(r => isRecent(r.timestamp_ms) && r.gyro_x != null);
+    avail.mag = imuRecords.some(r => isRecent(r.timestamp_ms) && r.mag_x != null);
+    avail.baro = imuRecords.some(r => isRecent(r.timestamp_ms) && r.pressure != null);
+
+    setHealth('hd-gps', avail.gps);
+    setHealth('hd-accel', avail.accel);
+    setHealth('hd-useraccel', avail.useraccel);
+    setHealth('hd-gyro', avail.gyro);
+    setHealth('hd-mag', avail.mag);
+    setHealth('hd-baro', avail.baro);
+
+    // Toggle NA badges & accordion heights for missing hardware
+    toggleNa('accel-na','panel-accel',!avail.accel);
+    toggleNa('useraccel-na','panel-useraccel',!avail.useraccel);
+    toggleNa('gyro-na','panel-gyro',!avail.gyro);
+    toggleNa('mag-na','panel-mag',!avail.mag);
+    toggleNa('env-na','panel-env',!avail.baro&&!avail.gps);
+  }
+
+  function toggleNa(naId,panelId,missing){
+    const na=document.getElementById(naId);
+    const p=document.getElementById(panelId);
+    if(na)na.style.display=missing?'inline-block':'none';
+    if(missing&&p){p.classList.remove('open')}
+  }
+
+  // ── Rendering Engine ───────────────────────────────────────────────────────
+  function renderAll(){
+    updateKPIs();
+    renderChart('c-accel', windowImu, [
+      {k:'accel_x', c:getCS('--c0'), label:'X'},
+      {k:'accel_y', c:getCS('--c1'), label:'Y'},
+      {k:'accel_z', c:getCS('--c2'), label:'Z'},
+      {k:'accel_magnitude', c:getCS('--c3'), label:'|G|'}
+    ], 'm/s²');
+    renderChart('c-useraccel', windowImu, [
+      {k:'user_accel_x', c:getCS('--c0'), label:'X'},
+      {k:'user_accel_y', c:getCS('--c1'), label:'Y'},
+      {k:'user_accel_z', c:getCS('--c2'), label:'Z'}
+    ], 'm/s²');
+    renderChart('c-gyro', windowImu, [
+      {k:'gyro_x', c:getCS('--c0'), label:'X'},
+      {k:'gyro_y', c:getCS('--c1'), label:'Y'},
+      {k:'gyro_z', c:getCS('--c2'), label:'Z'},
+      {k:'gyro_magnitude', c:getCS('--c3'), label:'|ω|'}
+    ], 'rad/s');
+    renderChart('c-mag', windowImu, [
+      {k:'mag_x', c:getCS('--c0'), label:'X'},
+      {k:'mag_y', c:getCS('--c1'), label:'Y'},
+      {k:'mag_z', c:getCS('--c2'), label:'Z'}
+    ], 'µT');
+    renderChart('c-env', windowRecords.length?windowRecords:windowImu, [
+      {k:'pressure', c:getCS('--c0'), label:'hPa'},
+      {k:'altitude', c:getCS('--c1'), label:'m'}
+    ], '');
+    updateMap();
+    renderGpsTable();
+  }
+
+  function getCS(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim()||'#06b6d4'}
+
+  // Generic Multi-Axis Canvas Plotter with Clean Grid, High Precision Ticks & Gap Protection
+  function renderChart(canvasId, dataset, series, unit){
+    const canvas=document.getElementById(canvasId);if(!canvas)return;
+    const ctx=canvas.getContext('2d');
+    const rect=canvas.getBoundingClientRect();
+    const dpr=window.devicePixelRatio||1;
+    canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
+    ctx.scale(dpr,dpr);
+    const W=rect.width, H=rect.height;
+    ctx.clearRect(0,0,W,H);
+
+    if(!dataset||!dataset.length){
+      ctx.fillStyle=getCS('--muted');ctx.font='11px sans-serif';ctx.textAlign='center';
+      ctx.fillText('No data available in selected window', W/2, H/2);
+      return;
+    }
+
+    // Min/Max bounds across series
+    let allVals=[];
+    series.forEach(s=>{dataset.forEach(r=>{if(r[s.k]!=null)allVals.push(Number(r[s.k]))})});
+    if(!allVals.length){
+      ctx.fillStyle=getCS('--muted');ctx.font='11px sans-serif';ctx.textAlign='center';
+      ctx.fillText('Sensor inactive / null values', W/2, H/2);
+      return;
+    }
+
+    let vMin=Math.min(...allVals), vMax=Math.max(...allVals);
+    if(vMin===vMax){vMin-=1;vMax+=1}
+
+    // Margins with dedicated unit header space and wide left gutter for numbers
+    const padL=54, padR=14, padT=22, padB=22;
+    const plotW=W-padL-padR, plotH=H-padT-padB;
+    const vRange=(vMax-vMin)||1;
+    const n=dataset.length;
+
+    // 1. Dedicated Unit Tag (above grid line, separated from Y numbers)
+    if(unit){
+      ctx.fillStyle=getCS('--accent');
+      ctx.font='bold 9px monospace';
+      ctx.textAlign='left';
+      ctx.fillText(unit, padL, padT - 7);
+    }
+
+    // 2. 5 Horizontal Grid Lines (0%, 25%, 50%, 75%, 100%) & Y-axis Ticks
+    const yDivisions = 4;
+    const dec = (vRange < 2) ? 2 : ((vRange < 20) ? 1 : 0);
+    ctx.fillStyle=getCS('--muted');
+    ctx.font='9px monospace';
+
+    for(let i=0; i<=yDivisions; i++){
+      const ratio=i/yDivisions;
+      const y=padT+plotH*ratio;
+      const val=vMax-ratio*vRange;
+      
+      // Main grid lines
+      ctx.strokeStyle=getCS('--grid');
+      ctx.lineWidth=0.5;
+      ctx.beginPath();
+      ctx.moveTo(padL,y);
+      ctx.lineTo(W-padR,y);
+      ctx.stroke();
+
+      // Y-axis tick label
+      ctx.textAlign='right';
+      ctx.fillText(val.toFixed(dec), padL-6, y+3);
+    }
+
+    // 3. 5 Vertical Grid Lines & X-axis Time Ticks (0%, 25%, 50%, 75%, 100%)
+    const tStart = currentWinStart || Number(dataset[0]?.timestamp || dataset[0]?.timestamp_ms);
+    const tEnd = currentWinEnd || Number(dataset[n-1]?.timestamp || dataset[n-1]?.timestamp_ms);
+    const tRange = Math.max(1, (Number(tEnd) - Number(tStart)));
+
+    if (tStart && tEnd) {
+      const xDivisions = 4;
+      for (let idx = 0; idx <= xDivisions; idx++) {
+        const ratio = idx / xDivisions;
+        const x = padL + plotW * ratio;
+        const t = Number(tStart) + ratio * tRange;
+
+        // Vertical grid line
+        ctx.strokeStyle = getCS('--grid');
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x, padT);
+        ctx.lineTo(x, padT + plotH);
+        ctx.stroke();
+
+        // Time label below chart
+        ctx.fillStyle = getCS('--muted');
+        ctx.font = '9px monospace';
+        const align = (idx === 0) ? 'left' : ((idx === xDivisions) ? 'right' : 'center');
+        ctx.textAlign = align;
+        const posX = (idx === 0) ? padL : ((idx === xDivisions) ? W - padR : x);
+        ctx.fillText(new Date(t).toLocaleTimeString(), posX, H - 4);
+      }
+    }
+
+    // 4. Draw Plot Lines with timestamp-based X and Sleep/Lock Gap Protection
+    series.forEach(s=>{
+      ctx.strokeStyle=s.c;
+      ctx.lineWidth=1.5;
+      ctx.beginPath();
+      let first=true;
+      let prevT=null;
+      dataset.forEach((r)=>{
+        const v=r[s.k]!=null?Number(r[s.k]):null;
+        if(v==null){first=true;prevT=null;return}
+        const t = Number(r.timestamp || r.timestamp_ms);
+        // Break line across sleep/pause gaps (> 3s)
+        if(prevT!=null && (t - prevT) > 3000){
+          first=true;
+        }
+        prevT = t;
+        const x = padL + plotW * Math.max(0, Math.min(1, (t - Number(tStart)) / tRange));
+        const y = padT + plotH * (1 - (v - vMin) / vRange);
+        if(first){
+          ctx.moveTo(x,y);
+          first=false;
+        } else {
+          ctx.lineTo(x,y);
+        }
+      });
+      ctx.stroke();
+    });
+  }
+
+  // ── KPIs ───────────────────────────────────────────────────────────────────
+  function updateKPIs(){
+    const r=windowRecords;
+    if(!r.length){['kpi-dist','kpi-gforce','kpi-speed','kpi-alt','kpi-heading','kpi-samples'].forEach(id=>{
+      const el=document.getElementById(id);if(el)el.firstChild.textContent='—';
+    });return;}
+    let dist=0,maxG=0,lastSpd=null,lastAlt=null,lastHdg=0;
+    r.forEach((rec,i)=>{
+      const am=Number(rec.accel_magnitude||rec.accelerometerZ||9.8);
+      const g=am/9.8;if(g>maxG)maxG=g;
+      if(rec.speed!=null)lastSpd=Number(rec.speed);
+      if(rec.altitude!=null)lastAlt=Number(rec.altitude);
+      if(rec.compassDirection!=null)lastHdg=Number(rec.compassDirection);
+      if(i>0&&r[i-1].latitude&&rec.latitude)dist+=haversine(r[i-1].latitude,r[i-1].longitude,rec.latitude,rec.longitude);
+    });
+    const q=(id,v,unit)=>{const el=document.getElementById(id);if(el){el.innerHTML=v+'<span class="kpi-unit">'+unit+'</span>'}};
+    q('kpi-dist',dist.toFixed(1),'km');
+    q('kpi-gforce',maxG.toFixed(2),'G');
+    q('kpi-speed',lastSpd!=null?lastSpd.toFixed(1):'—','m/s');
+    q('kpi-alt',lastAlt!=null?lastAlt.toFixed(0):'—','m');
+    const el=document.getElementById('kpi-heading');
+    if(el)el.innerHTML=cardinalDir(lastHdg)+'<span class="kpi-unit">'+Math.round(lastHdg)+'°</span>';
+    q('kpi-samples',r.length,'pts');
+  }
+
+  // ── Map ────────────────────────────────────────────────────────────────────
+  let userMovedMap = false;
+
+  function initMap(){
+    try{
+      if(typeof L!=='undefined'){
+        map=L.map('map').setView([20.5937,78.9629],5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'}).addTo(map);
+        pathPolyline=L.polyline([],{color:'#06b6d4',weight:4}).addTo(map);
+        map.on('dragstart zoomstart', ()=>{ userMovedMap = true; });
+      }
+    }catch(e){console.warn('Map init failed:',e)}
+  }
+
+  function recenterMap(){
+    userMovedMap = false;
+    fitMapBounds();
+  }
+
+  function fitMapBounds(){
+    if(!map)return;
+    const coords=windowRecords.filter(r=>r.latitude&&r.longitude).map(r=>[Number(r.latitude),Number(r.longitude)]);
+    if(!coords.length)return;
+    coords.length>1?map.fitBounds(pathPolyline.getBounds(),{padding:[15,15]}):map.setView(coords[coords.length-1],15);
+  }
+
+  function updateMap(){
+    if(!map)return;
+    const coords=windowRecords.filter(r=>r.latitude&&r.longitude).map(r=>[Number(r.latitude),Number(r.longitude)]);
+    if(!coords.length)return;
+    pathPolyline.setLatLngs(coords);
+    const last=coords[coords.length-1];
+    if(latestMarker)map.removeLayer(latestMarker);
+    latestMarker=L.circleMarker(last,{radius:8,color:getCS('--accent'),fillColor:getCS('--accent'),fillOpacity:.9}).addTo(map).bindPopup('Current: '+last.join(', '));
+    if(!userMovedMap){
+      fitMapBounds();
+    }
+  }
+
+  // ── GPS Table ──────────────────────────────────────────────────────────────
+  function renderGpsTable(){
+    const tbody=document.getElementById('tableBody');if(!tbody)return;
+    if(!windowRecords.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center">No GPS data in window</td></tr>';return}
+    tbody.innerHTML=windowRecords.slice(-50).reverse().map(r=>'<tr><td>'+new Date(Number(r.timestamp)).toLocaleTimeString()+'</td><td>'+fmt(r.latitude,4)+'</td><td>'+fmt(r.longitude,4)+'</td><td>'+fmt(r.altitude,0)+' m</td><td>'+fmt(r.speed,1)+' m/s</td><td>'+fmt(r.accel_z,2)+'</td><td>'+(r.compassDirection!=null?Math.round(r.compassDirection)+'°':'—')+'</td></tr>').join('');
+  }
+
+  // ── Accordion ──────────────────────────────────────────────────────────────
+  function toggleAccordion(id){document.getElementById(id).classList.toggle('open')}
+
+  // ── Theme ──────────────────────────────────────────────────────────────────
+  function cycleTheme(){themeIdx=(themeIdx+1)%THEMES.length;document.documentElement.setAttribute('data-theme',THEMES[themeIdx]);Object.keys(cs).forEach(k=>delete cs[k]);renderAll()}
+
+  // ── Settings Popover ───────────────────────────────────────────────────────
+  function toggleSettings(){document.getElementById('settingsPopover').classList.toggle('open')}
+  document.addEventListener('click',e=>{if(!e.target.closest('.popover-wrap'))document.getElementById('settingsPopover')?.classList.remove('open')});
+
+  function startRefreshTimer(){
+    clearInterval(refreshTimer);refreshTimer=null;
+    if(refreshMs>0)refreshTimer=setInterval(refreshAll,refreshMs);
+  }
+
+  function onRefreshIntervalChange(v){refreshMs=parseInt(v)||0;startRefreshTimer()}
+
+  async function onImuCadenceChange(v){
+    try{await fetch('/api/imu-settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cadenceMs:parseInt(v)})})}catch(e){console.warn('IMU cadence set failed',e)}
+  }
+
+  async function onImuRetentionChange(v){
+    try{await fetch('/api/imu-settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({retentionMs:parseInt(v)})})}catch(e){console.warn('IMU retention set failed',e)}
+  }
+
+  function onPresetChange(v){
+    const startSlider = document.getElementById('panSliderStart');
+    if (startSlider) startSlider.dataset.initialized = "false";
+    refreshAll();
+  }
+
+  // ── Export ─────────────────────────────────────────────────────────────────
+  function openExportModal(){document.getElementById('exportModal').classList.add('active')}
+  function closeExportModal(){document.getElementById('exportModal').classList.remove('active')}
+  function toggleTableDrawer(){
+    const d=document.getElementById('tableDrawer');
+    const wasOpen=d.classList.contains('open');
+    d.classList.toggle('open');
+    if(!wasOpen){
+      setTimeout(()=>d.scrollIntoView({behavior:'smooth',block:'start'}),50);
+    }
+  }
+
+  function doExport(format){
+    const scope=document.querySelector('input[name="exportScope"]:checked').value;
+    const dataset=scope==='full'?gpsRecords:windowRecords;
+    let mime='text/plain',ext=format,content='';
+    if(format==='csv'){
+      mime='text/csv';
+      const cols=['id','timestamp','latitude','longitude','altitude','speed','accel_x','accel_y','accel_z','accel_magnitude','user_accel_x','user_accel_y','user_accel_z','gyro_x','gyro_y','gyro_z','gyro_magnitude','mag_x','mag_y','mag_z','pressure','compassDirection'];
+      content=cols.join(',')+'\n'+dataset.map(r=>cols.map(c=>r[c]!=null?r[c]:'').join(',')).join('\n');
+    }else if(format==='geojson'){
+      mime='application/geo+json';
+      content=JSON.stringify({type:'FeatureCollection',features:dataset.filter(r=>r.latitude&&r.longitude).map(r=>({type:'Feature',geometry:{type:'Point',coordinates:[r.longitude,r.latitude,r.altitude||0]},properties:{timestamp:r.timestamp,speed:r.speed,accelZ:r.accel_z,compass:r.compassDirection,pressure:r.pressure}}))},null,2);
+    }else{mime='application/json';content=JSON.stringify(dataset,null,2)}
+    const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([content],{type:mime})),download:'telemeter_'+scope+'_'+Date.now()+'.'+ext});
+    a.click();closeExportModal();
+  }
+
+  // ── Bootstrap ──────────────────────────────────────────────────────────────
+  if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+
+  window.addEventListener('DOMContentLoaded',()=>{
+    initMap();
+    refreshAll();
+    startRefreshTimer();
+  });
+  window.addEventListener('resize',()=>renderAll());
+
+  // Handle visibility change (resume live feed when PWA / tab becomes visible)
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.visibilityState === 'visible') {
+      refreshAll();
+      startRefreshTimer();
+    }
+  });
+</script>
+</body>
+</html>

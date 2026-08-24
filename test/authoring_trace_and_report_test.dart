@@ -67,6 +67,6 @@ void main() {
   test('circle and issue copy for friends', () {
     expect(AppConfig.circleNotConfiguredHint.contains('Settings'), isTrue);
     expect(AppConfig.issueReporterNoteLabel.isNotEmpty, isTrue);
-    expect(AppConfig.headsetRidingHint.contains('Bluetooth'), isTrue);
+    expect(AppConfig.headsetRidingHint.contains('media controls'), isTrue);
   });
 }

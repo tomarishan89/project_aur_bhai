@@ -7,7 +7,7 @@ import 'package:project_aur_bhai/core/services/issue_report_service.dart';
 void main() {
   test('wake privacy copy and free-engine labels', () {
     expect(AppConfig.wakePrivacyBody.contains('does not save'), isTrue);
-    expect(AppConfig.wakeWordInterimBuiltIn, 'Hey Mycroft');
+    expect(AppConfig.wakeWordInterimBuiltIn, 'Hey Jarvis');
     expect(AppConfig.wakeCustomPpnHint.toLowerCase(), contains('openwakeword'));
   });
 
@@ -47,6 +47,6 @@ void main() {
   test('app config centralizes circle and free wake labels', () {
     expect(AppConfig.circleIndexPath, 'commons/index.json');
     expect(AppConfig.circleDefaultRepo, 'aur_bhai_circle');
-    expect(AppConfig.wakeWordInterimBuiltIn, 'Hey Mycroft');
+    expect(AppConfig.wakeWordInterimBuiltIn, 'Hey Jarvis');
   });
 }

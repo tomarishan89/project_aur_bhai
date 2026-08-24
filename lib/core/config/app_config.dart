@@ -9,10 +9,10 @@ class AppConfig {
   static const bool issueReportsFeatureEnabled = true;
 
   // --- Wake / privacy (MS-OFFLINE-WAKE, free openWakeWord) ---
-  static const String wakeWordPhraseLabel = 'Hey Mycroft';
+  static const String wakeWordPhraseLabel = 'Hey Jarvis';
 
   /// Default free pretrained openWakeWord model label.
-  static const String wakeWordInterimBuiltIn = 'Hey Mycroft';
+  static const String wakeWordInterimBuiltIn = 'Hey Jarvis';
   static const String wakePrivacyTitle = 'Wake listen privacy';
   static const String wakePrivacyBody =
       'While looking for the wake word, Aur Bhai processes mic audio in memory only. '
@@ -23,7 +23,7 @@ class AppConfig {
       'Hands-free wake (Bluetooth headset / mic). No recordings stored while listening.';
   static const String wakeListeningIndicator = 'Listening for wake word…';
   static const String wakeNeedsAccessKey =
-      'Wake listen needs a free wake model installed (default Hey Mycroft is bundled).';
+      'Wake listen needs a free wake model installed (default Hey Jarvis is bundled).';
   static const String wakeCustomPpnHint =
       'Free pretrained models from openWakeWord. Download extras in Settings; '
       'only one model is active at a time. Custom “Aur Bhai” training is later.';

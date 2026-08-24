@@ -593,6 +593,15 @@ Respond ONLY in RAW JSON (no markdown fences):
     }
     final script = scriptFromDraftJson(decoded);
 
+    // Parse any HTML/PWA side assets the LLM returned alongside the script.
+    final rawAssets = decoded['assets'];
+    final assetUpdates = <String, String>{};
+    if (rawAssets is Map) {
+      rawAssets.forEach((k, v) {
+        if (k is String && v is String) assetUpdates[k] = v;
+      });
+    }
+
     return AuthoredAgentDraft(
       name: name,
       description:
@@ -602,6 +611,7 @@ Respond ONLY in RAW JSON (no markdown fences):
           : <String, dynamic>{},
       script: script,
       notes: decoded['notes'] as String?,
+      assetUpdates: assetUpdates,
     );
   }
 

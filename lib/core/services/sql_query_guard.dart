@@ -5,8 +5,12 @@
 class SqlQueryGuard {
   SqlQueryGuard._();
 
-  static const int defaultMaxRows = 500;
-  static const Set<String> allowedTables = {'telemetry', 'sovereign_vault'};
+  static const int defaultMaxRows = 2000;
+  static const Set<String> allowedTables = {
+    'telemetry',
+    'imu_telemetry',
+    'sovereign_vault',
+  };
 
   static const _forbiddenKeywords = [
     'INSERT',
@@ -61,7 +65,10 @@ class SqlQueryGuard {
       }
     }
 
-    final touchesTelemetry = tables.any((t) => t.toLowerCase() == 'telemetry');
+    final touchesTelemetry = tables.any(
+      (t) =>
+          t.toLowerCase() == 'telemetry' || t.toLowerCase() == 'imu_telemetry',
+    );
     if (touchesTelemetry &&
         !_isAggregateOnlySelect(trimmed) &&
         !RegExp(r'\bLIMIT\b', caseSensitive: false).hasMatch(trimmed)) {
@@ -97,7 +104,9 @@ class SqlQueryGuard {
 
   static bool _isAggregateOnlySelect(String sql) {
     final s = sql.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
-    final m = RegExp(r'select\s+(.+?)\s+from\s+telemetry\b').firstMatch(s);
+    final m = RegExp(
+      r'select\s+(.+?)\s+from\s+(telemetry|imu_telemetry)\b',
+    ).firstMatch(s);
     if (m == null) return false;
     final projection = m.group(1)!;
     if (RegExp(r'(^|,)\s*\*\s*(,|$)').hasMatch(projection)) return false;

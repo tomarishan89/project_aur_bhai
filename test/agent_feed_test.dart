@@ -41,14 +41,14 @@ void main() {
     final catalog = container.read(marketplaceCatalogProvider);
     final registry = container.read(jsAgentRegistryProvider);
     final listing = catalog.listings().firstWhere(
-      (l) => l.name == 'HelloCounter',
+      (l) => l.name == 'Accountant',
     );
     // Shared FFI DB may already contain a prior pickup — make the test idempotent.
-    await registry.deleteAgent('HelloCounter');
+    await registry.deleteAgent('Accountant');
     expect(await catalog.pickup(listing), isTrue);
     expect(await catalog.pickup(listing), isFalse);
 
-    final bundle = await registry.exportAgentBundle('HelloCounter');
+    final bundle = await registry.exportAgentBundle('Accountant');
     expect(bundle, isNotNull);
     expect((bundle!['schema'] as Map)['securityClass'], 'C4');
     expect((bundle['schema'] as Map)['source'], 'pool');

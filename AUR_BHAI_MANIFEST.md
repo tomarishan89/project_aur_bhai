@@ -1,5 +1,5 @@
 # PROJECT AUR BHAI - MASTER ECOSYSTEM MANIFEST & KNOWLEDGE TRANSFER
-**Document State:** FROZEN (Arch v3.11 | Eng v2.8)
+**Document State:** FROZEN (Arch v3.12 | Eng v2.8)
 
 ## 1. PRODUCT CONCEPT & ULTIMATE VISION
 **The Concept:** Project Aur Bhai is a decentralized, voice-orchestrated **Mobile Agentic OS** and local **Edge Server** acting as a proxy for human activity. It is completely use-case agnostic. It natively runs as a secure, headless execution environment managing hardware sensors, acoustic handshakes, and an AI-driven Model Context Protocol (MCP). All features are dynamically added via local, sandboxed "Plugins."
@@ -12,7 +12,7 @@
 
 ---
 
-## 2. ARCHITECTURAL PARADIGMS (Arch v3.11 Frozen)
+## 2. ARCHITECTURAL PARADIGMS (Arch v3.12 Frozen)
 
 ### 2.1 The 4-Tier Security & Execution Matrix
 *See §2.7 for the agent verification lifecycle and marketplace promotion rules.*
@@ -153,6 +153,15 @@ Deferred design note for when (and only when) companies can be brought onto the 
 3. **Discovery:** How parties find each other — request-first browse, optional metadata-only offers, invite links, later thin match on metadata **never** on vault contents. Matching layer must not become a silent telemetry broker.
 4. **Distinct from Bro Code Commons (§2.10):** This is sovereign **data** relationships; commons is **source** licensing.
 
+### 2.12 First-Level Share Principles (Arch v3.12)
+Product stance for the first public/friend share. Not a SaaS launch. Not civic/pothole marketing. Milestones: `[MS-FIRST-SHARE-*]` ladder.
+
+1. **Honest OS story:** Describe what ships today — voice/text → Bro Code on-device, BYOK, pick up seed Bhai Codes, due diligence, Friend Circle. Do **not** lead with deferred capabilities (pothole auto-report, municipal tagging, Model Studio train, data sale).
+2. **Seed catalog over spectacle:** First share centers a small Sabke set (Calculator, Expenditure Logger, Note Taker, Telemetry Dashboard) plus **I Wish** feedback Bro Code. Depth demos wait until someone already cares.
+3. **No ambient product analytics:** Do not integrate cloud analytics that might ingest GPS/accelerometer or vault telemetry. Improvement comes from **direct user interaction** (`I Wish`, human feedback channels, optional user-sent diagnostics).
+4. **No SaaS tiers:** No Basic/Premium paywall for first share. BYOK remains the cost model. Paid Bro Codes / paid data packs stay far-future (§2.10 `paid`, §2.11) until real demand exists.
+5. **Sequence:** Product ready → seed catalog + I Wish → friend/alpha ops → intro surfaces (page/videos) → feedback network → stranger-success → soft store. Monetization frameworks are out of scope for this ladder.
+
 ---
 
 ## 3. ENGINEERING & TOOLCHAIN CONSTRAINTS (Eng v2.8 Frozen)
@@ -188,6 +197,16 @@ Evidence states (independent of parent `[x]`): **impl** (code exists) · **auto*
 
 **Friend Showcase (S14–S18 code):** closed-circle Publish/CIRCLE/pickup, Issues fixture lock tooling, wake path, Bro Call, headset copy — agent-ready; friend green signal is ops (private repo + PAT + APK).
 
+**First-level share priority ladder (Arch v3.12 — pick up in this order unless you override):**
+1. **`[MS-FIRST-SHARE-READY]`** — build/friend APK + first-run UX + BYOK discoverability  
+2. **`[MS-SEED-BHAI-CATALOG]`** — Calculator, Expenditure Logger, Note Taker, Telemetry Dashboard in Sabke  
+3. **`[MS-I-WISH-FEEDBACK]`** — I Wish Bro Code; ban ambient analytics that touch sensors/vault  
+4. **`[MS-FRIEND-ALPHA-OPS]`** — APK handoff, Circle PAT, scripted friend sessions  
+5. **`[MS-INTRO-SURFACE]`** — honest landing, screenshots, how-tos, short videos  
+6. **`[MS-FEEDBACK-NETWORK]`** — human feedback channel (WhatsApp/Telegram/Discussions; Discord later if needed)  
+7. **`[MS-STRANGER-SOFT-LAUNCH]`** — stranger-success gate → Play closed testing (not open blast)  
+**Out of this ladder:** SaaS tiers, Data Desk, civic/pothole marketing, PostHog-style telemetry (§2.11 / `[MS-DATA-MARKET]` stay deferred).
+
 **Canvas:** open [milestone-coverage-roadmap.canvas.tsx](file:///C:/Users/tomar/.cursor/projects/c-Users-tomar-Documents-Vidyaman-project-aur-bhai-workspace-project-aur-bhai/canvases/milestone-coverage-roadmap.canvas.tsx) beside chat for the full evidence map.
 
 **Sprint targets (evidence-gated) — original S1–S4 sequence; code largely landed, Accept open:**
@@ -196,7 +215,7 @@ Evidence states (independent of parent `[x]`): **impl** (code exists) · **auto*
 3. **S3 — Green suite + device acceptance:** keep suite green; CI + non-skipping QuickJS; accept Bridge → Core JS → LLM → Intent → Author → Refine → Dashboard.
 4. **S4 — Trust lifecycle then expand:** C4→C3→C2; structured due diligence; capability judge; Feed + marketplace shell landed in later sprints — device Accept still open.
 
-**Deferred unless you ask:** Model Studio Label/Train/Runtime, paid/public Commons, data market, chaining, **direct Bro Code prompt** (`[MS-DIRECT-BROCODE-PROMPT]` — brainstorm). Offline wake custom `.ppn` is ops (Picovoice file), not Eng.
+**Deferred unless you ask:** Model Studio Label/Train/Runtime, paid/public Commons, data market / SaaS tiers, chaining, civic/pothole marketing, ambient cloud analytics, **direct Bro Code prompt** (`[MS-DIRECT-BROCODE-PROMPT]`). Offline wake custom `.ppn` is ops (Picovoice file), not Eng. **Do ask / pick up:** First-level share ladder (`[MS-FIRST-SHARE-READY]` → … → `[MS-STRANGER-SOFT-LAUNCH]`).
 
 **Locator reconciliation (2026-07-18):** Accepted (underline) Bro Code agent/fixtures/dev-loop, platform ENG1–3, agent-refine IMPROVE path, vault dashboard BUILD/URL/RENDER/PERF, live-vs-sandbox. **Still In Review:** JS Bridge, User Ecosystem, Telemetry Dashboard (browser gate), Core Intent, Conv Author, Core JS Migration, LLM Agnostic. Run §5.1 post-sprint review tables after each sprint before flipping more italics → underlines.
 
@@ -562,8 +581,8 @@ Use Kanban: **Bold (targeted) → *Italic* (in review) → <u>Underline</u> (acc
 *   **Ecosystem & Agents:**
     *   [ ] ~~`[MS-AGENT-CHAINING-AGT1]` Build Orchestrator Agents (like Potter) that trigger downstream Action Agents (like Xter) dynamically.~~
 
-### - [ ] `[MS-DATA-MARKET]` MILESTONE: ~~User-Authorized Data Transfer & Monetization [DEFERRED — §2.6 / §2.11; OVERKILL until companies are on the platform; never silent pooling; ≠ Bro Code Commons §2.10]~~
-*   **Product gate:** Do not prioritize Eng until real company demand exists. Design preserved so labeled-pack shape and consent stay compatible.
+### - [ ] `[MS-DATA-MARKET]` MILESTONE: ~~User-Authorized Data Transfer & Monetization [DEFERRED — §2.6 / §2.11; OVERKILL until companies are on the platform; never silent pooling; ≠ Bro Code Commons §2.10; NOT a SaaS Basic/Premium launch]~~
+*   **Product gate:** Do not prioritize Eng until real company demand exists. **Not** first-share monetization — no subscription tiers for alpha. Design preserved so labeled-pack shape and consent stay compatible.
 *   **User Perspective (UI/UX):**
     *   [ ] ~~`[MS-DATA-MARKET-UX1]` **Data Desk** — manage who data is shared with and what (grants, packs, purpose, retention, revoke/expire, revenue if any).~~
     *   [ ] ~~`[MS-DATA-MARKET-UX2]` Per-pack consent to list/sell labeled Path L packs (windows + labels + provenance) distinct from self-use train export and from Bro Code Commons source publish.~~
@@ -609,6 +628,136 @@ Use Kanban: **Bold (targeted) → *Italic* (in review) → <u>Underline</u> (acc
 *   **Ecosystem & Agents:**
     *   [x] ***`[MS-BROCODE-COMMONS-AGT1]`** Sabke local seed browse + FRIEND CIRCLE remote; pickup → Sandbox (C4). [IN REVIEW]*
     *   [ ] ~~`[MS-BROCODE-COMMONS-AGT2]` Opt-in attach of Path L model / labeled pack only with separate §2.6 consent (cross-link `[MS-DATA-MARKET]`).~~
+
+### - [ ] **`[MS-FIRST-SHARE-READY]`** MILESTONE: **First-share product readiness [TARGETED — Arch v3.12 §2.12]**
+*   **Scope:** Make the app survivable for a non-you human: builds, first-run copy, BYOK findability. Blocks friend handoff. Civic/pothole marketing out of scope.
+*   **User Perspective (UI/UX):**
+    *   [ ] **`[MS-FIRST-SHARE-READY-UX1]`** Command Center idle copy directs action (e.g. “Tap mic to talk to Bhai”) — not “Waiting for handshake…”.
+        *   [ ] **`[MS-FIRST-SHARE-READY-UX1a]`** Text entry placeholder describes commands / chat (not “Test simulator” only).
+        *   [ ] **`[MS-FIRST-SHARE-READY-UX1b]`** Status strip: drop raw LAN IP and redundant `BUILTINEARPIECE`; keep Edge on/off, Key on/off, headset-or-speaker plain language.
+    *   [ ] **`[MS-FIRST-SHARE-READY-UX2]`** Settings: API/LLM (BYOK) is first / unmistakable for a new user.
+        *   [ ] **`[MS-FIRST-SHARE-READY-UX2a]`** Empty-key path shows actionable “add key” guidance before voice/text fails opaquely.
+        *   [ ] **`[MS-FIRST-SHARE-READY-UX2b]`** Short in-app note: user pays their own LLM (BYOK); no app subscription required for first share.
+    *   [ ] **`[MS-FIRST-SHARE-READY-UX3]`** Mere / Sabke / Sandbox labels understandable enough for a friend SOP (one-screen legend or first-run tip).
+*   **Engineering & Architecture:**
+    *   [ ] **`[MS-FIRST-SHARE-READY-ENG1]`** `flutter run` / release assemble green on target Android device (fix any compile blockers before friend APK).
+    *   [ ] **`[MS-FIRST-SHARE-READY-ENG2]`** Signed **release** APK (or Play internal) produced and smoke-tested install on a clean device.
+        *   [ ] **`[MS-FIRST-SHARE-READY-ENG2a]`** Install note: unknown sources / Play internal; min Android version; “bring your own API key.”
+    *   [ ] **`[MS-FIRST-SHARE-READY-ENG3]`** No new ambient cloud analytics SDK in this milestone (policy gate for `[MS-I-WISH-FEEDBACK-ENG2]`).
+*   **Ecosystem & Agents:**
+    *   [ ] **`[MS-FIRST-SHARE-READY-AGT1]`** Smoke SOP: key → one Ask Calculator (or seed) → result spoken/logged without developer intervention.
+
+### - [ ] **`[MS-SEED-BHAI-CATALOG]`** MILESTONE: **Seed Sabke Bhai catalog for first share [TARGETED — after READY]**
+*   **Scope:** Common pickups for first share — **Calculator**, **Expenditure Logger**, **Note Taker**, **Telemetry Dashboard**. Behavior depth intentionally shallow in public docs; must pickup → due diligence path → use. Do not block on perfect feature matrices.
+*   **User Perspective (UI/UX):**
+    *   [ ] **`[MS-SEED-BHAI-CATALOG-UX1]`** Sabke Bhai lists all four seeds with clear names + one-line purpose.
+        *   [ ] **`[MS-SEED-BHAI-CATALOG-UX1a]`** Calculator — math / power-style asks.
+        *   [ ] **`[MS-SEED-BHAI-CATALOG-UX1b]`** Expenditure Logger — log spends (voice/Tell/Feed path as already exists).
+        *   [ ] **`[MS-SEED-BHAI-CATALOG-UX1c]`** Note Taker — capture short notes.
+        *   [ ] **`[MS-SEED-BHAI-CATALOG-UX1d]`** Telemetry Dashboard — local vault charts (existing Path A/B validation).
+    *   [ ] **`[MS-SEED-BHAI-CATALOG-UX2]`** Pickup flow: Sabke → preview → install lands **Sandbox (C4)** → user can promote via due diligence to Mere when ready.
+        *   [ ] **`[MS-SEED-BHAI-CATALOG-UX2a]`** Friend SOP: “Pick Expenditure Logger → Sandbox run → Promote if you want Mere.”
+    *   [ ] **`[MS-SEED-BHAI-CATALOG-UX3]`** Origin badges remain correct (seed / pool vs Yours vs Friend Circle).
+*   **Engineering & Architecture:**
+    *   [ ] **`[MS-SEED-BHAI-CATALOG-ENG1]`** Seed bundles registered in local Sabke catalog (vault seed and/or `examples/` + registry), not only tribal knowledge.
+        *   [ ] **`[MS-SEED-BHAI-CATALOG-ENG1a]`** Calculator present (may already be core-seeded C2 — verify Sabke browse path).
+        *   [ ] **`[MS-SEED-BHAI-CATALOG-ENG1b]`** Expenditure Logger Bro Code artifact + schema.
+        *   [ ] **`[MS-SEED-BHAI-CATALOG-ENG1c]`** Note Taker Bro Code artifact + schema.
+        *   [ ] **`[MS-SEED-BHAI-CATALOG-ENG1d]`** Telemetry Dashboard Bro Code / example wired into Sabke browse.
+    *   [ ] **`[MS-SEED-BHAI-CATALOG-ENG2]`** Pickup → Sandbox isolation: sovereign GPS not copied into sandbox (existing live-vs-sandbox rule).
+*   **Ecosystem & Agents:**
+    *   [ ] **`[MS-SEED-BHAI-CATALOG-AGT1]`** Friend can exercise each of the four once (run or sandbox) without authoring from scratch.
+    *   [ ] **`[MS-SEED-BHAI-CATALOG-AGT2]`** Optional: publish the four to Friend Circle private repo for multi-device pickup (`[MS-BROCODE-COMMONS]`).
+
+### - [ ] **`[MS-I-WISH-FEEDBACK]`** MILESTONE: **I Wish Bro Code + no ambient analytics [TARGETED — with SEED]**
+*   **Scope:** Product improvement via **direct user interaction**, not cloud product analytics. **I Wish** is a first-class Bro Code for alpha and forever. Text-only by default; no auto GPS/accel attach.
+*   **User Perspective (UI/UX):**
+    *   [ ] **`[MS-I-WISH-FEEDBACK-UX1]`** Sabke (or Mere seed) entry **I Wish** — user submits a wish by voice/text.
+        *   [ ] **`[MS-I-WISH-FEEDBACK-UX1a]`** Confirm copy: wish is stored on-device; leaving the device requires explicit user action if/when export exists.
+        *   [ ] **`[MS-I-WISH-FEEDBACK-UX1b]`** No silent attach of last location / accel window to a wish.
+    *   [ ] **`[MS-I-WISH-FEEDBACK-UX2]`** User can list/review their own wishes on device (simple vault list or dashboard).
+    *   [ ] **`[MS-I-WISH-FEEDBACK-UX3]`** Optional later: “Share wish with developer” = user-authorized egress only (not part of MVP if Circle/email paste works).
+*   **Engineering & Architecture:**
+    *   [ ] **`[MS-I-WISH-FEEDBACK-ENG1]`** Bro Code + vault persistence for wish records (timestamp, text, optional tags).
+    *   [ ] **`[MS-I-WISH-FEEDBACK-ENG2]`** **Policy:** no PostHog/TelemetryDeck/Firebase Analytics (or similar) that can receive sensor/vault streams by default. Document in Settings privacy blurb.
+        *   [ ] **`[MS-I-WISH-FEEDBACK-ENG2a]`** CI/deps check or manifest note: reject adding ambient analytics packages without explicit Arch exception.
+    *   [ ] **`[MS-I-WISH-FEEDBACK-ENG3]`** Optional user-sent diagnostics remain clipboard/fixture style (existing Bro Code fixture / issue report paths) — never background GPS upload.
+*   **Ecosystem & Agents:**
+    *   [ ] **`[MS-I-WISH-FEEDBACK-AGT1]`** Seed I Wish alongside the four utility Bro Codes in Sabke.
+    *   [ ] **`[MS-I-WISH-FEEDBACK-AGT2]`** Friend SOP includes: “Submit one I Wish about anything confusing.”
+
+### - [ ] **`[MS-FRIEND-ALPHA-OPS]`** MILESTONE: **Friend / alpha handoff operations [TARGETED — after READY + SEED + I WISH]**
+*   **Scope:** Ops + human process, not new platform. Private Circle + APK + scripted sessions. Discord not required.
+*   **User Perspective (UI/UX):**
+    *   [ ] **`[MS-FRIEND-ALPHA-OPS-UX1]`** Written friend pack (repo `friend_share/` or docs):
+        *   [ ] **`[MS-FRIEND-ALPHA-OPS-UX1a]`** Install steps (APK or Play internal).
+        *   [ ] **`[MS-FRIEND-ALPHA-OPS-UX1b]`** BYOK: get key, paste in Settings, spend-cap warning.
+        *   [ ] **`[MS-FRIEND-ALPHA-OPS-UX1c]`** Friend Circle: private repo URL + fine-grained PAT scopes (read; write only if they publish).
+        *   [ ] **`[MS-FRIEND-ALPHA-OPS-UX1d]`** First tasks: pickup one seed + run I Wish once.
+    *   [ ] **`[MS-FRIEND-ALPHA-OPS-UX2]`** Session scripts (30 min each), filed into `feedback/inbox/`:
+        *   [ ] **`[MS-FRIEND-ALPHA-OPS-UX2a]`** Session A — install + key + one voice/text command.
+        *   [ ] **`[MS-FRIEND-ALPHA-OPS-UX2b]`** Session B — Sabke pickup + Sandbox + promote confusion points.
+        *   [ ] **`[MS-FRIEND-ALPHA-OPS-UX2c]`** Session C — author or IMPROVE something tiny OR use Expenditure/Note.
+*   **Engineering & Architecture:**
+    *   [ ] **`[MS-FRIEND-ALPHA-OPS-ENG1]`** Private GitHub Circle repo live with `commons/index.json` (or current Circle format); at least one seed published.
+    *   [ ] **`[MS-FRIEND-ALPHA-OPS-ENG2]`** Fresh release APK hash/date recorded in friend pack when rebuilt.
+*   **Ecosystem & Agents:**
+    *   [ ] **`[MS-FRIEND-ALPHA-OPS-AGT1]`** ≥1 friend completes Session A without full screenshare.
+    *   [ ] **`[MS-FRIEND-ALPHA-OPS-AGT2]`** ≥1 friend completes Sabke pickup (Session B).
+    *   [ ] **`[MS-FRIEND-ALPHA-OPS-AGT3]`** Wishes / inbox notes triage weekly (human); no analytics dashboard required.
+
+### - [ ] **`[MS-INTRO-SURFACE]`** MILESTONE: **Honest intro surfaces (landing, how-tos, videos) [TARGETED — parallel with FRIEND ops]**
+*   **Scope:** Introduction materials for the **OS + seed Bro Codes** story. Cheap hosting OK (GitHub Pages / Vercel). No waitlist hype machine required. No civic hero.
+*   **User Perspective (UI/UX):**
+    *   [ ] **`[MS-INTRO-SURFACE-UX1]`** Landing / intro page:
+        *   [ ] **`[MS-INTRO-SURFACE-UX1a]`** Headline = voice/build Bro Code on your phone + BYOK (honest OS).
+        *   [ ] **`[MS-INTRO-SURFACE-UX1b]`** Explicit non-claims: not a paid SaaS; not “municipal pothole app” as the product.
+        *   [ ] **`[MS-INTRO-SURFACE-UX1c]`** Section: seed Bro Codes list (four + I Wish) with one line each.
+        *   [ ] **`[MS-INTRO-SURFACE-UX1d]`** CTA: join closed alpha / contact / Circle instructions — not “Buy Premium.”
+    *   [ ] **`[MS-INTRO-SURFACE-UX2]`** Screenshots: Command Center, BYOK settings, Sabke pickup, one dashboard — dark/minimal OK; match shipped UI.
+    *   [ ] **`[MS-INTRO-SURFACE-UX3]`** How-to docs:
+        *   [ ] **`[MS-INTRO-SURFACE-UX3a]`** Add API key.
+        *   [ ] **`[MS-INTRO-SURFACE-UX3b]`** Pick up a seed Bro Code → Sandbox → Promote.
+        *   [ ] **`[MS-INTRO-SURFACE-UX3c]`** Submit an I Wish.
+        *   [ ] **`[MS-INTRO-SURFACE-UX3d]`** Friend Circle refresh (if used).
+    *   [ ] **`[MS-INTRO-SURFACE-UX4]`** Videos (short):
+        *   [ ] **`[MS-INTRO-SURFACE-UX4a]`** 60–90s: key → ask Calculator (or seed) → result.
+        *   [ ] **`[MS-INTRO-SURFACE-UX4b]`** 60–90s: Sabke pickup → Sandbox.
+        *   [ ] **`[MS-INTRO-SURFACE-UX4c]`** Optional: I Wish submit. Defer “complex capability” showcase videos until audience exists.
+*   **Engineering & Architecture:**
+    *   [ ] **`[MS-INTRO-SURFACE-ENG1]`** Host static site (GitHub Pages or Vercel); link from repo README / friend pack.
+    *   [ ] **`[MS-INTRO-SURFACE-ENG2]`** Screenshot/video assets stored under `docs/` or `friend_share/media/` (no secrets).
+*   **Ecosystem & Agents:**
+    *   [ ] **`[MS-INTRO-SURFACE-AGT1]`** Friend can follow how-to without you narrating every tap.
+
+### - [ ] **`[MS-FEEDBACK-NETWORK]`** MILESTONE: **Human feedback network (not ambient analytics) [TARGETED — with FRIEND ops]**
+*   **Scope:** Place humans talk. Prefer smallest channel you will read. Discord optional later (chat app with channels — not required for alpha).
+*   **User Perspective (UI/UX):**
+    *   [ ] **`[MS-FEEDBACK-NETWORK-UX1]`** Primary channel chosen and linked from intro + friend pack:
+        *   [ ] **`[MS-FEEDBACK-NETWORK-UX1a]`** Default alpha: WhatsApp or Telegram group, **or** GitHub Discussions — pick one.
+        *   [ ] **`[MS-FEEDBACK-NETWORK-UX1b]`** Discord only if ≥~10 people ask for a lounge; document channels (`#bugs`, `#ideas`) if created.
+    *   [ ] **`[MS-FEEDBACK-NETWORK-UX2]`** Intake rules: prefer **I Wish** in-app; paste screenshots to the human channel; no requirement to enable device analytics.
+    *   [ ] **`[MS-FEEDBACK-NETWORK-UX3]`** Triage rhythm: weekly review of I Wish + channel → `feedback/inbox/` notes for Eng.
+*   **Engineering & Architecture:**
+    *   [ ] **`[MS-FEEDBACK-NETWORK-ENG1]`** Links/config strings in `AppConfig` or friend pack (not hardcoded secrets).
+    *   [ ] **`[MS-FEEDBACK-NETWORK-ENG2]`** No dependency on Canny/Featurebase for alpha (add only if volume hurts).
+*   **Ecosystem & Agents:**
+    *   [ ] **`[MS-FEEDBACK-NETWORK-AGT1]`** At least one non-you message received and filed during friend alpha.
+
+### - [ ] **`[MS-STRANGER-SOFT-LAUNCH]`** MILESTONE: **Stranger-success → soft store [QUEUED — after FRIEND alpha evidence]**
+*   **Scope:** Soft distribution only. Not Week-4 dual-store fantasy. Not SaaS. Apple when iOS privacy story is deliberate.
+*   **User Perspective (UI/UX):**
+    *   [ ] **`[MS-STRANGER-SOFT-LAUNCH-UX1]`** Stranger-success gate: person outside household completes install → BYOK → one seed Bro Code win **without live help**.
+    *   [ ] **`[MS-STRANGER-SOFT-LAUNCH-UX2]`** Play Console **internal/closed testing** track (not open production until closed cohort is sane).
+        *   [ ] **`[MS-STRANGER-SOFT-LAUNCH-UX2a]`** Store listing copy matches shipped features + BYOK honesty + permission justification (mic; location only if dashboard/seeds need it).
+        *   [ ] **`[MS-STRANGER-SOFT-LAUNCH-UX2b]`** Data safety form: no silent analytics of telemetry; declare what actually leaves device (BYOK to user LLM).
+    *   [ ] ~~`[MS-STRANGER-SOFT-LAUNCH-UX3]` Open production / App Store — deferred until closed testing + iOS readiness.~~
+*   **Engineering & Architecture:**
+    *   [ ] **`[MS-STRANGER-SOFT-LAUNCH-ENG1]`** Play pre-launch report / closed-test crash triage before promoting track.
+    *   [ ] **`[MS-STRANGER-SOFT-LAUNCH-ENG2]`** Still no ambient sensor analytics; I Wish + human channel remain the insight path.
+*   **Ecosystem & Agents:**
+    *   [ ] **`[MS-STRANGER-SOFT-LAUNCH-AGT1]`** 5–20 closed testers max for first soft launch; measure qualitatively (wishes + channel), not vanity installs.
+    *   [ ] ~~`[MS-STRANGER-SOFT-LAUNCH-AGT2]` Investor / paid Bro Code / data-sale motions — out of scope; see §2.11.~~
 
 ### - [ ] `[MS-OFFLINE-TTS]` MILESTONE: ~~Native Offline Voice Synthesis [DEFERRED]~~
 *   **User Perspective (UI/UX):**
@@ -668,7 +817,12 @@ To guarantee extreme robustness of the native edge runtime before compiling furt
 ---
 
 ## 7. ARCHITECTURE & ENGINEERING HISTORY (Changelog)
-* **Coverage review + Locator reconciliation 2026-07-18 (Current planning freeze):**
+* **Arch v3.12 / Eng v2.8 (Current):**
+  * *First-level share (§2.12):* Honest OS story; seed Sabke catalog; **I Wish** feedback Bro Code; **no ambient analytics**; no SaaS tiers; sequence READY → SEED → I WISH → FRIEND ops → INTRO → FEEDBACK NETWORK → STRANGER soft launch.
+  * *Milestones:* `[MS-FIRST-SHARE-READY]`, `[MS-SEED-BHAI-CATALOG]`, `[MS-I-WISH-FEEDBACK]`, `[MS-FRIEND-ALPHA-OPS]`, `[MS-INTRO-SURFACE]`, `[MS-FEEDBACK-NETWORK]`, `[MS-STRANGER-SOFT-LAUNCH]` with nested UX/ENG/AGT substeps. Civic/pothole GTM and paid data remain deferred.
+  * *No Eng bump* for this freeze (roadmap documentation).
+
+* **Coverage review + Locator reconciliation 2026-07-18 (planning freeze):**
   * *Evidence:* Suite 200/34/1; strong auto on vault feature + Bro Code agent/fixtures/dev-loop; `MS-CORE-INTENT` has zero automation; marketplace demoted until edge auth + trust lifecycle.
   * *Vault claim:* Feature surface complete; sovereignty hardening open (`ENG3` SQL caps, `ENG4` LAN auth, `ENG5` encryption/BYOK secure storage).
   * *Accepted from Locator (underline):* `MS-BROCODE-AGENT` (+ UX/ENG/AGT), `MS-BROCODE-FIXTURES`, `MS-BROCODE-DEV-LOOP`, `MS-BROCODE-PLATFORM-ENG1–3`, `MS-AGENT-REFINE` (IMPROVE path), `MS-VAULT-DASHBOARD-*`, `MS-TELEMETRY-LIVE-VS-SANDBOX`.
@@ -677,7 +831,7 @@ To guarantee extreme robustness of the native edge runtime before compiling furt
   * *Deferred (strike):* marketplace UX3/AGT2; dashboard TTL/export stretch until later sprints.
   * *Process:* §5.1 post-sprint review tables are mandatory before Accepting further In Review items.
 
-* **Arch v3.11 / Eng v2.8 (Current):**
+* **Arch v3.11 / Eng v2.8 (Legacy):**
   * *Future note (§2.11):* **Data Desk** (who/what shared), company **`DataRequest` templates**, and **discovery** (request-first / invite / metadata match) under `[MS-DATA-MARKET]`. Explicit gate: **overkill until companies are on the platform** — no Eng priority.
   * *No Eng bump.*
 

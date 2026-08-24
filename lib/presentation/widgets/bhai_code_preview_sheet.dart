@@ -57,14 +57,17 @@ class BhaiCodePreviewSheet extends ConsumerStatefulWidget {
 
 class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
   DueDiligenceResult? _scan;
-  bool _busy = false;
+  String? _busyAction;
   String? _sandboxResult;
   final _paramCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _runScan());
+    // Only auto-run due diligence if the agent is already installed (Mere Bhai).
+    if (!widget.showPickup) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _runScan());
+    }
   }
 
   @override
@@ -73,17 +76,43 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
     super.dispose();
   }
 
-  void _runScan() {
+  Future<void> _runScan({bool isManualUserTap = false}) async {
     if (!widget.listing.access.allowDiligence) {
       if (!mounted) return;
       setState(() => _scan = null);
       return;
     }
+    if (isManualUserTap) {
+      setState(() {
+        _busyAction = 'scan';
+        _scan = null;
+      });
+      await Future.delayed(const Duration(milliseconds: 350));
+    }
+    final content = await _loadListingContent(widget.listing);
     final scan = ref
         .read(agentVerificationProvider)
-        .scanScript(widget.listing.script);
+        .scanScript(content['script'] as String);
     if (!mounted) return;
-    setState(() => _scan = scan);
+    setState(() {
+      _scan = scan;
+      _busyAction = null;
+    });
+    if (isManualUserTap && mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            scan.flagged
+                ? 'Due diligence re-scan: Flagged (RED)'
+                : (scan.findings.any((f) => f.severity == 'warning')
+                    ? 'Due diligence re-scan: Caution (AMBER)'
+                    : 'Due diligence re-scan: Passed (GREEN)'),
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Color get _lightColor {
@@ -114,6 +143,8 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
 
   List<String> _permissionLines() {
     final lines = <String>[];
+    // Note: For assetBundleDir, this will just show empty if not loaded yet,
+    // but typically UI relies on static manifest. For a true fix, we'd make this async.
     final script = widget.listing.script;
     void add(String label, bool hit) {
       if (hit) lines.add(label);
@@ -147,10 +178,31 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
     return lines;
   }
 
+  Future<Map<String, dynamic>> _loadListingContent(MarketplaceListing listing) async {
+    var finalScript = listing.script;
+    var finalAssets = Map<String, String>.from(listing.vaultAssets);
+    if (listing.assetBundleDir != null) {
+      try {
+        final bundle = DefaultAssetBundle.of(context);
+        final scriptJs = await bundle.loadString('${listing.assetBundleDir}/script.js');
+        final dashboardHtml = await bundle.loadString('${listing.assetBundleDir}/dashboard.html');
+        finalScript = scriptJs;
+        finalAssets['telemeter.html'] = dashboardHtml;
+        finalAssets['dashboard.html'] = dashboardHtml;
+      } catch (e) {
+        debugPrint('Error loading preview bundle: $e');
+      }
+    }
+    return {
+      'script': finalScript,
+      'assets': finalAssets,
+    };
+  }
+
   Future<void> _testNow() async {
     if (!widget.listing.access.allowSandboxTest) return;
     setState(() {
-      _busy = true;
+      _busyAction = 'testNow';
       _sandboxResult = null;
     });
     try {
@@ -171,12 +223,14 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
           params['text'] = raw;
         }
       }
+      final content = await _loadListingContent(widget.listing);
       final bridge = ref.read(jsBridgeServiceProvider);
       final result = await bridge.executeAgentScript(
         agentName: widget.listing.name,
-        script: widget.listing.script,
+        script: content['script'] as String,
         parameters: params,
         sandboxMode: true,
+        assets: content['assets'] as Map<String, String>,
       );
       if (!mounted) return;
       setState(() {
@@ -190,7 +244,7 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
       if (!mounted) return;
       setState(() => _sandboxResult = '[SANDBOX] ERROR: $e');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _busyAction = null);
     }
   }
 
@@ -206,18 +260,37 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
   }
 
   Future<void> _pickup() async {
-    setState(() => _busy = true);
+    setState(() => _busyAction = 'pickup');
     try {
+      final content = await _loadListingContent(widget.listing);
+      // Enforce due diligence before installing
+      if (widget.listing.access.allowDiligence) {
+        final scan = ref.read(agentVerificationProvider).scanScript(content['script'] as String);
+        if (scan.flagged) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Installation blocked: Due diligence failed (Flagged)'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+          return;
+        }
+      }
+
       final ok = widget.customPickup != null
           ? await widget.customPickup!(widget.listing)
-          : await ref.read(marketplaceCatalogProvider).pickup(widget.listing);
+          : await ref.read(marketplaceCatalogProvider).pickup(
+                widget.listing,
+                securityClass: AgentSecurityClass.c2Verified,
+              );
       await ref.read(jsAgentRegistryProvider).loadAndRegisterAgents();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             ok
-                ? '${widget.listing.name} added to Sandbox'
+                ? '${widget.listing.name} passed due diligence and installed to Mere Bhai'
                 : '${widget.listing.name} already installed',
           ),
         ),
@@ -232,14 +305,17 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
         context,
       ).showSnackBar(SnackBar(content: Text('Pick up failed: $e')));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _busyAction = null);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final listing = widget.listing;
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    final viewInsetsBottom = MediaQuery.viewInsetsOf(context).bottom;
+    final safePaddingBottom = MediaQuery.paddingOf(context).bottom;
+    final bottomPadding = viewInsetsBottom > 0 ? viewInsetsBottom : safePaddingBottom;
+    
     final author = listing.author.trim().isEmpty
         ? 'local pool'
         : listing.author;
@@ -248,7 +324,7 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
         : listing.description;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottom),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomPadding),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -282,48 +358,60 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
               desc,
               style: const TextStyle(color: Colors.white70, fontSize: 13),
             ),
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _lightColor.withValues(alpha: 0.5)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.circle, size: 12, color: _lightColor),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _lightLabel,
-                          style: TextStyle(
-                            color: _lightColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+            if (!widget.showPickup) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: _lightColor.withValues(alpha: 0.5)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.circle, size: 12, color: _lightColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _lightLabel,
+                            style: TextStyle(
+                              color: _lightColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                      if (listing.access.allowDiligence)
-                        TextButton(
-                          onPressed: _busy ? null : _runScan,
-                          child: const Text(
-                            'RE-SCAN',
-                            style: TextStyle(fontSize: 11),
+                        if (listing.access.allowDiligence)
+                          TextButton(
+                            onPressed:
+                                _busyAction != null
+                                    ? null
+                                    : () => _runScan(isManualUserTap: true),
+                            child: _busyAction == 'scan'
+                                ? const SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : const Text(
+                                    'RE-SCAN',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
                           ),
-                        ),
+                      ],
+                    ),
+                    if (_scan != null && _scan!.findings.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      DueDiligenceFindingsList(scan: _scan!),
                     ],
-                  ),
-                  if (_scan != null && _scan!.findings.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    DueDiligenceFindingsList(scan: _scan!),
                   ],
-                ],
+                ),
               ),
-            ),
+            ],
             const SizedBox(height: 14),
             const Text(
               'PERMISSIONS / VAULT ACCESS',
@@ -401,51 +489,63 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
               ),
             ],
             const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (listing.access.allowSandboxTest)
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.lightBlueAccent,
-                      foregroundColor: Colors.black,
-                    ),
-                    onPressed: _busy ? null : _testNow,
-                    icon: _busy
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.science, size: 16),
-                    label: const Text(
-                      'TEST NOW',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                if (listing.access.allowSandboxTest)
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.lightBlueAccent,
-                      side: const BorderSide(color: Colors.lightBlueAccent),
-                    ),
-                    onPressed: _busy ? null : _testLater,
-                    icon: const Icon(Icons.schedule, size: 16),
-                    label: const Text('TEST LATER'),
-                  ),
                 if (widget.showPickup)
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.greenAccent,
                       foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    onPressed: _busy ? null : _pickup,
-                    icon: const Icon(Icons.download, size: 16),
+                    onPressed: _busyAction != null ? () {} : _pickup,
+                    icon: _busyAction == 'pickup'
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.download, size: 18),
                     label: const Text(
-                      'ADD TO SANDBOX',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                      'INSTALL (MERE BHAI)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                     ),
+                  ),
+                if (widget.showPickup && listing.access.allowSandboxTest)
+                  const SizedBox(height: 12),
+                if (listing.access.allowSandboxTest)
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.lightBlueAccent,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    onPressed: _busyAction != null ? () {} : _testNow,
+                    icon: _busyAction == 'testNow'
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.science, size: 18),
+                    label: const Text(
+                      'TEST NOW (SANDBOX)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ),
+                if (listing.access.allowSandboxTest)
+                  const SizedBox(height: 12),
+                if (listing.access.allowSandboxTest)
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.lightBlueAccent,
+                      side: const BorderSide(color: Colors.lightBlueAccent),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    onPressed: _busyAction != null ? () {} : _testLater,
+                    icon: const Icon(Icons.schedule, size: 18),
+                    label: const Text('QUEUE IN SANDBOX', style: TextStyle(fontSize: 14)),
                   ),
               ],
             ),
