@@ -68,6 +68,19 @@ class MarketplaceCatalog {
       script: '',
       assetBundleDir: 'assets/bro_code/telemeter',
     ),
+    MarketplaceListing(
+      id: 'pool-notetaker',
+      name: 'NoteTaker',
+      description:
+          'Sovereign thought & idea vault with tag filtering, markdown search, and PWA dashboard.',
+      license: 'remix_free',
+      script: '',
+      assetBundleDir: 'assets/bro_code/note_taker',
+      inputSchema: {
+        'text': {'type': 'string', 'description': 'Note content, question, or tag'},
+        'action': {'type': 'string', 'description': 'Action such as "dashboard"'},
+      },
+    ),
   ];
 
   List<MarketplaceListing> listings() => List.unmodifiable(seedListings);

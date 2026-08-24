@@ -100,6 +100,8 @@ flutter:
     - assets/bro_code/telemeter/dashboard.html
     - assets/bro_code/accountant/script.js
     - assets/bro_code/accountant/dashboard.html
+    - assets/bro_code/note_taker/script.js
+    - assets/bro_code/note_taker/dashboard.html
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

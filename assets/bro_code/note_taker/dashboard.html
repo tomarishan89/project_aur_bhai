@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Note Taker — Sovereign Thought & Idea Vault</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#8b5cf6" />
+<link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22NoteTaker%22%2C%22short_name%22%3A%22Notes%22%2C%22start_url%22%3A%22%2Fvault%2Fnote_taker.html%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230b0f19%22%2C%22theme_color%22%3A%22%238b5cf6%22%7D" />
+
+<style>
+  :root {
+    --bg: #0b0f19;
+    --card: #131b2e;
+    --card-hover: #1c2742;
+    --border: #1e293b;
+    --border-light: #334155;
+    --text: #f8fafc;
+    --muted: #94a3b8;
+    --accent: #8b5cf6;
+    --accent-glow: rgba(139, 92, 246, 0.25);
+    --accent-sec: #06b6d4;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --green: #10b981;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  body.theme-oled {
+    --bg: #000000;
+    --card: #0a0a0a;
+    --card-hover: #141414;
+    --border: #222222;
+    --border-light: #333333;
+  }
+
+  body.theme-light {
+    --bg: #f1f5f9;
+    --card: #ffffff;
+    --card-hover: #f8fafc;
+    --border: #e2e8f0;
+    --border-light: #cbd5e1;
+    --text: #0f172a;
+    --muted: #64748b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); }
+  body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* ── Header ── */
+  header {
+    background: rgba(19, 27, 46, 0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-logo {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-sec));
+    display: grid; place-content: center; font-weight: 900; font-size: 16px; color: #fff;
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+  .brand-title h1 { font-size: 15px; font-weight: 800; letter-spacing: 0.5px; }
+  .brand-title .sub { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .header-controls { display: flex; align-items: center; gap: 6px; }
+  .btn {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+    transition: all .15s ease;
+  }
+  .btn:hover { background: var(--card-hover); border-color: var(--border-light); }
+  .btn-accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-accent:hover { opacity: 0.9; }
+
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .btn-spin { animation: spin 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+
+  /* ── Layout Grid ── */
+  .container { max-width: 1200px; margin: 0 auto; width: 100%; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+
+  /* ── Filter Bar Section ── */
+  .filter-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    justify-content: space-between;
+  }
+  .filter-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .date-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    outline: none;
+    color-scheme: dark;
+  }
+  .search-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: var(--text);
+    font-size: 12px;
+    outline: none;
+    min-width: 200px;
+    flex: 1;
+  }
+  .search-box:focus { border-color: var(--accent); }
+
+  /* ── Tag Chips Bar ── */
+  .tag-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .tag-chip {
+    padding: 4px 10px;
+    border-radius: 14px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    transition: all .15s ease;
+  }
+  .tag-chip:hover { border-color: var(--accent); color: var(--text); }
+  .tag-chip.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  /* ── Notes Grid ── */
+  .notes-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  @media(min-width: 650px) {
+    .notes-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media(min-width: 1000px) {
+    .notes-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .note-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    transition: transform .15s ease, border-color .15s ease;
+  }
+  .note-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-light);
+  }
+  .note-card.pinned {
+    border-color: rgba(139, 92, 246, 0.4);
+    box-shadow: 0 4px 16px rgba(139, 92, 246, 0.1);
+  }
+  .note-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .note-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  .note-time {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: monospace;
+    margin-top: 2px;
+  }
+  .note-body {
+    font-size: 13px;
+    color: rgba(248, 250, 252, 0.85);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    flex: 1;
+    word-break: break-word;
+  }
+  .note-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 8px;
+    margin-top: 4px;
+  }
+  .note-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .note-tag {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--accent-sec);
+    background: rgba(6, 182, 212, 0.12);
+    padding: 2px 6px;
+    border-radius: 6px;
+  }
+  .note-actions {
+    display: flex;
+    gap: 4px;
+  }
+  .icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px;
+    border-radius: 6px;
+    color: var(--muted);
+    transition: color .15s ease;
+  }
+  .icon-btn:hover { color: var(--text); }
+  .icon-btn.active { color: var(--warning); }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+    display: none; place-content: center; z-index: 999; padding: 16px;
+  }
+  .modal-overlay.active { display: grid; }
+  .modal {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px; width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 14px;
+    box-shadow: 0 16px 36px rgba(0,0,0,0.5);
+  }
+  .modal-title { font-size: 15px; font-weight: 700; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
+  .form-input, .form-textarea {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 8px 12px; font-size: 13px; outline: none;
+  }
+  .form-textarea { min-height: 120px; resize: vertical; line-height: 1.4; }
+  .form-input:focus, .form-textarea:focus { border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-logo">📝</div>
+      <div class="brand-title">
+        <h1>NOTE TAKER</h1>
+        <div class="sub"><span class="live-dot"></span> <span id="status-text">Sovereign Vault</span></div>
+      </div>
+    </div>
+    <div class="header-controls">
+      <button class="btn" onclick="cycleTheme()" title="Theme">🎨</button>
+      <button class="btn btn-accent" onclick="openAddModal()" title="Add Note">➕ Note</button>
+      <button class="btn" onclick="exportMarkdown()" title="Export Markdown">📥 .MD</button>
+      <button class="btn" onclick="exportJSON()" title="Export JSON">📥 .JSON</button>
+      <button class="btn btn-accent" id="btn-refresh" onclick="refreshAll(true)" title="Refresh">🔄</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Filter Control Bar -->
+    <div class="filter-panel">
+      <div class="filter-row">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1;">
+          <input type="text" id="search-input" class="search-box" placeholder="Search notes or tags..." oninput="applyAllFilters()" />
+          
+          <span class="filter-label">📅 Range:</span>
+          <select id="preset-selector" class="btn" onchange="onPresetChange(this.value)">
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="this_week">This Week</option>
+            <option value="last_week">Last Week</option>
+            <option value="this_month">This Month</option>
+            <option value="last_month">Last Month</option>
+            <option value="this_year">This Year</option>
+            <option value="all" selected>All Time</option>
+            <option value="custom">Custom Range...</option>
+          </select>
+
+          <div id="custom-date-wrap" style="display:none; align-items:center; gap:6px;">
+            <span class="filter-label">From:</span>
+            <input type="date" id="date-from" class="date-input" onchange="applyAllFilters()" />
+            <span class="filter-label">To:</span>
+            <input type="date" id="date-to" class="date-input" onchange="applyAllFilters()" />
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="filter-label">↕ Sort:</span>
+          <select id="sort-selector" class="btn" onchange="applyAllFilters()">
+            <option value="date_desc">Newest First</option>
+            <option value="date_asc">Oldest First</option>
+            <option value="title_asc">Title (A - Z)</option>
+          </select>
+
+          <button class="btn" onclick="resetFilters()" title="Reset All Filters">✕ Reset</button>
+        </div>
+      </div>
+
+      <!-- Tag Filter Bar -->
+      <div class="tag-bar" id="tag-chips-container">
+        <div class="tag-chip active" onclick="selectTag('all')">#all</div>
+      </div>
+    </div>
+
+    <!-- Notes Count Summary -->
+    <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--muted); padding:0 4px;">
+      <div>Showing <strong style="color:var(--text)" id="note-count">0</strong> notes</div>
+      <div id="filter-summary"></div>
+    </div>
+
+    <!-- Notes Cards Grid -->
+    <div class="notes-grid" id="notes-container">
+      <div style="grid-column: 1 / -1; text-align:center; padding:48px; color:var(--muted)">
+        Loading sovereign notes from vault…
+      </div>
+    </div>
+  </div>
+
+  <!-- Create / Edit Note Modal -->
+  <div class="modal-overlay" id="addModal">
+    <div class="modal">
+      <div class="modal-title" id="modal-heading">➕ New Note</div>
+      <input type="hidden" id="edit-id" value="" />
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" id="m-title" class="form-input" placeholder="e.g. Grocery List, App Architecture Ideas" required />
+      </div>
+      <div class="form-group">
+        <label>Body / Thoughts</label>
+        <textarea id="m-body" class="form-textarea" placeholder="Write thoughts, markdown, or bullet points here..." required></textarea>
+      </div>
+      <div class="form-group">
+        <label>Tags (Comma-separated or with #)</label>
+        <input type="text" id="m-tags" class="form-input" placeholder="e.g. #todo, work, ideas" />
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn btn-accent" style="flex:1" onclick="saveNoteModal()">Save Note</button>
+        <button class="btn" onclick="closeAddModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let allNotes = [];
+  let displayNotes = [];
+  let selectedTag = 'all';
+  const THEMES = ['cyber', 'oled', 'light'];
+  let themeIdx = 0;
+
+  // ── Data Fetch ─────────────────────────────────────────────────────────────
+  async function fetchNotes() {
+    try {
+      const res = await fetch('/vault/notes_ledger.json');
+      if (res.ok) {
+        const data = await res.json();
+        allNotes = Array.isArray(data) ? data : (data.notes || []);
+      }
+    } catch (e) {
+      console.warn('Vault fetch failed:', e);
+    }
+  }
+
+  // ── Tag Extraction & Rendering ─────────────────────────────────────────────
+  function updateTagChips() {
+    const container = document.getElementById('tag-chips-container');
+    if (!container) return;
+
+    const tagCounts = {};
+    allNotes.forEach(n => {
+      if (n.tags && Array.isArray(n.tags)) {
+        n.tags.forEach(t => {
+          const clean = t.toLowerCase().replace(/^#/, '');
+          tagCounts[clean] = (tagCounts[clean] || 0) + 1;
+        });
+      }
+    });
+
+    const tags = Object.keys(tagCounts).sort();
+    let html = `<div class="tag-chip ${selectedTag === 'all' ? 'active' : ''}" onclick="selectTag('all')">#all (${allNotes.length})</div>`;
+
+    tags.forEach(t => {
+      const isActive = selectedTag === t ? 'active' : '';
+      html += `<div class="tag-chip ${isActive}" onclick="selectTag('${t}')">#${t} (${tagCounts[t]})</div>`;
+    });
+
+    container.innerHTML = html;
+  }
+
+  function selectTag(t) {
+    selectedTag = t;
+    updateTagChips();
+    applyAllFilters();
+  }
+
+  // ── Filter & Search Logic ──────────────────────────────────────────────────
+  function getDateRangeFromPreset(preset) {
+    const now = new Date();
+    let from = null;
+    let to = null;
+
+    switch (preset) {
+      case 'today':
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        break;
+      case 'yesterday':
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0);
+        to = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
+        break;
+      case 'this_week': {
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+        from = new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0);
+        to = new Date(now.getFullYear(), now.getMonth(), diff + 6, 23, 59, 59, 999);
+        break;
+      }
+      case 'last_week': {
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1) - 7;
+        from = new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0);
+        to = new Date(now.getFullYear(), now.getMonth(), diff + 6, 23, 59, 59, 999);
+        break;
+      }
+      case 'this_month':
+        from = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+        to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        break;
+      case 'last_month':
+        from = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+        to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+        break;
+      case 'this_year':
+        from = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+        to = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+        break;
+      case 'custom': {
+        const fVal = document.getElementById('date-from').value;
+        const tVal = document.getElementById('date-to').value;
+        if (fVal) from = new Date(fVal + 'T00:00:00');
+        if (tVal) to = new Date(tVal + 'T23:59:59');
+        break;
+      }
+      case 'all':
+      default:
+        from = null; to = null;
+    }
+    return { from, to };
+  }
+
+  function onPresetChange(val) {
+    document.getElementById('custom-date-wrap').style.display = val === 'custom' ? 'inline-flex' : 'none';
+    applyAllFilters();
+  }
+
+  function resetFilters() {
+    document.getElementById('preset-selector').value = 'all';
+    document.getElementById('custom-date-wrap').style.display = 'none';
+    document.getElementById('date-from').value = '';
+    document.getElementById('date-to').value = '';
+    document.getElementById('search-input').value = '';
+    document.getElementById('sort-selector').value = 'date_desc';
+    selectedTag = 'all';
+    updateTagChips();
+    applyAllFilters();
+  }
+
+  function applyAllFilters() {
+    const preset = document.getElementById('preset-selector').value;
+    const { from, to } = getDateRangeFromPreset(preset);
+    const query = (document.getElementById('search-input').value || '').toLowerCase().trim();
+    const sortVal = document.getElementById('sort-selector').value;
+
+    displayNotes = allNotes.filter(n => {
+      // Date filter
+      if (from || to) {
+        const ts = new Date(n.timestamp).getTime();
+        if (!isNaN(ts)) {
+          if (from && ts < from.getTime()) return false;
+          if (to && ts > to.getTime()) return false;
+        }
+      }
+
+      // Tag filter
+      if (selectedTag !== 'all') {
+        const hasTag = n.tags && n.tags.some(t => t.toLowerCase() === selectedTag.toLowerCase());
+        if (!hasTag) return false;
+      }
+
+      // Search filter
+      if (query) {
+        const inTitle = (n.title || '').toLowerCase().includes(query);
+        const inBody = (n.body || '').toLowerCase().includes(query);
+        const inTags = n.tags && n.tags.some(t => t.toLowerCase().includes(query));
+        if (!inTitle && !inBody && !inTags) return false;
+      }
+
+      return true;
+    });
+
+    // Sorting (pinned notes always at top)
+    displayNotes.sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+
+      const dateA = new Date(a.timestamp).getTime() || 0;
+      const dateB = new Date(b.timestamp).getTime() || 0;
+
+      if (sortVal === 'date_desc') return dateB - dateA;
+      if (sortVal === 'date_asc') return dateA - dateB;
+      if (sortVal === 'title_asc') return (a.title || '').localeCompare(b.title || '');
+      return 0;
+    });
+
+    renderNotes();
+  }
+
+  // ── Render Notes Grid ──────────────────────────────────────────────────────
+  function renderNotes() {
+    const container = document.getElementById('notes-container');
+    const countEl = document.getElementById('note-count');
+    if (!container) return;
+
+    if (countEl) countEl.textContent = displayNotes.length;
+
+    if (!displayNotes.length) {
+      container.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align:center; padding:48px; color:var(--muted)">
+          No sovereign notes matching your filter. Tap <strong>➕ Note</strong> or speak "Note down…" to record a thought.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = displayNotes.map(n => {
+      const dateStr = new Date(n.timestamp).toLocaleString('en-IN', {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+      const tagHtml = (n.tags || []).map(t => `<span class="note-tag">#${_escape(t)}</span>`).join('');
+      const isPinned = n.pinned ? 'active' : '';
+
+      return `
+        <div class="note-card ${n.pinned ? 'pinned' : ''}">
+          <div class="note-header">
+            <div>
+              <div class="note-title">${_escape(n.title)}</div>
+              <div class="note-time">${dateStr}</div>
+            </div>
+            <button class="icon-btn ${isPinned}" onclick="togglePin('${n.id}')" title="${n.pinned ? 'Unpin note' : 'Pin note'}">📌</button>
+          </div>
+          <div class="note-body">${_escape(n.body)}</div>
+          <div class="note-footer">
+            <div class="note-tags">${tagHtml}</div>
+            <div class="note-actions">
+              <button class="icon-btn" onclick="openEditModal('${n.id}')" title="Edit Note">✏️</button>
+              <button class="icon-btn" onclick="copyNote('${n.id}')" title="Copy Note">📋</button>
+              <button class="icon-btn" style="color:var(--danger)" onclick="deleteNote('${n.id}')" title="Delete Note">🗑️</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function _escape(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Actions: Add, Edit, Delete, Pin, Copy, Export ───────────────────────────
+  function openAddModal() {
+    document.getElementById('edit-id').value = '';
+    document.getElementById('modal-heading').textContent = '➕ New Note';
+    document.getElementById('m-title').value = '';
+    document.getElementById('m-body').value = '';
+    document.getElementById('m-tags').value = '';
+    document.getElementById('addModal').classList.add('active');
+  }
+
+  function openEditModal(id) {
+    const note = allNotes.find(n => n.id === id);
+    if (!note) return;
+
+    document.getElementById('edit-id').value = note.id;
+    document.getElementById('modal-heading').textContent = '✏️ Edit Note';
+    document.getElementById('m-title').value = note.title || '';
+    document.getElementById('m-body').value = note.body || '';
+    document.getElementById('m-tags').value = (note.tags || []).map(t => '#' + t).join(', ');
+    document.getElementById('addModal').classList.add('active');
+  }
+
+  function closeAddModal() {
+    document.getElementById('addModal').classList.remove('active');
+  }
+
+  function saveNoteModal() {
+    const id = document.getElementById('edit-id').value;
+    const title = document.getElementById('m-title').value.trim();
+    const body = document.getElementById('m-body').value.trim();
+    const rawTags = document.getElementById('m-tags').value;
+
+    if (!title && !body) {
+      alert('Please provide a note title or body.');
+      return;
+    }
+
+    const tags = [];
+    rawTags.split(/[\s,]+/).forEach(t => {
+      const clean = t.trim().toLowerCase().replace(/^#/, '');
+      if (clean && !tags.includes(clean)) tags.push(clean);
+    });
+
+    if (id) {
+      // Edit existing
+      const note = allNotes.find(n => n.id === id);
+      if (note) {
+        note.title = title || 'Untitled Note';
+        note.body = body;
+        note.tags = tags;
+        note.updatedAt = new Date().toISOString();
+      }
+    } else {
+      // Create new
+      allNotes.unshift({
+        id: 'note-' + Date.now(),
+        timestamp: new Date().toISOString(),
+        title: title || 'Untitled Note',
+        body: body,
+        tags: tags,
+        pinned: false
+      });
+    }
+
+    closeAddModal();
+    updateTagChips();
+    applyAllFilters();
+  }
+
+  function togglePin(id) {
+    const note = allNotes.find(n => n.id === id);
+    if (note) {
+      note.pinned = !note.pinned;
+      applyAllFilters();
+    }
+  }
+
+  function deleteNote(id) {
+    if (!confirm('Permanently delete this note from your sovereign vault?')) return;
+    allNotes = allNotes.filter(n => n.id !== id);
+    updateTagChips();
+    applyAllFilters();
+  }
+
+  function copyNote(id) {
+    const note = allNotes.find(n => n.id === id);
+    if (!note) return;
+    const text = `# ${note.title}\n\n${note.body}\n\nTags: ${(note.tags || []).map(t => '#' + t).join(' ')}`;
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Note copied to clipboard!');
+    });
+  }
+
+  function exportMarkdown() {
+    if (!displayNotes.length) { alert('No notes to export.'); return; }
+    let md = `# Sovereign Notes Export (${new Date().toLocaleDateString('en-IN')})\n\n`;
+    displayNotes.forEach(n => {
+      md += `## ${n.title}\n*Created: ${new Date(n.timestamp).toLocaleString('en-IN')}*\n`;
+      if (n.tags && n.tags.length) md += `*Tags: ${n.tags.map(t => '#' + t).join(' ')}*\n`;
+      md += `\n${n.body}\n\n---\n\n`;
+    });
+
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([md], { type: 'text/markdown' })),
+      download: `sovereign_notes_${Date.now()}.md`
+    });
+    a.click();
+  }
+
+  function exportJSON() {
+    if (!displayNotes.length) { alert('No notes to export.'); return; }
+    const jsonStr = JSON.stringify({ notes: displayNotes, exportedAt: new Date().toISOString() }, null, 2);
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([jsonStr], { type: 'application/json' })),
+      download: `sovereign_notes_${Date.now()}.json`
+    });
+    a.click();
+  }
+
+  function cycleTheme() {
+    themeIdx = (themeIdx + 1) % THEMES.length;
+    document.body.className = 'theme-' + THEMES[themeIdx];
+  }
+
+  async function refreshAll(isManual) {
+    if (isManual) {
+      const btn = document.getElementById('btn-refresh');
+      if (btn) {
+        btn.classList.remove('btn-spin');
+        void btn.offsetWidth;
+        btn.classList.add('btn-spin');
+        setTimeout(() => btn.classList.remove('btn-spin'), 600);
+      }
+    }
+    await fetchNotes();
+    updateTagChips();
+    applyAllFilters();
+  }
+
+  // ── Bootstrap ──────────────────────────────────────────────────────────────
+  window.addEventListener('DOMContentLoaded', () => {
+    refreshAll();
+    setInterval(() => refreshAll(false), 5000);
+  });
+</script>
+</body>
+</html>

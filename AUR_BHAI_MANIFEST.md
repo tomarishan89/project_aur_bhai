@@ -653,7 +653,7 @@ Use Kanban: **Bold (targeted) → *Italic* (in review) → <u>Underline</u> (acc
     *   [ ] **`[MS-SEED-BHAI-CATALOG-UX1]`** Sabke Bhai lists all four seeds with clear names + one-line purpose.
         *   [ ] **`[MS-SEED-BHAI-CATALOG-UX1a]`** Calculator — math / power-style asks.
         *   [ ] **`[MS-SEED-BHAI-CATALOG-UX1b]`** Expenditure Logger — log spends (voice/Tell/Feed path as already exists).
-        *   [ ] **`[MS-SEED-BHAI-CATALOG-UX1c]`** Note Taker — capture short notes.
+        *   [x] **`[MS-SEED-BHAI-CATALOG-UX1c]`** Note Taker — capture short notes, tag filtering, markdown export, and PWA dashboard.
         *   [ ] **`[MS-SEED-BHAI-CATALOG-UX1d]`** Telemetry Dashboard — local vault charts (existing Path A/B validation).
     *   [ ] **`[MS-SEED-BHAI-CATALOG-UX2]`** Pickup flow: Sabke → preview → install lands **Sandbox (C4)** → user can promote via due diligence to Mere when ready.
         *   [ ] **`[MS-SEED-BHAI-CATALOG-UX2a]`** Friend SOP: “Pick Expenditure Logger → Sandbox run → Promote if you want Mere.”
@@ -661,8 +661,8 @@ Use Kanban: **Bold (targeted) → *Italic* (in review) → <u>Underline</u> (acc
 *   **Engineering & Architecture:**
     *   [ ] **`[MS-SEED-BHAI-CATALOG-ENG1]`** Seed bundles registered in local Sabke catalog (vault seed and/or `examples/` + registry), not only tribal knowledge.
         *   [ ] **`[MS-SEED-BHAI-CATALOG-ENG1a]`** Calculator present (may already be core-seeded C2 — verify Sabke browse path).
-        *   [ ] **`[MS-SEED-BHAI-CATALOG-ENG1b]`** Expenditure Logger Bro Code artifact + schema.
-        *   [ ] **`[MS-SEED-BHAI-CATALOG-ENG1c]`** Note Taker Bro Code artifact + schema.
+        *   [x] **`[MS-SEED-BHAI-CATALOG-ENG1b]`** Expenditure Logger Bro Code artifact + schema (Accountant).
+        *   [x] **`[MS-SEED-BHAI-CATALOG-ENG1c]`** Note Taker Bro Code artifact + schema (`assets/bro_code/note_taker`).
         *   [ ] **`[MS-SEED-BHAI-CATALOG-ENG1d]`** Telemetry Dashboard Bro Code / example wired into Sabke browse.
     *   [ ] **`[MS-SEED-BHAI-CATALOG-ENG2]`** Pickup → Sandbox isolation: sovereign GPS not copied into sandbox (existing live-vs-sandbox rule).
 *   **Ecosystem & Agents:**
