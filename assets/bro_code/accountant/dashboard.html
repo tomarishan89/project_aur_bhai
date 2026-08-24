@@ -91,6 +91,41 @@
   /* ── Layout Grid ── */
   .container { max-width: 1200px; margin: 0 auto; width: 100%; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
 
+  /* ── Filter Bar Section ── */
+  .filter-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+  .filter-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .date-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    outline: none;
+    color-scheme: dark;
+  }
+  .date-input:focus { border-color: var(--accent); }
+
   /* ── KPI Grid ── */
   .kpi-grid {
     display: grid;
@@ -200,6 +235,7 @@
   .badge-travel { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
   .badge-shopping { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
   .badge-bills { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+  .badge-health { background: rgba(236, 72, 153, 0.15); color: #ec4899; }
   .badge-general { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
 
   /* ── Modal ── */
@@ -234,12 +270,6 @@
       </div>
     </div>
     <div class="header-controls">
-      <select id="preset-selector" class="btn" onchange="onPresetChange(this.value)">
-        <option value="today">Today</option>
-        <option value="7d">7 Days</option>
-        <option value="30d" selected>30 Days</option>
-        <option value="all">All-Time</option>
-      </select>
       <button class="btn" onclick="cycleTheme()" title="Theme">🎨</button>
       <button class="btn btn-accent" onclick="openAddModal()" title="Add Expense">➕ Add</button>
       <button class="btn" onclick="exportCSV()" title="Export CSV">📥 CSV</button>
@@ -248,10 +278,62 @@
   </header>
 
   <div class="container">
+    <!-- Filter Control Bar -->
+    <div class="filter-panel">
+      <div class="filter-row" style="justify-content: space-between;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span class="filter-label">📅 Period:</span>
+          <select id="preset-selector" class="btn" onchange="onPresetChange(this.value)">
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="this_week">This Week</option>
+            <option value="last_week">Last Week</option>
+            <option value="this_month">This Month</option>
+            <option value="last_month">Last Month</option>
+            <option value="this_year">This Year</option>
+            <option value="last_year">Last Year</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+            <option value="all" selected>All Time</option>
+            <option value="custom">Custom Range...</option>
+          </select>
+
+          <div id="custom-date-wrap" style="display:none; align-items:center; gap:6px;">
+            <span class="filter-label">From:</span>
+            <input type="date" id="date-from" class="date-input" onchange="onCustomDateChange()" />
+            <span class="filter-label">To:</span>
+            <input type="date" id="date-to" class="date-input" onchange="onCustomDateChange()" />
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span class="filter-label">💰 Amount:</span>
+          <select id="amount-filter" class="btn" onchange="applyAllFilters()">
+            <option value="all">All Amounts</option>
+            <option value="under_100">&lt; ₹100</option>
+            <option value="100_500">₹100 - ₹500</option>
+            <option value="500_2000">₹500 - ₹2,000</option>
+            <option value="over_2000">&gt; ₹2,000</option>
+          </select>
+
+          <span class="filter-label">↕ Sort:</span>
+          <select id="sort-selector" class="btn" onchange="applyAllFilters()">
+            <option value="date_desc">Date (Newest First)</option>
+            <option value="date_asc">Date (Oldest First)</option>
+            <option value="amount_desc">Amount (Highest First)</option>
+            <option value="amount_asc">Amount (Lowest First)</option>
+            <option value="item_asc">Item (A - Z)</option>
+          </select>
+
+          <button class="btn" onclick="resetFilters()" title="Reset All Filters">✕ Reset</button>
+        </div>
+      </div>
+    </div>
+
     <!-- KPI Row -->
     <div class="kpi-grid">
       <div class="kpi-card">
-        <div class="kpi-label">Total Spend</div>
+        <div class="kpi-label">Filtered Spend</div>
         <div class="kpi-val"><span id="kpi-total">0</span><span class="kpi-unit">₹</span></div>
       </div>
       <div class="kpi-card kpi-sec">
@@ -300,14 +382,15 @@
       <div class="table-controls">
         <div class="panel-title">📋 Expense Ledger</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:1;justify-content:flex-end;">
-          <input type="text" id="search-input" class="search-box" placeholder="Search item or note..." oninput="renderTable()" />
-          <select id="category-filter" class="btn" onchange="renderTable()">
+          <input type="text" id="search-input" class="search-box" placeholder="Search item or note..." oninput="applyAllFilters()" />
+          <select id="category-filter" class="btn" onchange="applyAllFilters()">
             <option value="All">All Categories</option>
             <option value="Food">Food / Dining</option>
             <option value="Groceries">Groceries</option>
             <option value="Travel">Travel / Fuel</option>
             <option value="Shopping">Shopping</option>
             <option value="Bills">Bills / Utilities</option>
+            <option value="Health">Health / Pharmacy</option>
             <option value="General">General / Other</option>
           </select>
         </div>
@@ -353,6 +436,7 @@
           <option value="Travel">Travel / Fuel</option>
           <option value="Shopping">Shopping</option>
           <option value="Bills">Bills / Utilities</option>
+          <option value="Health">Health / Pharmacy</option>
           <option value="General" selected>General / Other</option>
         </select>
       </div>
@@ -379,6 +463,7 @@
     'Travel': '#f59e0b',
     'Shopping': '#a855f7',
     'Bills': '#ef4444',
+    'Health': '#ec4899',
     'General': '#94a3b8'
   };
 
@@ -427,22 +512,167 @@
     }
   }
 
-  function filterExpenses() {
-    const preset = document.getElementById('preset-selector').value;
-    const now = Date.now();
-    let minTs = 0;
-    if (preset === 'today') {
-      const d = new Date(); d.setHours(0,0,0,0); minTs = d.getTime();
-    } else if (preset === '7d') {
-      minTs = now - 7 * 86400000;
-    } else if (preset === '30d') {
-      minTs = now - 30 * 86400000;
-    }
+  // ── Date Preset & Filter Computation ───────────────────────────────────────
+  function getDateRangeFromPreset(preset) {
+    const now = new Date();
+    let from = null;
+    let to = null;
 
+    switch (preset) {
+      case 'today': {
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        break;
+      }
+      case 'yesterday': {
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0);
+        to = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
+        break;
+      }
+      case 'this_week': {
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+        from = new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0);
+        to = new Date(now.getFullYear(), now.getMonth(), diff + 6, 23, 59, 59, 999);
+        break;
+      }
+      case 'last_week': {
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1) - 7;
+        from = new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0);
+        to = new Date(now.getFullYear(), now.getMonth(), diff + 6, 23, 59, 59, 999);
+        break;
+      }
+      case 'this_month': {
+        from = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+        to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        break;
+      }
+      case 'last_month': {
+        from = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+        to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+        break;
+      }
+      case 'this_year': {
+        from = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+        to = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+        break;
+      }
+      case 'last_year': {
+        from = new Date(now.getFullYear() - 1, 0, 1, 0, 0, 0, 0);
+        to = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
+        break;
+      }
+      case '7d': {
+        from = new Date(Date.now() - 7 * 86400000);
+        to = new Date();
+        break;
+      }
+      case '30d': {
+        from = new Date(Date.now() - 30 * 86400000);
+        to = new Date();
+        break;
+      }
+      case 'custom': {
+        const fVal = document.getElementById('date-from').value;
+        const tVal = document.getElementById('date-to').value;
+        if (fVal) from = new Date(fVal + 'T00:00:00');
+        if (tVal) to = new Date(tVal + 'T23:59:59');
+        break;
+      }
+      case 'all':
+      default:
+        from = null;
+        to = null;
+    }
+    return { from, to };
+  }
+
+  function onPresetChange(val) {
+    const customWrap = document.getElementById('custom-date-wrap');
+    if (val === 'custom') {
+      customWrap.style.display = 'inline-flex';
+    } else {
+      customWrap.style.display = 'none';
+    }
+    applyAllFilters();
+  }
+
+  function onCustomDateChange() {
+    applyAllFilters();
+  }
+
+  function resetFilters() {
+    document.getElementById('preset-selector').value = 'all';
+    document.getElementById('custom-date-wrap').style.display = 'none';
+    document.getElementById('date-from').value = '';
+    document.getElementById('date-to').value = '';
+    document.getElementById('amount-filter').value = 'all';
+    document.getElementById('sort-selector').value = 'date_desc';
+    document.getElementById('category-filter').value = 'All';
+    document.getElementById('search-input').value = '';
+    applyAllFilters();
+  }
+
+  function applyAllFilters() {
+    const preset = document.getElementById('preset-selector').value;
+    const { from, to } = getDateRangeFromPreset(preset);
+    const amtFilter = document.getElementById('amount-filter').value;
+    const catFilter = document.getElementById('category-filter').value;
+    const query = (document.getElementById('search-input').value || '').toLowerCase().trim();
+    const sortVal = document.getElementById('sort-selector').value;
+
+    // 1. Filter by Date, Amount, Category, Search Query
     displayExpenses = allExpenses.filter(e => {
-      const ts = new Date(e.timestamp).getTime();
-      return isNaN(ts) || ts >= minTs;
+      // Date Check
+      if (from || to) {
+        const ts = new Date(e.timestamp).getTime();
+        if (!isNaN(ts)) {
+          if (from && ts < from.getTime()) return false;
+          if (to && ts > to.getTime()) return false;
+        }
+      }
+
+      // Amount Check
+      const amt = Number(e.amount) || 0;
+      if (amtFilter === 'under_100' && amt >= 100) return false;
+      if (amtFilter === '100_500' && (amt < 100 || amt > 500)) return false;
+      if (amtFilter === '500_2000' && (amt < 500 || amt > 2000)) return false;
+      if (amtFilter === 'over_2000' && amt <= 2000) return false;
+
+      // Category Check
+      if (catFilter !== 'All' && e.category !== catFilter) return false;
+
+      // Search Query Check
+      if (query) {
+        const matchItem = (e.item || '').toLowerCase().includes(query);
+        const matchNote = (e.note || '').toLowerCase().includes(query);
+        if (!matchItem && !matchNote) return false;
+      }
+
+      return true;
     });
+
+    // 2. Sort Items
+    displayExpenses.sort((a, b) => {
+      const dateA = new Date(a.timestamp).getTime() || 0;
+      const dateB = new Date(b.timestamp).getTime() || 0;
+      const amtA = Number(a.amount) || 0;
+      const amtB = Number(b.amount) || 0;
+
+      if (sortVal === 'date_desc') return dateB - dateA;
+      if (sortVal === 'date_asc') return dateA - dateB;
+      if (sortVal === 'amount_desc') return amtB - amtA;
+      if (sortVal === 'amount_asc') return amtA - amtB;
+      if (sortVal === 'item_asc') return (a.item || '').localeCompare(b.item || '');
+      return 0;
+    });
+
+    // 3. Update Visuals
+    updateKPIs();
+    renderDonutChart();
+    renderTrendChart();
+    renderTable();
   }
 
   async function refreshAll(isManual) {
@@ -456,11 +686,7 @@
       }
     }
     await fetchExpenses();
-    filterExpenses();
-    updateKPIs();
-    renderDonutChart();
-    renderTrendChart();
-    renderTable();
+    applyAllFilters();
   }
 
   // ── KPIs ───────────────────────────────────────────────────────────────────
@@ -620,21 +846,13 @@
   function renderTable() {
     const tbody = document.getElementById('table-body');
     if (!tbody) return;
-    const query = (document.getElementById('search-input')?.value || '').toLowerCase();
-    const catFilter = document.getElementById('category-filter')?.value || 'All';
 
-    let filtered = displayExpenses.filter(e => {
-      const matchQuery = !query || e.item.toLowerCase().includes(query) || (e.note && e.note.toLowerCase().includes(query));
-      const matchCat = (catFilter === 'All') || (e.category === catFilter);
-      return matchQuery && matchCat;
-    });
-
-    if (!filtered.length) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">No matching expenses found.</td></tr>`;
+    if (!displayExpenses.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">No matching expenses found for this filter.</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = filtered.map(e => {
+    tbody.innerHTML = displayExpenses.map(e => {
       const dateStr = new Date(e.timestamp).toLocaleString('en-IN', {
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
       });
@@ -688,19 +906,19 @@
     document.getElementById('m-amount').value = '';
     document.getElementById('m-note').value = '';
 
-    refreshAll();
+    applyAllFilters();
   }
 
   function deleteExpenseItem(id) {
     if (!confirm('Delete this expense entry?')) return;
     allExpenses = allExpenses.filter(e => e.id !== id);
-    refreshAll();
+    applyAllFilters();
   }
 
   function exportCSV() {
-    if (!allExpenses.length) { alert('No expenses to export.'); return; }
+    if (!displayExpenses.length) { alert('No expenses to export.'); return; }
     const cols = ['id', 'timestamp', 'item', 'category', 'amount', 'note'];
-    const csv = cols.join(',') + '\n' + allExpenses.map(e => cols.map(c => `"${(e[c] || '').toString().replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = cols.join(',') + '\n' + displayExpenses.map(e => cols.map(c => `"${(e[c] || '').toString().replace(/"/g, '""')}"`).join(',')).join('\n');
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
       download: `accountant_expenses_${Date.now()}.csv`
@@ -708,7 +926,6 @@
     a.click();
   }
 
-  function onPresetChange() { filterExpenses(); updateKPIs(); renderDonutChart(); renderTrendChart(); renderTable(); }
   function cycleTheme() {
     themeIdx = (themeIdx + 1) % THEMES.length;
     document.body.className = 'theme-' + THEMES[themeIdx];
