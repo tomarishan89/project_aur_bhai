@@ -759,6 +759,19 @@ Use Kanban: **Bold (targeted) → *Italic* (in review) → <u>Underline</u> (acc
     *   [ ] **`[MS-STRANGER-SOFT-LAUNCH-AGT1]`** 5–20 closed testers max for first soft launch; measure qualitatively (wishes + channel), not vanity installs.
     *   [ ] ~~`[MS-STRANGER-SOFT-LAUNCH-AGT2]` Investor / paid Bro Code / data-sale motions — out of scope; see §2.11.~~
 
+### - [ ] **`[MS-MCP-DEVELOPER-BRIDGE]`** MILESTONE: **Remote IDE Agent Authoring Bridge & Proxy Distribution [IN REVIEW]**
+*   **Scope:** Enable developers to author, debug, and hot-reload Bhai Code and Web Dashboards directly on their Android device over local Wi-Fi from desktop IDEs (Antigravity, Cursor, Claude Desktop) via Model Context Protocol (MCP).
+*   **User Perspective (UI/UX):**
+    *   [x] **`[MS-MCP-DEVELOPER-BRIDGE-UX1]`** Local Edge Server settings panel shows "DEVELOPER MODE (MCP BRIDGE)" with pair code and exact proxy command.
+    *   [ ] **`[MS-MCP-DEVELOPER-BRIDGE-UX2]`** Web Vault / Local Server UI serves `mcp_proxy.py` download directly to the desktop browser so contributors don't need repository git access.
+*   **Engineering & Architecture:**
+    *   [x] **`[MS-MCP-DEVELOPER-BRIDGE-ENG1]`** `McpHandlerService` implements JSON-RPC 2.0 dispatch for `mcp_list_agents`, `mcp_read_agent`, `mcp_deploy_agent`, `mcp_run_agent`, and guarded `mcp_query_telemetry`.
+    *   [x] **`[MS-MCP-DEVELOPER-BRIDGE-ENG2]`** `POST /api/mcp` endpoint wired into `LocalServerService` with pair-token security check (`X-Aur-Pair`).
+    *   [x] **`[MS-MCP-DEVELOPER-BRIDGE-ENG3]`** Zero-dependency Python standard library stdio-to-HTTP proxy (`tool/mcp_proxy.py`).
+    *   [ ] **`[MS-MCP-DEVELOPER-BRIDGE-ENG4]`** Standalone public release / Gist / npm CLI package distribution for external circle creators without main repo access.
+*   **Ecosystem & Agents:**
+    *   [x] **`[MS-MCP-DEVELOPER-BRIDGE-AGT1]`** Developer can edit `Accountant` or `Telemeter` on desktop IDE and hot-deploy to phone's Sovereign Vault.
+
 ### - [ ] `[MS-OFFLINE-TTS]` MILESTONE: ~~Native Offline Voice Synthesis [DEFERRED]~~
 *   **User Perspective (UI/UX):**
     *   [ ] ~~`[MS-OFFLINE-TTS-UX1]` Custom synthesized voice answers generated instantly on-device without API charges, internet requirements, or robotic system default sounds.~~
