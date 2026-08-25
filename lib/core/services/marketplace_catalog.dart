@@ -103,15 +103,23 @@ class MarketplaceCatalog {
     final registry = _ref.read(jsAgentRegistryProvider);
     final telemetry = _ref.read(telemetryBusProvider);
     for (final listing in seedListings) {
-      final bundle = await registry.exportAgentBundle(listing.name);
-      if (bundle == null) {
-        await _installListing(registry, listing);
-        continue;
-      }
-      final storedScript = bundle['script'] as String? ?? '';
-      final vaultAsset = await telemetry.readVaultData('telemeter.html');
-      if (storedScript != listing.script || vaultAsset == null) {
-        await _installListing(registry, listing);
+      try {
+        final bundle = await registry.exportAgentBundle(listing.name);
+        if (bundle == null) {
+          await _installListing(registry, listing);
+          continue;
+        }
+        final storedScript = bundle['script'] as String? ?? '';
+        final keyName = listing.name.toLowerCase();
+        final vaultAsset = await telemetry.readVaultData('$keyName.html') ??
+            await telemetry.readVaultData('dashboard.html');
+        if (storedScript != listing.script || vaultAsset == null) {
+          await _installListing(registry, listing);
+        }
+      } catch (e) {
+        debugPrint(
+          '[MarketplaceCatalog] Seed upgrade skipped for ${listing.name}: $e',
+        );
       }
     }
   }
@@ -133,16 +141,23 @@ class MarketplaceCatalog {
 
     var finalScript = listing.script;
     var finalAssets = Map<String, String>.from(listing.vaultAssets);
-    
+
     if (listing.assetBundleDir != null) {
       try {
-        final scriptJs = await rootBundle.loadString('${listing.assetBundleDir}/script.js');
-        final dashboardHtml = await rootBundle.loadString('${listing.assetBundleDir}/dashboard.html');
+        final scriptJs = await rootBundle.loadString(
+          '${listing.assetBundleDir}/script.js',
+        );
+        final dashboardHtml = await rootBundle.loadString(
+          '${listing.assetBundleDir}/dashboard.html',
+        );
         finalScript = scriptJs;
-        finalAssets['telemeter.html'] = dashboardHtml;
+        final keyName = listing.name.toLowerCase();
+        finalAssets['$keyName.html'] = dashboardHtml;
         finalAssets['dashboard.html'] = dashboardHtml;
       } catch (e) {
-        debugPrint('[MarketplaceCatalog] Error loading bundle assets for ${listing.name}: $e');
+        debugPrint(
+          '[MarketplaceCatalog] Error loading bundle assets for ${listing.name}: $e',
+        );
       }
     }
 

@@ -89,9 +89,10 @@ async function saveNotes(notes) {
 }
 
 // ── Main Entrypoint ────────────────────────────────────────────────────────
-(async function() {
-  const userText = (typeof text !== 'undefined' && text) ? text.toString() : '';
-  const userAction = (typeof action !== 'undefined' && action) ? action.toString().toLowerCase() : '';
+async function execute(params) {
+  params = params || {};
+  const userText = params.text || (typeof text !== 'undefined' && text) || '';
+  const userAction = (params.action || (typeof action !== 'undefined' && action) || '').toString().toLowerCase();
 
   let notes = await loadExistingNotes();
 
@@ -121,8 +122,10 @@ async function saveNotes(notes) {
   // 3. Process inbox / text
   const inbox = await System.readInbox({ unreadOnly: true, limit: 50 });
   const incomingTexts = [];
-  if (inbox) {
+  const idsToConsume = [];
+  if (inbox && inbox.length > 0) {
     for (const item of inbox) {
+      idsToConsume.push(item.id);
       if (item.text) incomingTexts.push(item.text);
     }
   }
@@ -163,7 +166,11 @@ async function saveNotes(notes) {
 
   if (newNotes.length > 0) {
     await saveNotes(notes);
-    await System.consumeInbox();
+    if (idsToConsume.length > 0) {
+      await System.consumeInbox({ ids: idsToConsume });
+    } else {
+      await System.consumeInbox();
+    }
     
     if (newNotes.length === 1) {
       const tagStr = newNotes[0].tags.length ? ` [${newNotes[0].tags.map(t => '#' + t).join(' ')}]` : '';
@@ -174,4 +181,4 @@ async function saveNotes(notes) {
   }
 
   return 'No new note content detected.';
-})();
+}
