@@ -55,49 +55,53 @@ class JsAgentRegistry {
       final keys = await telemetry.listVaultKeys(prefix: prefix);
 
       for (final key in keys) {
-        if (key.endsWith(':schema')) continue;
-        // Skip version archives and related assets — not top-level scripts.
-        if (RegExp(r':v\d+$').hasMatch(key)) continue;
-        if (key.contains(':asset:')) continue;
+        try {
+          if (key.endsWith(':schema')) continue;
+          // Skip version archives and related assets — not top-level scripts.
+          if (RegExp(r':v\d+$').hasMatch(key)) continue;
+          if (key.contains(':asset:')) continue;
 
-        final vaultEntry = await telemetry.readVaultData(key);
-        if (vaultEntry == null) continue;
+          final vaultEntry = await telemetry.readVaultData(key);
+          if (vaultEntry == null) continue;
 
-        final agentName = key.substring(prefix.length);
-        if (agentName.isEmpty) continue;
+          final agentName = key.substring(prefix.length);
+          if (agentName.isEmpty) continue;
 
-        final schemaEntry = await telemetry.readVaultData('$key:schema');
-        final schema = schemaEntry != null
-            ? jsonDecode(schemaEntry['value']!) as Map<String, dynamic>
-            : <String, dynamic>{};
+          final schemaEntry = await telemetry.readVaultData('$key:schema');
+          final schema = schemaEntry != null
+              ? jsonDecode(schemaEntry['value']!) as Map<String, dynamic>
+              : <String, dynamic>{};
 
-        final displayName = schema['name'] as String? ?? agentName;
-        final description =
-            schema['description'] as String? ??
-            'Bro Code loaded from vault ($key)';
-        final createdAt = _parseDate(schema['createdAt'] as String?);
-        final updatedAt = _parseDate(schema['updatedAt'] as String?);
-        final assets = await readAgentAssets(displayName);
+          final displayName = schema['name'] as String? ?? agentName;
+          final description =
+              schema['description'] as String? ??
+              'Bro Code loaded from vault ($key)';
+          final createdAt = _parseDate(schema['createdAt'] as String?);
+          final updatedAt = _parseDate(schema['updatedAt'] as String?);
+          final assets = await readAgentAssets(displayName);
 
-        agentService.registerAgent(
-          JsAgentAdapter(
-            ref: _ref,
-            name: displayName,
-            description: description,
-            inputSchema: _parseInputSchema(schema['inputSchema']),
-            script: vaultEntry['value']!,
-            assets: assets,
-            securityClass: AgentSecurityClassX.fromId(
-              schema['securityClass'] as String?,
+          agentService.registerAgent(
+            JsAgentAdapter(
+              ref: _ref,
+              name: displayName,
+              description: description,
+              inputSchema: _parseInputSchema(schema['inputSchema']),
+              script: vaultEntry['value']!,
+              assets: assets,
+              securityClass: AgentSecurityClassX.fromId(
+                schema['securityClass'] as String?,
+              ),
+              source: BhaiCodeOrigin.normalize(schema['source'] as String?),
+              diligencePassed: schema['diligencePassed'] as bool? ?? false,
+              createdAt: createdAt,
+              updatedAt: updatedAt,
             ),
-            source: BhaiCodeOrigin.normalize(schema['source'] as String?),
-            diligencePassed: schema['diligencePassed'] as bool? ?? false,
-            createdAt: createdAt,
-            updatedAt: updatedAt,
-          ),
-        );
-        registered++;
-        debugPrint('[JsAgentRegistry] Registered Bro Code: $displayName');
+          );
+          registered++;
+          debugPrint('[JsAgentRegistry] Registered Bro Code: $displayName');
+        } catch (e, st) {
+          debugPrint('[JsAgentRegistry] Error loading agent key "$key": $e\n$st');
+        }
       }
     }
 

@@ -24,34 +24,53 @@ void main() async {
   final container = ProviderContainer();
 
   // Pre-initialize Telemetry database before booting the app UI
-  final telemetryBus = container.read(telemetryBusProvider);
-  await telemetryBus.initialize();
+  try {
+    final telemetryBus = container.read(telemetryBusProvider);
+    await telemetryBus.initialize();
+  } catch (e, st) {
+    debugPrint('[Main] TelemetryBus init warning: $e\n$st');
+  }
 
-  final voiceEngine = container.read(voiceHandshakeProvider);
-  debugPrint(
-    '[Main] Core engines pre-initialized. Voice State: ${voiceEngine.state}',
-  );
+  try {
+    final voiceEngine = container.read(voiceHandshakeProvider);
+    debugPrint(
+      '[Main] Core engines pre-initialized. Voice State: ${voiceEngine.state}',
+    );
+  } catch (e, st) {
+    debugPrint('[Main] Voice Engine init warning: $e\n$st');
+  }
 
   // Pre-initialize Shelf Local Edge Server
-  final localServer = container.read(localServerProvider);
-  await localServer.startServer();
-  debugPrint(
-    '[Main] Local Edge Server initialized. Address: ${localServer.serverAddress}',
-  );
+  try {
+    final localServer = container.read(localServerProvider);
+    await localServer.startServer();
+    debugPrint(
+      '[Main] Local Edge Server initialized. Address: ${localServer.serverAddress}',
+    );
+  } catch (e, st) {
+    debugPrint('[Main] Local Edge Server init warning: $e\n$st');
+  }
 
   // Load Javascript agents from sovereign vault (MS-JS-BRIDGE-AGT1)
-  final jsRegistry = container.read(jsAgentRegistryProvider);
-  await jsRegistry
-      .seedCoreAgentsIfMissing(); // MS-CORE-JS-MIGRATION: Calculator + DrivingCoach as C2 JS agents
-  await jsRegistry.seedDemoAgentIfMissing();
-  await jsRegistry.consumeFriendInstallQueueIfPresent(); // S15 friend fixture replay
-  final jsAgentCount = await jsRegistry.loadAndRegisterAgents();
-  debugPrint('[Main] JS Bridge: $jsAgentCount vault agent(s) registered.');
+  try {
+    final jsRegistry = container.read(jsAgentRegistryProvider);
+    await jsRegistry.seedCoreAgentsIfMissing();
+    await jsRegistry.seedDemoAgentIfMissing();
+    await jsRegistry.consumeFriendInstallQueueIfPresent();
+    final jsAgentCount = await jsRegistry.loadAndRegisterAgents();
+    debugPrint('[Main] JS Bridge: $jsAgentCount vault agent(s) registered.');
+  } catch (e, st) {
+    debugPrint('[Main] JS Registry boot warning: $e\n$st');
+  }
 
   // Auto-upgrade any installed seed-catalog agent whose script has changed.
   // This means users never have to delete + re-pick Telemeter etc. after updates.
-  await container.read(marketplaceCatalogProvider).upgradeSeedListings();
-  debugPrint('[Main] Seed catalog upgrade check complete.');
+  try {
+    await container.read(marketplaceCatalogProvider).upgradeSeedListings();
+    debugPrint('[Main] Seed catalog upgrade check complete.');
+  } catch (e, st) {
+    debugPrint('[Main] Seed catalog upgrade warning: $e\n$st');
+  }
 
   // Live GPS/accel → sovereign vault starts after first UI frame (AmbientHub).
   // Sandbox / due-diligence Bro Code never receives that stream.
