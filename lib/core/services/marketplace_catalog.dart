@@ -21,6 +21,9 @@ class MarketplaceListing {
   final Map<String, dynamic> inputSchema;
   final String license;
   final String author;
+  final String provenance;
+  final List<String> bhaiWords;
+  final String invocationPrompt;
   final BhaiCodeAccess access;
   final Map<String, String> vaultAssets;
   final String? assetBundleDir;
@@ -32,7 +35,10 @@ class MarketplaceListing {
     required this.script,
     this.inputSchema = const {},
     this.license = 'remix_free',
-    this.author = '',
+    this.author = 'Aur Bhai Team',
+    this.provenance = 'official',
+    this.bhaiWords = const [],
+    this.invocationPrompt = '',
     this.access = BhaiCodeAccess.defaults,
     this.vaultAssets = const {},
     this.assetBundleDir,
@@ -46,12 +52,43 @@ class MarketplaceCatalog {
   final Ref _ref;
 
   static final List<MarketplaceListing> seedListings = [
-    MarketplaceListing(
+    const MarketplaceListing(
+      id: 'pool-calculator',
+      name: 'Calculator',
+      description:
+          'Sovereign mathematical evaluator for arithmetic expressions, percentages, and formulas.',
+      license: 'remix_free',
+      author: 'Aur Bhai Team',
+      provenance: 'official',
+      bhaiWords: ['calculate', 'what is', 'how much is'],
+      invocationPrompt: 'Calculate 15 * 84',
+      script: r'''
+async function execute(params) {
+  const expr = String((params && params.text) || (params && params.expression) || '').trim();
+  if (!expr) return 'Please provide a mathematical expression to calculate.';
+  try {
+    const sanitized = expr.replace(/[^0-9+\-*/().%^ ]/g, '');
+    const res = Function('"use strict"; return (' + sanitized + ')')();
+    return 'The result is ' + res;
+  } catch (e) {
+    return 'Could not calculate expression: ' + expr;
+  }
+}
+''',
+      inputSchema: {
+        'text': {'type': 'string', 'description': 'Math expression to evaluate'},
+      },
+    ),
+    const MarketplaceListing(
       id: 'pool-accountant',
       name: 'Accountant',
       description:
           'Sovereign expenditure logger & PWA dashboard. Multi-item voice feed, spend Q&A, and category charts.',
       license: 'remix_free',
+      author: 'Aur Bhai Team',
+      provenance: 'official',
+      bhaiWords: ['spent', 'expense', 'how much did i spend', 'expenditure'],
+      invocationPrompt: 'Spent 50 on chai',
       script: '',
       assetBundleDir: 'assets/bro_code/accountant',
       inputSchema: {
@@ -59,26 +96,51 @@ class MarketplaceCatalog {
         'action': {'type': 'string', 'description': 'Action such as "dashboard"'},
       },
     ),
-    MarketplaceListing(
+    const MarketplaceListing(
       id: 'pool-telemeter',
       name: 'Telemeter',
       description:
           'Sovereign PWA telemetry dashboard for live motion, map, and CSV/GeoJSON exports.',
       license: 'remix_free',
+      author: 'Aur Bhai Team',
+      provenance: 'official',
+      bhaiWords: ['telemetry', 'live speed', 'sensor map', 'show telemetry'],
+      invocationPrompt: 'Show telemetry dashboard',
       script: '',
       assetBundleDir: 'assets/bro_code/telemeter',
     ),
-    MarketplaceListing(
+    const MarketplaceListing(
       id: 'pool-notetaker',
       name: 'NoteTaker',
       description:
           'Sovereign thought & idea vault with tag filtering, markdown search, and PWA dashboard.',
       license: 'remix_free',
+      author: 'Aur Bhai Team',
+      provenance: 'official',
+      bhaiWords: ['note down', 'jot down', 'remember that', 'take a note', 'what did i note'],
+      invocationPrompt: 'Note down buy groceries tomorrow',
       script: '',
       assetBundleDir: 'assets/bro_code/note_taker',
       inputSchema: {
         'text': {'type': 'string', 'description': 'Note content, question, or tag'},
         'action': {'type': 'string', 'description': 'Action such as "dashboard"'},
+      },
+    ),
+    const MarketplaceListing(
+      id: 'pool-iwish',
+      name: 'IWish',
+      description:
+          'Sovereign feedback & feature wishlist vault. 100% on-device wish recording and PWA dashboard.',
+      license: 'remix_free',
+      author: 'Aur Bhai Team',
+      provenance: 'official',
+      bhaiWords: ['i wish', 'wish', 'feedback', 'feature request', 'bhai wish'],
+      invocationPrompt: 'I wish we had dark red theme',
+      script: '',
+      assetBundleDir: 'assets/bro_code/i_wish',
+      inputSchema: {
+        'wish': {'type': 'string', 'description': 'Wish, feature request, or feedback text'},
+        'action': {'type': 'string', 'description': 'Action such as "list", "summary", or "dashboard"'},
       },
     ),
   ];
@@ -98,7 +160,8 @@ class MarketplaceCatalog {
     return true;
   }
 
-  /// Silently upgrade any installed seed-catalog agent whose script has changed or asset is missing.
+  /// Silently upgrade already-installed seed-catalog agents whose script or assets changed.
+  /// NOTE: This never auto-installs unpicked seeds into Sandbox.
   Future<void> upgradeSeedListings() async {
     final registry = _ref.read(jsAgentRegistryProvider);
     final telemetry = _ref.read(telemetryBusProvider);
@@ -106,7 +169,7 @@ class MarketplaceCatalog {
       try {
         final bundle = await registry.exportAgentBundle(listing.name);
         if (bundle == null) {
-          await _installListing(registry, listing);
+          // Do NOT auto-install catalog items. User must tap "Pick Up".
           continue;
         }
         final storedScript = bundle['script'] as String? ?? '';
@@ -114,7 +177,10 @@ class MarketplaceCatalog {
         final vaultAsset = await telemetry.readVaultData('$keyName.html') ??
             await telemetry.readVaultData('dashboard.html');
         if (storedScript != listing.script || vaultAsset == null) {
-          await _installListing(registry, listing);
+          final existingSec = AgentSecurityClassX.fromId(
+            bundle['securityClass'] as String? ?? 'C4',
+          );
+          await _installListing(registry, listing, securityClass: existingSec);
         }
       } catch (e) {
         debugPrint(

@@ -8,6 +8,7 @@ import 'core/services/voice_handshake_engine.dart';
 import 'core/services/local_server_service.dart';
 import 'core/services/js_agent_registry.dart';
 import 'core/services/marketplace_catalog.dart';
+import 'core/services/theme_service.dart';
 import 'presentation/screens/ambient_hub.dart';
 
 void main() async {
@@ -55,7 +56,6 @@ void main() async {
   try {
     final jsRegistry = container.read(jsAgentRegistryProvider);
     await jsRegistry.seedCoreAgentsIfMissing();
-    await jsRegistry.seedDemoAgentIfMissing();
     await jsRegistry.consumeFriendInstallQueueIfPresent();
     final jsAgentCount = await jsRegistry.loadAndRegisterAgents();
     debugPrint('[Main] JS Bridge: $jsAgentCount vault agent(s) registered.');
@@ -83,19 +83,16 @@ void main() async {
   );
 }
 
-class ProjectAurBhaiApp extends StatelessWidget {
+class ProjectAurBhaiApp extends ConsumerWidget {
   const ProjectAurBhaiApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeService = ref.watch(themeServiceProvider);
     return MaterialApp(
       title: 'Project Aur Bhai',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.black,
-        useMaterial3: true,
-      ),
+      theme: themeService.buildThemeData(),
       home: const AmbientHubScreen(),
     );
   }

@@ -25,6 +25,7 @@ import '../../core/services/agent_verification_service.dart';
 import '../../core/services/device_auth_service.dart';
 import '../../core/services/telemetry_bus.dart';
 import '../../core/services/telemetry_collector.dart';
+import '../../core/services/theme_service.dart';
 import '../../core/services/vault_dashboard_url.dart';
 import '../../core/services/marketplace_catalog.dart';
 import '../../core/services/llm/llm_slot.dart';
@@ -1626,32 +1627,6 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
               children: const [_VaultDashboardsBanner(showTitle: false)],
             ),
             _settingsSection(
-              title: 'MODEL STUDIO — AMBIENT CAPTURE',
-              children: const [AmbientCapturePanel(showTitle: false)],
-            ),
-            _settingsSection(
-              title: 'LOCAL EDGE SERVER',
-              children: const [_EdgeServerPanel(compactTitle: true)],
-            ),
-            _settingsSection(
-              title: 'VAULT SECURITY',
-              children: const [
-                Text(
-                  'Force-promoting flagged agents uses your device screen lock, PIN, or fingerprint — the same gate as your banking apps. No separate vault password is required.',
-                  style: TextStyle(color: Colors.white38, fontSize: 11),
-                ),
-              ],
-            ),
-            _settingsSection(
-              title: 'VOICE & LANGUAGE',
-              children: const [
-                Text(
-                  'English only (Arch v3.7). Commands and agent authoring replies are in English.',
-                  style: TextStyle(color: Colors.white38, fontSize: 11),
-                ),
-              ],
-            ),
-            _settingsSection(
               title: 'API / LLM',
               initiallyExpanded: true,
               children: [
@@ -1800,6 +1775,10 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
                   ),
                 ],
               ],
+            ),
+            _settingsSection(
+              title: 'LOCAL EDGE SERVER',
+              children: const [_EdgeServerPanel(compactTitle: true)],
             ),
             _settingsSection(
               title: 'WAKE & HANDSHAKE',
@@ -1969,7 +1948,10 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
                             )
                             .toList(),
                         onChanged: (v) {
-                          if (v != null) setState(() => _tapAck = v);
+                          if (v != null) {
+                            setState(() => _tapAck = v);
+                            _autoSaveLlmConfig();
+                          }
                         },
                       ),
                     ),
@@ -1992,7 +1974,10 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
                             )
                             .toList(),
                         onChanged: (v) {
-                          if (v != null) setState(() => _holdAck = v);
+                          if (v != null) {
+                            setState(() => _holdAck = v);
+                            _autoSaveLlmConfig();
+                          }
                         },
                       ),
                     ),
@@ -2002,6 +1987,7 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: _respWordCtrl,
+                    onSubmitted: (_) => _autoSaveLlmConfig(),
                     style: const TextStyle(color: Colors.white, fontSize: 13),
                     decoration: const InputDecoration(
                       labelText: 'Response word',
@@ -2069,6 +2055,233 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
                         color: Colors.redAccent,
                         fontSize: 11,
                       ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            _settingsSection(
+              title: 'VOICE & AUDIO CONTROLS',
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: _gender,
+                  dropdownColor: const Color(0xFF1E1E1E),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: const InputDecoration(
+                    labelText: "Voice Gender",
+                    labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  items: const ["Male", "Female"]
+                      .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _gender = val);
+                      _autoSaveLlmConfig();
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Text(
+                      "Max Recording Duration:",
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                    Expanded(
+                      child: Slider(
+                        value: _maxRecSecs,
+                        min: 7,
+                        max: 15,
+                        divisions: 8,
+                        label: "${_maxRecSecs.toInt()}s",
+                        activeColor: Colors.greenAccent,
+                        onChanged: (val) {
+                          setState(() => _maxRecSecs = val);
+                          _autoSaveLlmConfig();
+                        },
+                      ),
+                    ),
+                    Text(
+                      "${_maxRecSecs.toInt()}s",
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                SwitchListTile(
+                  title: const Text(
+                    "Vibrate on tap wake",
+                    style: TextStyle(color: Colors.white, fontSize: 13),
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                  activeThumbColor: Colors.greenAccent,
+                  value: _vibrate,
+                  onChanged: (val) {
+                    setState(() => _vibrate = val);
+                    _autoSaveLlmConfig();
+                  },
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Language: English only (Arch v3.7). Ambient commands and authoring replies are generated in English.',
+                  style: TextStyle(color: Colors.white38, fontSize: 11),
+                ),
+                const SizedBox(height: 12),
+                if (!_selectedProviderSupportsTts)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'LLM voice synthesis requires OpenAI or Custom OpenAI (TTS not supported by this provider).',
+                      style: TextStyle(color: Colors.white38, fontSize: 11),
+                    ),
+                  ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF222222),
+                    foregroundColor: Colors.greenAccent,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: (_isGeneratingTTS || !_selectedProviderSupportsTts)
+                      ? null
+                      : _generateLLMVoice,
+                  icon: _isGeneratingTTS
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.auto_awesome, size: 18),
+                  label: Text(
+                    _isGeneratingTTS
+                        ? "GENERATING..."
+                        : "GENERATE CUSTOM VOICE VIA LLM",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            _settingsSection(
+              title: 'APP THEME & ACCENT GLOW',
+              children: [
+                Consumer(
+                  builder: (context, ref, _) {
+                    final themeService = ref.watch(themeServiceProvider);
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Base Palette',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: AppThemePalette.values.map((p) {
+                            final isSel = themeService.currentPalette == p;
+                            return ChoiceChip(
+                              label: Text(p.label),
+                              selected: isSel,
+                              selectedColor: themeService.accentColor
+                                  .withValues(alpha: 0.2),
+                              backgroundColor: const Color(0xFF1E1E1E),
+                              labelStyle: TextStyle(
+                                color: isSel
+                                    ? themeService.accentColor
+                                    : Colors.white70,
+                                fontSize: 11,
+                                fontWeight: isSel
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                              side: BorderSide(
+                                color: isSel
+                                    ? themeService.accentColor
+                                    : Colors.white12,
+                              ),
+                              onSelected: (_) => themeService.setPalette(p),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 14),
+                        const Text(
+                          'Accent Glow',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 6,
+                          children: AppAccentGlow.values.map((a) {
+                            final isSel = themeService.currentAccent == a;
+                            return GestureDetector(
+                              onTap: () => themeService.setAccent(a),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1E1E1E),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isSel ? a.color : Colors.white12,
+                                    width: isSel ? 2 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: a.color,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: a.color.withValues(
+                                              alpha: 0.6,
+                                            ),
+                                            blurRadius: 4,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      a.label,
+                                      style: TextStyle(
+                                        color: isSel
+                                            ? Colors.white
+                                            : Colors.white60,
+                                        fontSize: 11,
+                                        fontWeight: isSel
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -2314,171 +2527,13 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
               ],
             ),
             _settingsSection(
-              title: 'EXTERNAL PLATFORM KEYS',
-              children: [
-                const Text(
-                  'Agents that post to Twitter/X, Facebook, Instagram, YouTube, Threads, or a webhook need keys here. Promotion to Mere Bhai is required before external posting.',
-                  style: TextStyle(color: Colors.white38, fontSize: 11),
-                ),
-                const SizedBox(height: 12),
-                for (final platform in ExternalPlatform.values) ...[
-                  TextField(
-                    controller: _externalKeyCtrls[platform.name],
-                    obscureText: true,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                    decoration: InputDecoration(
-                      labelText: platform.label,
-                      labelStyle: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-              ],
-            ),
-            _settingsSection(
-              title: 'BEHAVIOR SETTINGS',
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      "Max Recording Duration:",
-                      style: TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                    Expanded(
-                      child: Slider(
-                        value: _maxRecSecs,
-                        min: 7,
-                        max: 15,
-                        divisions: 8,
-                        label: "${_maxRecSecs.toInt()}s",
-                        activeColor: Colors.greenAccent,
-                        onChanged: (val) => setState(() => _maxRecSecs = val),
-                      ),
-                    ),
-                    Text(
-                      "${_maxRecSecs.toInt()}s",
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-                SwitchListTile(
-                  title: const Text(
-                    "Vibrate on tap wake",
-                    style: TextStyle(color: Colors.white, fontSize: 13),
-                  ),
-                  contentPadding: EdgeInsets.zero,
-                  activeThumbColor: Colors.greenAccent,
-                  value: _vibrate,
-                  onChanged: (val) => setState(() => _vibrate = val),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  onPressed: _save,
-                  child: const Text(
-                    "SAVE CREDENTIALS, BEHAVIOR & VOICE",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Saves API keys, WAKE & HANDSHAKE prefs, Response Word, and Voice Gender.',
-                  style: TextStyle(color: Colors.white38, fontSize: 10),
+              title: 'VAULT SECURITY',
+              children: const [
+                Text(
+                  'Promoting unverified/sandbox agents into Mere Bhai uses your on-device screen lock, biometric fingerprint, or PIN. Your sovereign vault is encrypted locally on this device.',
+                  style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
                 ),
               ],
-            ),
-            _settingsSection(
-              title: 'AI VOICE RESPONSE GENERATOR',
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: _gender,
-                  dropdownColor: const Color(0xFF1E1E1E),
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                  decoration: const InputDecoration(
-                    labelText: "Voice Gender",
-                    labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                  items: ["Male", "Female"]
-                      .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                      .toList(),
-                  onChanged: (val) {
-                    if (val != null) setState(() => _gender = val);
-                  },
-                ),
-                const SizedBox(height: 16),
-                if (!_selectedProviderSupportsTts)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      'LLM voice generation requires OpenAI or Custom OpenAI (TTS not supported by this provider).',
-                      style: TextStyle(color: Colors.white38, fontSize: 11),
-                    ),
-                  ),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF222222),
-                    foregroundColor: Colors.greenAccent,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  onPressed: (_isGeneratingTTS || !_selectedProviderSupportsTts)
-                      ? null
-                      : _generateLLMVoice,
-                  icon: _isGeneratingTTS
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.auto_awesome, size: 18),
-                  label: Text(
-                    _isGeneratingTTS
-                        ? "GENERATING..."
-                        : "GENERATE VOICE VIA LLM",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Theme(
-              data: Theme.of(
-                context,
-              ).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                initiallyExpanded: false,
-                enabled: false,
-                tilePadding: EdgeInsets.zero,
-                collapsedIconColor: Colors.white24,
-                title: const Text(
-                  'VOICE TRAINING STUDIO (DEACTIVATED)',
-                  style: TextStyle(
-                    color: Colors.white38,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                subtitle: const Text(
-                  'Custom wake/response recording is turned off for now. Use Response Word + Voice Gender above.',
-                  style: TextStyle(color: Colors.white24, fontSize: 11),
-                ),
-                children: const [],
-              ),
             ),
           ],
         ),
@@ -2957,7 +3012,7 @@ class _PluginsPage extends ConsumerWidget {
       ...grouped[AgentSecurityClass.c3DueDiligence]!,
     ];
     return DefaultTabController(
-      length: 5,
+      length: 4,
       initialIndex: 0, // Mere Bhai
       child: SafeArea(
         child: Column(
@@ -3024,7 +3079,6 @@ class _PluginsPage extends ConsumerWidget {
                 const Tab(text: "SABKE BHAI"),
                 const Tab(text: "SANDBOX"),
                 Tab(text: AppConfig.circleTabLabel),
-                const Tab(text: "CORE"),
               ],
             ),
             Expanded(
@@ -3033,17 +3087,15 @@ class _PluginsPage extends ConsumerWidget {
                   _buildAgentGrid(
                     context,
                     ref,
-                    grouped[AgentSecurityClass.c2Verified]!,
+                    [
+                      ...grouped[AgentSecurityClass.c1Core]!,
+                      ...grouped[AgentSecurityClass.c2Verified]!,
+                    ],
                     showOrigin: true,
                   ),
                   _buildSabkeBrowseGrid(context, ref, sandboxInstalled),
                   SandboxQueueTab(onOpenInstalled: _openAgentDetail),
                   const CircleMarketplaceTab(),
-                  _buildAgentGrid(
-                    context,
-                    ref,
-                    grouped[AgentSecurityClass.c1Core]!,
-                  ),
                 ],
               ),
             ),
@@ -3300,10 +3352,21 @@ class _VaultDashboardsBannerState
     _future = _load();
   }
 
-  Future<List<Map<String, String>>> _load() {
-    return ref
+  Future<List<Map<String, String>>> _load() async {
+    final list = await ref
         .read(telemetryBusProvider)
         .listVaultEntries(mimeType: 'text/html');
+    final filtered = <Map<String, String>>[];
+    final seen = <String>{};
+    for (final e in list) {
+      final key = e['key'] ?? '';
+      // Skip internal scoped asset keys (e.g. agent:Accountant:asset:...)
+      if (key.startsWith('agent:') && key.contains(':asset:')) continue;
+      if (seen.add(key)) {
+        filtered.add(e);
+      }
+    }
+    return filtered;
   }
 
   void _refresh() => setState(() => _future = _load());
@@ -3422,10 +3485,6 @@ class _VaultDashboardsBannerState
         if (mounted) _refresh();
       });
     }
-    final maxListH = (MediaQuery.sizeOf(context).height * 0.28).clamp(
-      96.0,
-      180.0,
-    );
 
     return FutureBuilder<List<Map<String, String>>>(
       future: _future,
@@ -3487,13 +3546,15 @@ class _VaultDashboardsBannerState
                   ),
                 )
               else
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: maxListH),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    padding: EdgeInsets.zero,
-                    itemCount: dashboards.length,
-                    itemBuilder: (context, index) {
+                SizedBox(
+                  height: (dashboards.length * 52.0).clamp(52.0, 240.0),
+                  child: Scrollbar(
+                    thumbVisibility: true,
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.zero,
+                      itemCount: dashboards.length,
+                      itemBuilder: (context, index) {
                       final d = dashboards[index];
                       final key = d['key']!;
                       final buildId = d['build_id'];
@@ -3552,6 +3613,36 @@ class _VaultDashboardsBannerState
                               ),
                               onPressed: canOpen
                                   ? () => _openDashboard(server, key)
+                                  : null,
+                            ),
+                            IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                              tooltip: 'Share link to PC',
+                              icon: Icon(
+                                Icons.share,
+                                color: canOpen
+                                    ? Colors.cyanAccent
+                                    : Colors.white24,
+                                size: 16,
+                              ),
+                              onPressed: canOpen
+                                  ? () {
+                                      final url = server.vaultUrl(key);
+                                      Clipboard.setData(
+                                        ClipboardData(text: url),
+                                      );
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Copied: $url'),
+                                          backgroundColor: const Color(0xFF00E5FF),
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                    }
                                   : null,
                             ),
                             PopupMenuButton<String>(
@@ -3789,6 +3880,7 @@ class _VaultDashboardsBannerState
                     },
                   ),
                 ),
+              ),
             ],
           ),
         );
@@ -4436,485 +4528,692 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
       ),
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: mq.size.height * 0.92),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
+        child: Consumer(
+          builder: (context, ref, _) {
+            final themeService = ref.watch(themeServiceProvider);
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(
-                    isJs ? Icons.javascript : Icons.extension,
-                    color: isJs ? Colors.amberAccent : Colors.greenAccent,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      agent.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                  Row(
+                    children: [
+                      Icon(
+                        isJs ? Icons.javascript : Icons.extension,
+                        color: isJs ? Colors.amberAccent : Colors.greenAccent,
                       ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF222222),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      isJs ? agent.securityClass.id : 'C2',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                agent.description,
-                style: const TextStyle(color: Colors.white54, fontSize: 12),
-              ),
-              if (isJs) ...[
-                const SizedBox(height: 6),
-                Text(
-                  'Origin: ${BhaiCodeOrigin.label(agent.source)}',
-                  style: const TextStyle(color: Colors.white38, fontSize: 11),
-                ),
-              ],
-              if (builtAt != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  'Built ${DateFormat('yyyy-MM-dd HH:mm').format(builtAt.toLocal())}',
-                  style: const TextStyle(
-                    color: Colors.white38,
-                    fontSize: 11,
-                    fontFamily: 'Courier',
-                  ),
-                ),
-              ],
-              if (isJs) ...[
-                const SizedBox(height: 10),
-                _buildVerificationBanner(agent, scan),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.amberAccent,
-                    side: const BorderSide(color: Colors.amberAccent),
-                  ),
-                  onPressed: _runDiligence,
-                  icon: const Icon(Icons.policy, size: 16),
-                  label: const Text(
-                    'RUN DUE DILIGENCE',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                if (scan != null && scan.findings.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  DueDiligenceFindingsList(scan: scan),
-                ],
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.greenAccent,
-                    side: const BorderSide(color: Colors.greenAccent),
-                  ),
-                  onPressed: () async {
-                    final result = await showPublishToCircleDialog(context);
-                    if (result == null || !mounted) return;
-                    try {
-                      await ref
-                          .read(circleRegistryProvider)
-                          .publishAgent(
-                            agent.name,
-                            license: result.license,
-                            access: result.access,
-                          );
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '${agent.name} published to Friend Circle (${result.license})',
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          agent.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      );
-                    } catch (e) {
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Publish failed: $e')),
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.cloud_upload_outlined, size: 16),
-                  label: const Text(
-                    'PUBLISH TO FRIEND CIRCLE',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              if (agent.inputSchema.isNotEmpty) ...[
-                const Text(
-                  "PARAMETERS",
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                ...agent.inputSchema.entries.map(
-                  (e) => Text(
-                    "• ${e.key} (${e.value.type})${e.value.required ? '' : ' — optional'}: ${e.value.description}",
-                    style: const TextStyle(color: Colors.white70, fontSize: 11),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-              if (_relatedDashboards.isNotEmpty) ...[
-                const Text(
-                  'DASHBOARDS',
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                ..._relatedDashboards.map((e) {
-                  final key = e['key'] ?? '';
-                  final server = ref.read(localServerProvider);
-                  final url = server.isRunning ? server.vaultUrl(key) : null;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.greenAccent,
-                        side: const BorderSide(color: Colors.greenAccent),
                       ),
-                      onPressed: url == null
-                          ? null
-                          : () => launchVaultDashboard(context, url),
-                      icon: const Icon(Icons.open_in_browser, size: 16),
-                      label: Text(
-                        key,
-                        style: const TextStyle(fontSize: 11),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      if (isJs) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: agent.source == BhaiCodeOrigin.pool
+                                ? Colors.cyan.withValues(alpha: 0.15)
+                                : agent.source == BhaiCodeOrigin.self
+                                ? Colors.green.withValues(alpha: 0.15)
+                                : Colors.purple.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: agent.source == BhaiCodeOrigin.pool
+                                  ? Colors.cyanAccent.withValues(alpha: 0.4)
+                                  : agent.source == BhaiCodeOrigin.self
+                                  ? Colors.greenAccent.withValues(alpha: 0.4)
+                                  : Colors.purpleAccent.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Text(
+                            BhaiCodeOrigin.label(agent.source),
+                            style: TextStyle(
+                              color: agent.source == BhaiCodeOrigin.pool
+                                  ? Colors.cyanAccent
+                                  : agent.source == BhaiCodeOrigin.self
+                                  ? Colors.greenAccent
+                                  : Colors.purpleAccent,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: agent.securityClass == AgentSecurityClass.c2Verified
+                                ? Colors.green.withValues(alpha: 0.15)
+                                : Colors.amber.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: agent.securityClass == AgentSecurityClass.c2Verified
+                                  ? Colors.greenAccent.withValues(alpha: 0.4)
+                                  : Colors.amberAccent.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Text(
+                            agent.securityClass == AgentSecurityClass.c2Verified
+                                ? 'MERE BHAI (C2)'
+                                : 'SANDBOX (C4)',
+                            style: TextStyle(
+                              color: agent.securityClass == AgentSecurityClass.c2Verified
+                                  ? Colors.greenAccent
+                                  : Colors.amberAccent,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    agent.description,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      height: 1.3,
                     ),
-                  );
-                }),
-                const SizedBox(height: 12),
-              ],
-              if (isJs) ...[
-                const Text(
-                  "SOURCE",
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1,
                   ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  width: double.infinity,
-                  constraints: const BoxConstraints(maxHeight: 160),
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0D0D0D),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SingleChildScrollView(
-                    child: Text(
-                      agent.script,
+                  if (builtAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Built ${DateFormat('yyyy-MM-dd HH:mm').format(builtAt.toLocal())}',
                       style: const TextStyle(
-                        color: Colors.white60,
+                        color: Colors.white30,
                         fontSize: 10,
                         fontFamily: 'Courier',
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-              if (_runResult != null) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: _runWasError
-                        ? const Color(0xFF2A1515)
-                        : const Color(0xFF10261A),
-                    borderRadius: BorderRadius.circular(8),
-                    border: _runWasError
-                        ? Border.all(
-                            color: Colors.redAccent.withValues(alpha: 0.4),
-                          )
-                        : null,
-                  ),
-                  child: Text(
-                    _runResult!,
-                    style: TextStyle(
-                      color: _runWasError
-                          ? Colors.redAccent
-                          : Colors.greenAccent,
-                      fontSize: 11,
+                  ],
+                  if (isJs) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF181818),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.record_voice_over,
+                                color: themeService.accentColor,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'BHAI WORDS & VOICE INVOCATION',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (agent.bhaiWords.isNotEmpty)
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: agent.bhaiWords.map((word) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF222222),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: themeService.accentColor.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: Text(
+                                  word,
+                                  style: TextStyle(
+                                    color: themeService.accentColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              )).toList(),
+                            )
+                          else
+                            const Text(
+                              'No custom hot words defined.',
+                              style: TextStyle(color: Colors.white38, fontSize: 11),
+                            ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Example prompt: "${agent.invocationPrompt.isNotEmpty ? agent.invocationPrompt : 'Run ${agent.name}'}"',
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-                if (_runWasError && isJs) ...[
-                  const SizedBox(height: 8),
-                  TextButton.icon(
-                    onPressed: _openImprove,
-                    icon: const Icon(
-                      Icons.tune,
-                      color: Colors.lightBlueAccent,
-                      size: 16,
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF181818),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: (scan != null && scan.flagged)
+                              ? Colors.amber.withValues(alpha: 0.4)
+                              : Colors.greenAccent.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                (scan != null && scan.flagged)
+                                    ? Icons.shield_outlined
+                                    : Icons.verified_user,
+                                color: (scan != null && scan.flagged)
+                                    ? Colors.amber
+                                    : Colors.greenAccent,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              const Expanded(
+                                child: Text(
+                                  '7-POINT DUE DILIGENCE AUDIT',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: const Size(50, 24),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: _runDiligence,
+                                child: const Text(
+                                  'RE-SCAN',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.amberAccent,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (scan != null) ...[
+                            ...scan.standardChecks.map((item) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2.5),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    item.passed
+                                        ? Icons.check_circle_outline
+                                        : Icons.cancel_outlined,
+                                    color: item.passed
+                                        ? Colors.greenAccent
+                                        : Colors.redAccent,
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      item.title,
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    item.passed ? 'PASSED' : 'FLAGGED',
+                                    style: TextStyle(
+                                      color: item.passed
+                                          ? Colors.greenAccent
+                                          : Colors.redAccent,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )),
+                            if (scan.findings.isNotEmpty) ...[
+                              const Divider(color: Colors.white12, height: 16),
+                              DueDiligenceFindingsList(scan: scan),
+                            ],
+                          ],
+                        ],
+                      ),
                     ),
-                    label: const Text(
-                      'FIX WITH IMPROVE',
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF181818),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(
+                                Icons.science_outlined,
+                                color: Colors.orangeAccent,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'SANDBOX SIMULATION',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Test in Sandbox executes this code in an isolated QuickJS runner without granting access to ambient voice or sensitive vault data.',
+                            style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: 11,
+                              height: 1.3,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.orangeAccent,
+                                side: const BorderSide(color: Colors.orangeAccent),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                              ),
+                              onPressed: _running ? null : () => _run(sandbox: true),
+                              icon: const Icon(Icons.play_circle_outline, size: 16),
+                              label: const Text(
+                                'TEST IN SANDBOX',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (agent.inputSchema.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      "PARAMETERS",
                       style: TextStyle(
-                        color: Colors.lightBlueAccent,
-                        fontSize: 11,
+                        color: Colors.white54,
+                        fontSize: 10,
                         fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
                       ),
                     ),
-                  ),
-                ],
-                if (_dashboardUrl != null && !_runWasError) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.greenAccent,
-                      side: const BorderSide(color: Colors.greenAccent),
+                    const SizedBox(height: 4),
+                    ...agent.inputSchema.entries.map(
+                      (e) => Text(
+                        "• ${e.key} (${e.value.type})${e.value.required ? '' : ' — optional'}: ${e.value.description}",
+                        style: const TextStyle(color: Colors.white70, fontSize: 11),
+                      ),
                     ),
-                    onPressed: () =>
-                        launchVaultDashboard(context, _dashboardUrl!),
-                    icon: const Icon(Icons.open_in_browser, size: 16),
-                    label: Text(
-                      'OPEN DASHBOARD (${_dashboardKey ?? ''})',
-                      style: const TextStyle(
-                        fontSize: 11,
+                  ],
+                  if (_relatedDashboards.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'DASHBOARDS',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 10,
                         fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
                       ),
                     ),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      await Clipboard.setData(
-                        ClipboardData(text: _dashboardUrl!),
-                      );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Copied: $_dashboardUrl')),
-                        );
-                      }
-                    },
-                    child: Text(
-                      _dashboardUrl!,
-                      style: const TextStyle(
-                        color: Colors.white38,
-                        fontSize: 9,
-                        fontFamily: 'Courier',
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-              ],
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: canRun
-                          ? Colors.greenAccent
-                          : Colors.white24,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 12,
-                      ),
-                    ),
-                    onPressed: (_running || !canRun) ? null : () => _run(),
-                    icon: _running
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(
-                            canRun ? Icons.play_arrow : Icons.lock,
-                            size: 18,
+                    const SizedBox(height: 4),
+                    ..._relatedDashboards.map((e) {
+                      final key = e['key'] ?? '';
+                      final server = ref.read(localServerProvider);
+                      final url = server.isRunning ? server.vaultUrl(key) : null;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.greenAccent,
+                            side: const BorderSide(color: Colors.greenAccent),
                           ),
-                    label: Text(
-                      _running
-                          ? 'RUNNING'
-                          : (canRun ? 'RUN' : 'RUN (MERE BHAI ONLY)'),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
+                          onPressed: url == null
+                              ? null
+                              : () => launchVaultDashboard(context, url),
+                          icon: const Icon(Icons.open_in_browser, size: 16),
+                          label: Text(
+                            key,
+                            style: const TextStyle(fontSize: 11),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                  if (isJs) ...[
+                    const SizedBox(height: 8),
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        dividerColor: Colors.transparent,
+                      ),
+                      child: ExpansionTile(
+                        tilePadding: EdgeInsets.zero,
+                        title: const Text(
+                          'INSPECT JAVASCRIPT SOURCE',
+                          style: TextStyle(
+                            color: Colors.white38,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            constraints: const BoxConstraints(maxHeight: 160),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0D0D0D),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: SingleChildScrollView(
+                              child: Text(
+                                agent.script,
+                                style: const TextStyle(
+                                  color: Colors.white60,
+                                  fontSize: 10,
+                                  fontFamily: 'Courier',
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                  ],
+                  if (_runResult != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: _runWasError
+                            ? const Color(0xFF2A1515)
+                            : const Color(0xFF10261A),
+                        borderRadius: BorderRadius.circular(8),
+                        border: _runWasError
+                            ? Border.all(
+                                color: Colors.redAccent.withValues(alpha: 0.4),
+                              )
+                            : null,
+                      ),
+                      child: Text(
+                        _runResult!,
+                        style: TextStyle(
+                          color: _runWasError
+                              ? Colors.redAccent
+                              : Colors.greenAccent,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    if (_runWasError && isJs) ...[
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: _openImprove,
+                        icon: const Icon(
+                          Icons.tune,
+                          color: Colors.lightBlueAccent,
+                          size: 16,
+                        ),
+                        label: const Text(
+                          'FIX WITH IMPROVE',
+                          style: TextStyle(
+                            color: Colors.lightBlueAccent,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (_dashboardUrl != null && !_runWasError) ...[
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.greenAccent,
+                          side: const BorderSide(color: Colors.greenAccent),
+                        ),
+                        onPressed: () =>
+                            launchVaultDashboard(context, _dashboardUrl!),
+                        icon: const Icon(Icons.open_in_browser, size: 16),
+                        label: Text(
+                          'OPEN DASHBOARD (${_dashboardKey ?? ''})',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: canRun
+                              ? Colors.greenAccent
+                              : Colors.white24,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 12,
+                          ),
+                        ),
+                        onPressed: (_running || !canRun) ? null : () => _run(),
+                        icon: _running
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Icon(
+                                canRun ? Icons.play_arrow : Icons.lock,
+                                size: 18,
+                              ),
+                        label: Text(
+                          _running
+                              ? 'RUNNING'
+                              : (canRun ? 'RUN' : 'RUN (MERE BHAI ONLY)'),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (isJs)
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.lightBlueAccent,
+                            side: const BorderSide(color: Colors.lightBlueAccent),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 12,
+                            ),
+                          ),
+                          onPressed: _openImprove,
+                          icon: const Icon(Icons.tune, size: 16),
+                          label: const Text(
+                            'IMPROVE',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      if (isJs &&
+                          agent.securityClass != AgentSecurityClass.c2Verified)
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.amber,
+                            side: const BorderSide(color: Colors.amber),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 12,
+                            ),
+                          ),
+                          onPressed: _promote,
+                          icon: const Icon(Icons.verified_user, size: 16),
+                          label: const Text(
+                            'PROMOTE',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      if (isJs)
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.greenAccent,
+                            side: const BorderSide(color: Colors.greenAccent),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 12,
+                            ),
+                          ),
+                          onPressed: () async {
+                            final result = await showPublishToCircleDialog(context);
+                            if (result == null || !mounted) return;
+                            try {
+                              await ref
+                                  .read(circleRegistryProvider)
+                                  .publishAgent(
+                                    agent.name,
+                                    license: result.license,
+                                    access: result.access,
+                                  );
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '${agent.name} published to Friend Circle (${result.license})',
+                                  ),
+                                ),
+                              );
+                            } catch (e) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Publish failed: $e')),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.cloud_upload_outlined, size: 16),
+                          label: const Text(
+                            'PUBLISH',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      if (isJs)
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white70,
+                            side: const BorderSide(color: Colors.white24),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 12,
+                            ),
+                          ),
+                          onPressed: _export,
+                          icon: const Icon(Icons.download, size: 16),
+                          label: const Text(
+                            'EXPORT',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      if (isJs)
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.redAccent,
+                            side: const BorderSide(color: Colors.redAccent),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 12,
+                            ),
+                          ),
+                          onPressed: _delete,
+                          icon: const Icon(Icons.delete_outline, size: 16),
+                          label: Text(
+                            widget.fromSandbox ? 'REMOVE FROM DEVICE' : 'DELETE',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                  if (isJs)
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.orangeAccent,
-                        side: const BorderSide(color: Colors.orangeAccent),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 12,
-                        ),
-                      ),
-                      onPressed: _running ? null : () => _run(sandbox: true),
-                      icon: const Icon(Icons.science, size: 16),
-                      label: const Text(
-                        'TEST IN SANDBOX',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  if (isJs)
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.lightBlueAccent,
-                        side: const BorderSide(color: Colors.lightBlueAccent),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 12,
-                        ),
-                      ),
-                      onPressed: _openImprove,
-                      icon: const Icon(Icons.tune, size: 16),
-                      label: const Text(
-                        'IMPROVE',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  if (isJs &&
-                      agent.securityClass != AgentSecurityClass.c2Verified)
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.amber,
-                        side: const BorderSide(color: Colors.amber),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 12,
-                        ),
-                      ),
-                      onPressed: _promote,
-                      icon: const Icon(Icons.verified_user, size: 16),
-                      label: const Text(
-                        'PROMOTE',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  if (isJs)
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white70,
-                        side: const BorderSide(color: Colors.white24),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 12,
-                        ),
-                      ),
-                      onPressed: _export,
-                      icon: const Icon(Icons.download, size: 16),
-                      label: const Text(
-                        'EXPORT',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  if (isJs)
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.redAccent,
-                        side: const BorderSide(color: Colors.redAccent),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 12,
-                        ),
-                      ),
-                      onPressed: _delete,
-                      icon: const Icon(Icons.delete_outline, size: 16),
-                      label: Text(
-                        widget.fromSandbox ? 'REMOVE FROM DEVICE' : 'DELETE',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
                 ],
               ),
-            ],
-          ),
+            );
+          },
         ),
-      ),
-    );
-  }
-
-  Widget _buildVerificationBanner(
-    JsAgentAdapter agent,
-    DueDiligenceResult? scan,
-  ) {
-    final flagged = scan != null && scan.flagged;
-    final atC2 = agent.securityClass == AgentSecurityClass.c2Verified;
-    String text;
-    Color color;
-    if (atC2) {
-      text = 'Mere Bhai — RUN enabled.';
-      color = Colors.greenAccent;
-    } else if (flagged) {
-      text =
-          'Due diligence: FLAGGED — fix via IMPROVE before promotion. RUN disabled until Mere Bhai.';
-      color = Colors.amber;
-    } else {
-      text = 'Due diligence passed. Promote to Mere Bhai to enable RUN.';
-      color = Colors.lightBlueAccent;
-    }
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(text, style: TextStyle(color: color, fontSize: 11)),
-          if (flagged) ...[
-            const SizedBox(height: 6),
-            DueDiligenceFindingsList(scan: scan),
-          ],
-        ],
       ),
     );
   }

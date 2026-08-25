@@ -44,14 +44,14 @@ void main() {
       container.dispose();
     });
 
-    test('seed + load registers TelemetryCounter adapter', () async {
+    test('seed + load registers Calculator adapter', () async {
       final registry = container.read(jsAgentRegistryProvider);
-      await registry.seedDemoAgentIfMissing();
+      await registry.seedCoreAgentsIfMissing();
       final count = await registry.loadAndRegisterAgents();
       expect(count, greaterThanOrEqualTo(1));
 
       final agentService = container.read(agentServiceProvider);
-      final agent = agentService.findAgent('TelemetryCounter');
+      final agent = agentService.findAgent('Calculator');
       expect(agent, isA<JsAgentAdapter>());
     });
 
@@ -230,18 +230,18 @@ async function execute(params) {
     );
 
     test(
-      'vault agent executes TelemetryCounter script',
+      'vault agent executes Calculator script',
       () async {
         final registry = container.read(jsAgentRegistryProvider);
-        await registry.seedDemoAgentIfMissing();
+        await registry.seedCoreAgentsIfMissing();
         await registry.loadAndRegisterAgents();
 
         final agentService = container.read(agentServiceProvider);
-        final agent = agentService.findAgent('TelemetryCounter');
+        final agent = agentService.findAgent('Calculator');
         expect(agent, isNotNull);
 
-        final spoken = await agent!.execute(const {});
-        expect(spoken, contains('TelemetryCounter agent says'));
+        final spoken = await agent!.execute({'expression': '10 + 5'});
+        expect(spoken, contains('15'));
       },
       skip: quickJsAvailable
           ? false

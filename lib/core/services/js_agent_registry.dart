@@ -8,6 +8,7 @@ import '../agents/agent_base.dart';
 import '../agents/js_agent_adapter.dart';
 import '../pipeline/authoring_trace.dart';
 import 'agent_service.dart';
+import 'agent_verification_service.dart';
 import 'bhai_code_origin.dart';
 import 'js_bridge_service.dart';
 import 'model_studio/bro_code_ml_meta.dart';
@@ -79,6 +80,11 @@ class JsAgentRegistry {
           final createdAt = _parseDate(schema['createdAt'] as String?);
           final updatedAt = _parseDate(schema['updatedAt'] as String?);
           final assets = await readAgentAssets(displayName);
+          final bhaiWordsRaw = schema['bhaiWords'] as List?;
+          final bhaiWords = bhaiWordsRaw != null
+              ? bhaiWordsRaw.map((e) => e.toString()).toList()
+              : null;
+          final invocationPrompt = schema['invocationPrompt'] as String?;
 
           agentService.registerAgent(
             JsAgentAdapter(
@@ -95,6 +101,8 @@ class JsAgentRegistry {
               diligencePassed: schema['diligencePassed'] as bool? ?? false,
               createdAt: createdAt,
               updatedAt: updatedAt,
+              bhaiWords: bhaiWords,
+              invocationPrompt: invocationPrompt,
             ),
           );
           registered++;
@@ -185,7 +193,7 @@ class JsAgentRegistry {
   ///
   /// This is the shared sink for both LLM authoring (Path A) and manual
   /// import (Path B). Vault convention: `agent:<Name>` + `agent:<Name>:schema`.
-    Future<JsAgentAdapter> saveAndRegisterAgent({
+  Future<JsAgentAdapter> saveAndRegisterAgent({
     required String name,
     required String description,
     required Map<String, AgentParameter> inputSchema,
@@ -196,6 +204,8 @@ class JsAgentRegistry {
     bool? diligencePassed,
     DateTime? createdAt,
     DateTime? updatedAt,
+    List<String>? bhaiWords,
+    String? invocationPrompt,
     BroCodeMlMeta? mlMeta,
   }) async {
     final syntax = _ref
@@ -211,10 +221,12 @@ class JsAgentRegistry {
     final agentService = _ref.read(agentServiceProvider);
     final now = DateTime.now().toIso8601String();
 
-    // Preserve existing createdAt / source / diligence when overwriting.
+    // Preserve existing createdAt / source / diligence / bhaiWords when overwriting.
     String? existingCreatedAt;
     String? existingSource;
     bool? existingDiligence;
+    List<String>? existingBhaiWords;
+    String? existingInvocationPrompt;
     Map<String, dynamic>? priorMl;
     final priorSchema = await telemetry.readVaultData(schemaKeyFor(name));
     if (priorSchema != null) {
@@ -224,6 +236,12 @@ class JsAgentRegistry {
         existingCreatedAt = decoded['createdAt'] as String?;
         existingSource = decoded['source'] as String?;
         existingDiligence = decoded['diligencePassed'] as bool?;
+        if (decoded['bhaiWords'] is List) {
+          existingBhaiWords = (decoded['bhaiWords'] as List)
+              .map((e) => e.toString())
+              .toList();
+        }
+        existingInvocationPrompt = decoded['invocationPrompt'] as String?;
         if (decoded['ml'] is Map) {
           priorMl = Map<String, dynamic>.from(decoded['ml'] as Map);
         }
@@ -235,7 +253,12 @@ class JsAgentRegistry {
     final resolvedSource = BhaiCodeOrigin.normalize(
       source ?? existingSource ?? BhaiCodeOrigin.self,
     );
-    final resolvedDiligence = diligencePassed ?? existingDiligence ?? false;
+    
+    // Automatically run due diligence scan if not explicitly given
+    final scan = _ref.read(agentVerificationProvider).scanScript(script);
+    final resolvedDiligence = diligencePassed ?? existingDiligence ?? !scan.flagged;
+    final resolvedBhaiWords = bhaiWords ?? existingBhaiWords;
+    final resolvedInvocation = invocationPrompt ?? existingInvocationPrompt;
 
     await telemetry.writeVaultData(
       vaultKeyFor(name),
@@ -268,6 +291,12 @@ class JsAgentRegistry {
         (key, param) => MapEntry(key, param.toJson()),
       ),
     };
+    if (resolvedBhaiWords != null) {
+      schemaMap['bhaiWords'] = resolvedBhaiWords;
+    }
+    if (resolvedInvocation != null) {
+      schemaMap['invocationPrompt'] = resolvedInvocation;
+    }
     if (vaultAssets != null && vaultAssets.isNotEmpty) {
       schemaMap['vaultAssets'] = vaultAssets;
     }
@@ -295,10 +324,12 @@ class JsAgentRegistry {
       diligencePassed: resolvedDiligence,
       createdAt: DateTime.tryParse(created),
       updatedAt: DateTime.tryParse(updated),
+      bhaiWords: resolvedBhaiWords,
+      invocationPrompt: resolvedInvocation,
     );
     agentService.registerAgent(adapter);
     debugPrint(
-      '[JsAgentRegistry] Saved & registered agent: $name (${securityClass.id})',
+      '[JsAgentRegistry] Saved & registered agent: $name (${securityClass.id}, diligence: $resolvedDiligence)',
     );
     return adapter;
   }
@@ -512,11 +543,10 @@ class JsAgentRegistry {
     };
   }
 
-  /// Seeds the migrated core agents (Calculator, DrivingCoach) into the vault as
-  /// refinable JS agents pre-verified at C2 (MS-CORE-JS-MIGRATION).
+  /// Seeds the minimal core agent (Calculator) into the vault as
+  /// a refinable JS agent pre-verified at C2 (MS-CORE-JS-MIGRATION).
   ///
-  /// Guarded by "if missing" so a later user refinement (MS-AGENT-REFINE) is
-  /// never overwritten on the next boot.
+  /// Guarded by "if missing" so user refinements are never overwritten on boot.
   Future<void> seedCoreAgentsIfMissing() async {
     await _seedAgentIfMissing(
       name: 'Calculator',
@@ -531,78 +561,8 @@ class JsAgentRegistry {
           'required': true,
         },
       },
-    );
-
-    await _seedAgentIfMissing(
-      name: 'DrivingCoach',
-      description:
-          'Analyzes recent sensor telemetry from the SQLite vault to predict user movement state (Idle, Walking, Driving).',
-      script: _drivingCoachScript,
-      inputSchema: {
-        'recordCount': {
-          'type': 'number',
-          'description':
-              'The number of recent telemetry records to analyze (e.g. 10 or 50). Default is 20 if omitted.',
-          'required': false,
-        },
-      },
-    );
-
-    // MS-AGENT-FEED-AGT1 — consume voice-"tell" cash entries (C2 seed).
-    await _seedAgentIfMissing(
-      name: 'Accountant',
-      description:
-          'Records cash expenses from voice feed inbox (Tell Accountant I spent …).',
-      script: _accountantScript,
-      inputSchema: const {},
-    );
-
-    // MVP-S13 — selected social Bro Codes (BYOK platform keys + C2).
-    await _seedAgentIfMissing(
-      name: 'Xter',
-      description:
-          'Posts short text to X/Twitter via System.sendHTTP (needs C2 + Twitter key).',
-      script: _xterScript,
-      inputSchema: {
-        'text': {
-          'type': 'string',
-          'description': 'Status text to post (max ~280 chars)',
-          'required': true,
-        },
-      },
-    );
-    await _seedAgentIfMissing(
-      name: 'FacebookPoster',
-      description:
-          'Posts a message via Facebook Graph HTTP (needs C2 + Facebook key).',
-      script: _facebookPosterScript,
-      inputSchema: {
-        'text': {
-          'type': 'string',
-          'description': 'Message to post',
-          'required': true,
-        },
-        'pageId': {
-          'type': 'string',
-          'description': 'Page id or "me" (default me)',
-          'required': false,
-        },
-      },
-    );
-
-    // S17 — Bro Code Call demo (local notify; no external API).
-    await _seedAgentIfMissing(
-      name: 'CallDemo',
-      description:
-          'Demo Bro Call: queues a local Aur Bhai alert; say Haan Bhai to hear the message.',
-      script: _callDemoScript,
-      inputSchema: {
-        'message': {
-          'type': 'string',
-          'description': 'Message to speak after Haan Bhai',
-          'required': false,
-        },
-      },
+      bhaiWords: const ['calculate', 'what is', 'how much is'],
+      invocationPrompt: 'Calculate 15 * 84',
     );
   }
 
@@ -612,6 +572,8 @@ class JsAgentRegistry {
     required String description,
     required String script,
     required Map<String, dynamic> inputSchema,
+    List<String>? bhaiWords,
+    String? invocationPrompt,
   }) async {
     final telemetry = _ref.read(telemetryBusProvider);
     if (await telemetry.readVaultData(vaultKeyFor(name)) != null) return;
@@ -631,46 +593,12 @@ class JsAgentRegistry {
         'createdAt': now,
         'updatedAt': now,
         'inputSchema': inputSchema,
+        if (bhaiWords != null) 'bhaiWords': bhaiWords,
+        if (invocationPrompt != null) 'invocationPrompt': invocationPrompt,
       }),
       mimeType: 'application/json',
     );
     debugPrint('[JsAgentRegistry] Seeded core agent: $name (C2)');
-  }
-
-  /// Seeds a minimal demo agent so JS Bridge can be validated before MS-USER-ECOSYSTEM.
-  Future<void> seedDemoAgentIfMissing() async {
-    const agentKey = '${vaultPrefix}TelemetryCounter';
-    const schemaKey = '$agentKey:schema';
-
-    final telemetry = _ref.read(telemetryBusProvider);
-    if (await telemetry.readVaultData(agentKey) != null) return;
-
-    final now = DateTime.now().toIso8601String();
-    await telemetry.writeVaultData(
-      agentKey,
-      _telemetryCounterScript,
-      mimeType: 'application/javascript',
-    );
-    await telemetry.writeVaultData(
-      schemaKey,
-      jsonEncode({
-        'name': 'TelemetryCounter',
-        'description':
-            'Counts telemetry rows in the sovereign vault via System.querySQL.',
-        'securityClass': 'C2',
-        'createdAt': now,
-        'updatedAt': now,
-        'inputSchema': {
-          'limit': {
-            'type': 'number',
-            'description': 'Optional row limit for the spoken summary.',
-            'required': false,
-          },
-        },
-      }),
-      mimeType: 'application/json',
-    );
-    debugPrint('[JsAgentRegistry] Seeded demo agent: TelemetryCounter');
   }
 
   Map<String, AgentParameter> _parseInputSchema(dynamic raw) {
@@ -695,25 +623,8 @@ class JsAgentRegistry {
   }
 }
 
-const _telemetryCounterScript = '''
-async function execute(params) {
-  System.log('TelemetryCounter: querying sovereign telemetry table');
-  const rows = await System.querySQL('SELECT COUNT(*) AS count FROM telemetry');
-  const count = rows[0]?.count ?? 0;
-  const limit = params.limit ?? 5;
-  const recent = await System.querySQL(
-    'SELECT accelerometerZ FROM telemetry ORDER BY timestamp DESC LIMIT ' + limit
-  );
-  const latestZ = recent.length > 0 ? recent[0].accelerometerZ : 'n/a';
-  return 'TelemetryCounter agent says there are ' + count +
-    ' records in the vault. Latest accelerometer Z is ' + latestZ + '.';
-}
-''';
-
 /// Calculator as a refinable JS vault agent (MS-CORE-JS-MIGRATION).
 /// Recursive-descent evaluator supporting + - * / ^ and parentheses.
-/// The `^` power operator is right-associative and binds tighter than * /,
-/// fixing the "2 to the power of 3" gap in the legacy Dart SimpleMathParser.
 const _calculatorScript = r'''
 async function execute(params) {
   var raw = (params.expression == null) ? '' : String(params.expression);
@@ -817,119 +728,6 @@ async function execute(params) {
   } catch (e) {
     return 'Calculator agent encountered an error: ' + (e && e.message ? e.message : e);
   }
-}
-''';
-
-/// DrivingCoach as a refinable JS vault agent (MS-CORE-JS-MIGRATION).
-/// Reads recent accelerometer telemetry via System.querySQL and applies the
-/// same idle/walking/driving variance thresholds as the legacy Dart agent.
-const _drivingCoachScript = '''
-async function execute(params) {
-  var count = 20;
-  if (params.recordCount != null) {
-    var n = parseInt(params.recordCount, 10);
-    if (!isNaN(n)) count = n;
-  }
-  System.log('DrivingCoach: reading last ' + count + ' telemetry rows');
-  var rows = await System.querySQL(
-    'SELECT accelerometerZ FROM telemetry ORDER BY timestamp DESC LIMIT ' + count
-  );
-  if (!rows || rows.length === 0) {
-    return 'I cannot analyze your movement. The SQLite telemetry vault is currently empty.';
-  }
-  if (rows.length < 5) {
-    return 'I need a few more seconds of telemetry data to make an accurate prediction.';
-  }
-
-  var sum = 0;
-  for (var k = 0; k < rows.length; k++) sum += Number(rows[k].accelerometerZ);
-  var mean = sum / rows.length;
-
-  var varianceSum = 0;
-  for (var j = 0; j < rows.length; j++) {
-    var d = Number(rows[j].accelerometerZ) - mean;
-    varianceSum += d * d;
-  }
-  var variance = varianceSum / rows.length;
-
-  var prediction;
-  if (variance <= 0.45) prediction = 'Idle';
-  else if (variance <= 1.85) prediction = 'Walking';
-  else prediction = 'Driving';
-
-  var v = Math.round(variance * 100) / 100;
-  return 'Based on your last ' + rows.length + ' sensor readings, your accelerometer variance is ' +
-    v + '. My model predicts you are currently ' + prediction + '.';
-}
-''';
-
-const _accountantScript = r'''
-async function execute(params) {
-  System.log('Accountant reading feed inbox…');
-  const items = await System.readInbox({ unreadOnly: true, limit: 50 });
-  if (!items || items.length === 0) {
-    return 'No new expenses. Tell Accountant that you spent an amount.';
-  }
-  let total = 0;
-  const ids = [];
-  for (const item of items) {
-    ids.push(item.id);
-    const m = String(item.text).match(/(\d+(?:\.\d+)?)/);
-    if (m) total += Number(m[1]);
-  }
-  await System.consumeInbox({ ids: ids });
-  return 'Recorded ' + items.length + ' expense entr' +
-    (items.length === 1 ? 'y' : 'ies') + '; total about ' + total + '.';
-}
-''';
-
-const _xterScript = r'''
-async function execute(params) {
-  const text = String((params && params.text) || '').trim();
-  if (!text) {
-    return 'Provide text to post (e.g. Run Xter with text="Hello from Aur Bhai").';
-  }
-  const url = 'https://api.twitter.com/2/tweets';
-  const payload = JSON.stringify({ text: text.slice(0, 280) });
-  try {
-    const res = await System.sendHTTP(url, payload);
-    System.log('Xter sendHTTP result: ' + JSON.stringify(res));
-    return 'Posted to X (or received API response). Check your X account.';
-  } catch (e) {
-    return 'Xter failed: ' + e + '. Ensure C2 + Twitter key in Settings.';
-  }
-}
-''';
-
-const _facebookPosterScript = r'''
-async function execute(params) {
-  const text = String((params && params.text) || '').trim();
-  const pageId = String((params && params.pageId) || 'me').trim();
-  if (!text) {
-    return 'Provide text (and optional pageId) to post.';
-  }
-  const url = 'https://graph.facebook.com/v19.0/' + encodeURIComponent(pageId) + '/feed';
-  const payload = JSON.stringify({ message: text });
-  try {
-    const res = await System.sendHTTP(url, payload);
-    System.log('FacebookPoster result: ' + JSON.stringify(res));
-    return 'Facebook post attempted. Verify on your page.';
-  } catch (e) {
-    return 'FacebookPoster failed: ' + e + '. Ensure C2 + Facebook key in Settings.';
-  }
-}
-''';
-
-const _callDemoScript = r'''
-async function execute(params) {
-  const message = String((params && params.message) ||
-    'Your pothole complaint was picked up. Demo only — no network.').trim();
-  await System.notifyUser({
-    title: 'Update',
-    body: message,
-    speakText: message
-  });
-  return 'Call queued. When you hear or see Aur Bhai, say Haan Bhai to hear the message.';
 }
 ''';
 

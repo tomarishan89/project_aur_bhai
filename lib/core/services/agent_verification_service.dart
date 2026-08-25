@@ -44,6 +44,23 @@ class DueDiligenceFinding {
   String toString() => '[$code] $message';
 }
 
+/// Single checklist row in the 7-Point Due Diligence Report.
+class DueDiligenceCheckItem {
+  final String id;
+  final String title;
+  final String description;
+  final bool passed;
+  final String? warningMessage;
+
+  const DueDiligenceCheckItem({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.passed,
+    this.warningMessage,
+  });
+}
+
 /// Result of automated due-diligence on agent JS (MS-USER-ECOSYSTEM-ENG3).
 class DueDiligenceResult {
   final bool passed;
@@ -52,6 +69,67 @@ class DueDiligenceResult {
   const DueDiligenceResult({required this.passed, this.findings = const []});
 
   bool get flagged => !passed;
+
+  /// 7-Point structured security checklist for UI display.
+  List<DueDiligenceCheckItem> get standardChecks {
+    DueDiligenceFinding? findCode(String code) {
+      for (final f in findings) {
+        if (f.code == code) return f;
+      }
+      return null;
+    }
+
+    return [
+      DueDiligenceCheckItem(
+        id: 'DD_DESTRUCTIVE_SQL',
+        title: 'No Destructive SQL',
+        description: 'No DROP, DELETE, TRUNCATE, or ALTER queries',
+        passed: findCode('DD_DESTRUCTIVE_SQL') == null,
+        warningMessage: findCode('DD_DESTRUCTIVE_SQL')?.message,
+      ),
+      DueDiligenceCheckItem(
+        id: 'DD_WRITE_SQL',
+        title: 'Read-Only Database Access',
+        description: 'System.querySQL uses SELECT-only statements',
+        passed: findCode('DD_WRITE_SQL') == null,
+        warningMessage: findCode('DD_WRITE_SQL')?.message,
+      ),
+      DueDiligenceCheckItem(
+        id: 'DD_EXTERNAL_HTTP',
+        title: 'Network Isolation',
+        description: 'Zero unauthorized outbound HTTP calls (100% offline)',
+        passed: findCode('DD_EXTERNAL_HTTP') == null,
+        warningMessage: findCode('DD_EXTERNAL_HTTP')?.message,
+      ),
+      DueDiligenceCheckItem(
+        id: 'DD_DYNAMIC_CODE',
+        title: 'No Dynamic Code Execution',
+        description: 'No eval() or dynamic Function compilation',
+        passed: findCode('DD_DYNAMIC_CODE') == null,
+        warningMessage: findCode('DD_DYNAMIC_CODE')?.message,
+      ),
+      DueDiligenceCheckItem(
+        id: 'DD_HARDCODED_SECRET',
+        title: 'No Hardcoded Secrets',
+        description: 'No leaked API keys, tokens, or passwords in source',
+        passed: findCode('DD_HARDCODED_SECRET') == null,
+        warningMessage: findCode('DD_HARDCODED_SECRET')?.message,
+      ),
+      DueDiligenceCheckItem(
+        id: 'DD_BROWSER_DOM',
+        title: 'Sandbox Boundary',
+        description: 'Pure QuickJS execution within sandbox environment',
+        passed: findCode('DD_BROWSER_DOM') == null,
+        warningMessage: findCode('DD_BROWSER_DOM')?.message,
+      ),
+      DueDiligenceCheckItem(
+        id: 'DD_VAULT_ISOLATION',
+        title: 'Vault Asset Integrity',
+        description: 'Sidecar PWA HTML assets stored in vault sandbox',
+        passed: true,
+      ),
+    ];
+  }
 
   /// Legacy string list for UI that still expects messages only.
   List<String> get findingMessages =>

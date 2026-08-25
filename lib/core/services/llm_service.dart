@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'byok_service.dart';
 import 'agent_service.dart';
 import '../agents/agent_base.dart';
+import '../agents/js_agent_adapter.dart';
 import 'llm/llm_http_errors.dart';
 import 'llm/llm_provider.dart';
 import 'llm/llm_provider_factory.dart';
@@ -436,6 +437,10 @@ Respond ONLY in RAW JSON (no markdown fences):
     final agentService = _ref.read(agentServiceProvider);
     final Map<String, dynamic> agentSchemas = {};
     for (var a in agentService.agents) {
+      if (a is JsAgentAdapter && !a.canExecute) {
+        // Strict Voice Partitioning: Quarantined Sandbox (C4) agents are excluded from ambient voice routing
+        continue;
+      }
       final Map<String, dynamic> paramsJson = {};
       a.inputSchema.forEach((key, param) {
         paramsJson[key] = {
@@ -444,8 +449,12 @@ Respond ONLY in RAW JSON (no markdown fences):
           'required': param.required,
         };
       });
+      final bhaiWords = (a is JsAgentAdapter) ? a.bhaiWords : const <String>[];
+      final invocationPrompt = (a is JsAgentAdapter) ? a.invocationPrompt : '';
       agentSchemas[a.name] = {
         'description': a.description,
+        if (bhaiWords.isNotEmpty) 'bhaiWords': bhaiWords,
+        if (invocationPrompt.isNotEmpty) 'invocationPrompt': invocationPrompt,
         'parameters': paramsJson,
       };
     }
@@ -516,12 +525,30 @@ ${_turnJsonContract()}
     final confirmation = (decoded['confirmation'] as String?)?.trim();
     final directResponse = decoded['directResponse'] as String?;
 
+    var intent = _intentFromString(decoded['intent'] as String?);
+    var targetAgent = decoded['targetAgent'] as String?;
+    var parameters = decoded['parameters'] != null
+        ? Map<String, dynamic>.from(decoded['parameters'] as Map)
+        : null;
+
+    // Direct routing safety net for "I wish..." utterances
+    final lowerTrans = transcription.toLowerCase();
+    if (intent == AgentIntent.direct || targetAgent == null || targetAgent.isEmpty) {
+      if (lowerTrans.startsWith('i wish') ||
+          lowerTrans.startsWith('bhai, i wish') ||
+          lowerTrans.startsWith('bhai i wish') ||
+          lowerTrans.startsWith('wish that') ||
+          lowerTrans.startsWith('my wish is')) {
+        intent = AgentIntent.execute;
+        targetAgent = 'IWish';
+        parameters = {'wish': transcription};
+      }
+    }
+
     return TurnParsedResponse(
-      intent: _intentFromString(decoded['intent'] as String?),
-      targetAgent: decoded['targetAgent'] as String?,
-      parameters: decoded['parameters'] != null
-          ? Map<String, dynamic>.from(decoded['parameters'] as Map)
-          : null,
+      intent: intent,
+      targetAgent: targetAgent,
+      parameters: parameters,
       payload: decoded['payload'] as String?,
       transcription: transcription,
       spec: spec,

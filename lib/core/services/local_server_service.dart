@@ -19,12 +19,97 @@ class LocalServerService extends ChangeNotifier {
   static const int defaultPort = 8080;
   static const String pairHeader = 'x-aur-pair';
 
+  /// Exact content of the standalone stdio-to-HTTP MCP proxy script.
+  static const String mcpProxyPyContent = '''#!/usr/bin/env python3
+import sys
+import json
+import urllib.request
+import argparse
+
+def log(msg):
+    # Print to stderr so it doesn't corrupt MCP stdio protocol on stdout
+    print(msg, file=sys.stderr, flush=True)
+
+def main():
+    parser = argparse.ArgumentParser(description="MCP Proxy for Project Aur Bhai")
+    parser.add_argument("--url", required=True, help="The Local Edge Server MCP URL (e.g. http://192.168.1.5:8080/api/mcp)")
+    parser.add_argument("--token", required=True, help="The Pairing Token (e.g. 4F2A89)")
+    args = parser.parse_args()
+
+    headers = {
+        "Content-Type": "application/json",
+        "x-aur-pair": args.token
+    }
+
+    log(f"Starting MCP Proxy forwarding to {args.url}")
+
+    while True:
+        line = sys.stdin.readline()
+        if not line:
+            break
+        
+        line = line.strip()
+        if not line:
+            continue
+            
+        try:
+            req_data = json.loads(line)
+        except json.JSONDecodeError:
+            log("Warning: Received invalid JSON on stdin")
+            continue
+
+        try:
+            req = urllib.request.Request(
+                args.url,
+                data=json.dumps(req_data).encode("utf-8"),
+                headers=headers,
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=30) as response:
+                resp_text = response.read().decode("utf-8")
+                sys.stdout.write(resp_text + "\\n")
+                sys.stdout.flush()
+        except Exception as e:
+            log(f"Error forwarding request: {e}")
+            error_response = {
+                "jsonrpc": "2.0",
+                "id": req_data.get("id"),
+                "error": {
+                    "code": -32603,
+                    "message": f"Proxy Error: {e}"
+                }
+            }
+            sys.stdout.write(json.dumps(error_response) + "\\n")
+            sys.stdout.flush()
+
+if __name__ == "__main__":
+    main()
+''';
+
   final Ref _ref;
   HttpServer? _server;
   final Router _router = Router();
   final Map<String, Response Function(Request)> _dynamicRoutes = {};
+  final List<StreamController<List<int>>> _sseClients = [];
   String? _lanIp;
   bool _disposed = false;
+
+  /// Broadcasts a dashboard navigation event to all connected web hub browser tabs.
+  void broadcastDashboardOpen(String dashboardKey) {
+    final cleanKey = dashboardKey.trim();
+    final url = cleanKey.startsWith('/vault/') ? cleanKey : '/vault/$cleanKey';
+    final payload = jsonEncode({'action': 'open_dashboard', 'url': url});
+    final pad = ' ' * 4096;
+    final raw = utf8.encode('data: $payload\n: pad $pad\n\n');
+    for (final client in List.of(_sseClients)) {
+      if (!client.isClosed) {
+        client.add(raw);
+      }
+    }
+    debugPrint(
+      '[LocalServer] Broadcasted open_dashboard event to ${_sseClients.length} web clients: $url',
+    );
+  }
 
   /// When false (default), non-loopback clients get 403.
   bool _lanExposureEnabled = false;
@@ -237,41 +322,211 @@ self.addEventListener('fetch', (event) => {
   }
 
   void _setupCoreRoutes() {
-    // Bare host:8080/ is not a dashboard — explain and link vault HTML keys.
+    // Tool download route for zero-repo external developer setup
+    _router.get('/tool/mcp_proxy.py', (Request request) {
+      return Response.ok(
+        mcpProxyPyContent,
+        headers: {
+          'Content-Type': 'text/x-python; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="mcp_proxy.py"',
+          'Cache-Control': 'no-cache',
+        },
+      );
+    });
+
+    // Developer Setup Portal for MCP IDE Configuration (Approach A)
+    _router.get('/dev', (Request request) {
+      final effectiveIp = _lanIp ?? '127.0.0.1';
+      final effectivePort = _server?.port ?? defaultPort;
+      final mcpUrl = 'http://$effectiveIp:$effectivePort/api/mcp';
+      final pairToken = _pairingToken;
+      final body = '''<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aur Bhai // Developer Setup Portal (MCP)</title>
+<style>
+:root{--bg:#090d16;--card:#111827;--border:#1f293d;--accent:#38bdf8;--text:#f8fafc;--muted:#94a3b8;--code-bg:#030712}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+body{background:var(--bg);color:var(--text);padding:24px;line-height:1.5}
+.container{max-width:860px;margin:0 auto}
+header{border-bottom:1px solid var(--border);padding-bottom:18px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+h1{font-size:22px;font-weight:800;display:flex;align-items:center;gap:8px}
+.badge{background:rgba(56,189,248,0.15);color:var(--accent);border:1px solid rgba(56,189,248,0.3);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px}
+.card h2{font-size:16px;margin-bottom:12px;color:var(--text)}
+.btn{background:var(--accent);color:#030712;border:none;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+.btn:hover{opacity:0.9}
+.btn-sec{background:var(--card);color:var(--text);border:1px solid var(--border);padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer}
+.btn-sec:hover{border-color:var(--accent)}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:14px;color:#a5f3fc;font-family:monospace;font-size:13px;overflow-x:auto;position:relative;margin:10px 0}
+.copy-btn{position:absolute;top:8px;right:8px;background:rgba(255,255,255,0.1);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer}
+.copy-btn:hover{background:var(--accent);color:#030712}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+th,td{padding:8px 12px;border:1px solid var(--border);text-align:left}
+th{background:rgba(255,255,255,0.03);color:var(--muted)}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--card);border:1px solid var(--accent);color:var(--text);padding:10px 16px;border-radius:8px;font-size:13px;display:none}
+</style></head><body>
+<div class="container">
+<header>
+<div><h1><span>🛠️</span> Aur Bhai // Developer Portal</h1><p style="color:var(--muted);font-size:13px">Remote Agent Authoring via Model Context Protocol (MCP)</p></div>
+<span class="badge">ACTIVE SERVER</span>
+</header>
+<div class="card">
+<h2>1. Download MCP Proxy Adapter (No Repo Access Needed)</h2>
+<p style="color:var(--muted);font-size:13px;margin-bottom:14px">External contributors only need this single-file Python script to bridge their IDE to this phone over local Wi-Fi.</p>
+<a href="/tool/mcp_proxy.py" class="btn" download="mcp_proxy.py">⬇️ Download mcp_proxy.py</a>
+</div>
+<div class="card">
+<h2>2. IDE Configuration</h2>
+<p style="color:var(--muted);font-size:13px">Paste the configuration below into your desktop IDE settings.</p>
+<h3 style="font-size:13px;margin-top:14px;color:var(--accent)">Google Antigravity (~/.gemini/config/mcp_config.json)</h3>
+<pre id="antigravity-cfg">{
+  "mcpServers": {
+    "aur-bhai-phone": {
+      "command": "python",
+      "args": ["mcp_proxy.py", "--url", "$mcpUrl", "--token", "$pairToken"]
+    }
+  }
+}<button class="copy-btn" onclick="copySnippet('antigravity-cfg')">Copy</button></pre>
+<h3 style="font-size:13px;margin-top:14px;color:var(--accent)">Cursor / Claude Desktop</h3>
+<pre id="cursor-cfg">{
+  "mcpServers": {
+    "aur-bhai": {
+      "command": "python",
+      "args": ["path/to/mcp_proxy.py", "--url", "$mcpUrl", "--token", "$pairToken"]
+    }
+  }
+}<button class="copy-btn" onclick="copySnippet('cursor-cfg')">Copy</button></pre>
+</div>
+<div class="card">
+<h2>3. Available MCP Tools</h2>
+<table>
+<tr><th>Tool</th><th>Description</th></tr>
+<tr><td><code>mcp_list_agents</code></td><td>Lists installed Bhai Code agents in Sovereign Vault</td></tr>
+<tr><td><code>mcp_read_agent</code></td><td>Reads script, schema, and HTML assets for an agent</td></tr>
+<tr><td><code>mcp_deploy_agent</code></td><td>Hot-deploys updated JavaScript/HTML into phone vault</td></tr>
+<tr><td><code>mcp_run_agent</code></td><td>Executes agent live in phone QuickJS sandbox</td></tr>
+<tr><td><code>mcp_query_telemetry</code></td><td>Executes read-only SQL query on device telemetry</td></tr>
+</table>
+</div>
+</div>
+<div class="toast" id="toast">Copied to clipboard!</div>
+<script>
+function copySnippet(id){
+  const el = document.getElementById(id);
+  const text = el.innerText.replace("Copy", "").trim();
+  navigator.clipboard.writeText(text);
+  const t = document.getElementById("toast");
+  t.style.display = "block";
+  setTimeout(()=>{t.style.display="none"}, 2500);
+}
+</script>
+</body></html>''';
+      return Response.ok(
+        body,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store',
+        },
+      );
+    });
+
+    // Server-Sent Events (SSE) Stream for real-time dashboard updates & voice cross-device switching
+    _router.get('/api/events', (Request request) {
+      final denied = _authorizeLan(request);
+      if (denied != null) return denied;
+
+      late StreamController<List<int>> controller;
+
+      controller = StreamController<List<int>>(
+        onListen: () {
+          _sseClients.add(controller);
+          final pad = ' ' * 4096;
+          controller.add(utf8.encode(': connected\n: pad $pad\n\n'));
+        },
+        onCancel: () {
+          _sseClients.remove(controller);
+        },
+      );
+
+      return Response.ok(
+        controller.stream,
+        headers: {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-cache, no-transform',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+        },
+        context: {'shelf.io.buffer_output': false},
+      );
+    });
+
+    // Unified Web Hub (root landing page)
     _router.get('/', (Request request) async {
       try {
         final bus = _ref.read(telemetryBusProvider);
         final dashboards = await bus.listVaultEntries(mimeType: 'text/html');
-        final links = dashboards
-            .map((d) {
-              final key = d['key'] ?? '';
-              final build = d['build_id'] ?? '';
-              final href =
-                  '/vault/${key.split('/').map(Uri.encodeComponent).join('/')}';
-              final buildNote = build.isEmpty
-                  ? ''
-                  : ' <span style="color:#888">build ${_htmlEscape(build)}</span>';
-              return '<li><a href="$href">${_htmlEscape(key)}</a>$buildNote</li>';
-            })
-            .join('\n');
-        final body =
-            '''
-<!DOCTYPE html>
+        final cards = dashboards.map((d) {
+          final key = d['key'] ?? '';
+          final build = d['build_id'] ?? '';
+          final href =
+              '/vault/${key.split('/').map(Uri.encodeComponent).join('/')}';
+          final name = key.replaceAll('.html', '').toUpperCase();
+          final buildBadge = build.isNotEmpty
+              ? '<span class="badge">build ${_htmlEscape(build)}</span>'
+              : '';
+          return '<a href="$href" class="dash-card"><div class="dash-icon">📊</div><div class="dash-info"><h3>${_htmlEscape(name)}</h3><p>/vault/${_htmlEscape(key)}</p></div>$buildBadge</a>';
+        }).join('\n');
+
+        final body = '''<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Aur Bhai Edge Server</title>
+<title>Aur Bhai // Unified Web Hub</title>
 <style>
-body{font-family:system-ui,sans-serif;background:#111;color:#eee;padding:24px;line-height:1.45}
-a{color:#7CFFB2} .muted{color:#888;font-size:14px}
+:root{--bg:#090d16;--card:#111827;--border:#1f293d;--accent:#38bdf8;--text:#f8fafc;--muted:#94a3b8}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+body{background:var(--bg);color:var(--text);padding:24px;line-height:1.5}
+.container{max-width:900px;margin:0 auto}
+header{border-bottom:1px solid var(--border);padding-bottom:18px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+h1{font-size:24px;font-weight:800;display:flex;align-items:center;gap:10px}
+.badge{background:rgba(56,189,248,0.15);color:var(--accent);border:1px solid rgba(56,189,248,0.3);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:24px}
+.dash-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;text-decoration:none;color:var(--text);display:flex;align-items:center;gap:14px;transition:all 0.2s}
+.dash-card:hover{border-color:var(--accent);transform:translateY(-2px);background:rgba(56,189,248,0.05)}
+.dash-icon{font-size:24px;background:rgba(255,255,255,0.05);padding:10px;border-radius:10px}
+.dash-info h3{font-size:15px;font-weight:700}
+.dash-info p{color:var(--muted);font-size:12px;margin-top:2px}
+.dev-banner{background:linear-gradient(135deg,rgba(56,189,248,0.1),rgba(17,24,39,1));border:1px solid var(--accent);border-radius:12px;padding:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+.btn{background:var(--accent);color:#030712;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{opacity:0.9}
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted);background:var(--card);border:1px dashed var(--border);border-radius:12px}
 </style></head><body>
-<h1>Aur Bhai edge server</h1>
-<p class="muted">This is the server root — not a Bro Code dashboard.
-Open a vault HTML URL (<code>/vault/&lt;name.html&gt;</code>) from the app’s
-<strong>Vault Dashboards</strong> panel.</p>
-<p><a href="/api/status">/api/status</a></p>
-<h2>Dashboards in vault</h2>
-${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes HTML.</p>' : '<ul>$links</ul>'}
-</body></html>
-''';
+<div class="container">
+<header>
+<div><h1><span>📱</span> Aur Bhai // Web Hub</h1><p style="color:var(--muted);font-size:13px">Live Sovereign Dashboards & Local Edge Server</p></div>
+<span class="badge">EDGE ACTIVE</span>
+</header>
+<h2 style="font-size:16px;margin-bottom:14px">Active Vault Dashboards</h2>
+${dashboards.isEmpty ? '<div class="empty-state"><p>No dashboards published yet. Run a Bro Code (e.g. NoteTaker, Telemeter, IWish) to generate one.</p></div>' : '<div class="grid">$cards</div>'}
+<div class="dev-banner">
+<div><h3 style="font-size:16px;font-weight:700">Developer MCP Bridge Portal</h3><p style="color:var(--muted);font-size:13px;margin-top:4px">Author & hot-reload Bhai Code directly from desktop IDEs without repo access.</p></div>
+<a href="/dev" class="btn">Open Developer Portal 🛠️</a>
+</div>
+</div>
+<script>
+// Auto-switch dashboard when user speaks into phone
+try {
+  const evtSource = new EventSource("/api/events");
+  evtSource.onmessage = function(event) {
+    if (!event.data) return;
+    try {
+      const data = JSON.parse(event.data);
+      if (data.action === "open_dashboard" && data.url) {
+        window.location.href = data.url;
+      }
+    } catch(e) {}
+  };
+} catch(e) {}
+</script>
+</body></html>''';
         return Response.ok(
           body,
           headers: {
@@ -584,6 +839,10 @@ ${dashboards.isEmpty ? '<p class="muted">None yet. Run a Bro Code that publishes
   @override
   void dispose() {
     _disposed = true;
+    for (final client in _sseClients) {
+      client.close();
+    }
+    _sseClients.clear();
     if (_server != null) {
       _server!.close(force: true);
       _server = null;

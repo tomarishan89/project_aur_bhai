@@ -44,13 +44,33 @@ class SandboxQueueTab extends ConsumerWidget {
     }
 
     if (installed.isEmpty && queue.items.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'Sandbox is empty.\nAdd a Bhai from Sabke or Friend Circle, or use Test later.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white38, fontSize: 13),
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.shield_outlined,
+                color: Colors.amberAccent.withValues(alpha: 0.7),
+                size: 44,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Sandbox is Clean',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Bhai Codes tested or imported from Sabke Bhai or Friend Circle appear here in quarantine before promotion to Mere Bhai.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
+              ),
+            ],
           ),
         ),
       );

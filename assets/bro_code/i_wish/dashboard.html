@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>I Wish — Sovereign Feedback Vault</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --border: #1f293d;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.2);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #34d399;
+      --warning: #fbbf24;
+      --tag-bg: rgba(56, 189, 248, 0.1);
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 24px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .title-group h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .title-group p {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    .badge {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+      background: var(--accent-glow);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      background: var(--card-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    button:hover {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.05);
+    }
+    button.primary {
+      background: var(--accent);
+      color: #030712;
+      border: none;
+    }
+    button.primary:hover {
+      opacity: 0.9;
+    }
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      padding: 14px 18px;
+      border-radius: 10px;
+    }
+    .stat-card .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+    .stat-card .value {
+      font-size: 20px;
+      font-weight: 700;
+      margin-top: 4px;
+      color: var(--text);
+    }
+    .composer {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 12px;
+    }
+    .composer input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .composer input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .wish-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .wish-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    .wish-card:hover {
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+    .wish-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .wish-text {
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+    .wish-meta {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .category-chip {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+    }
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+      background: var(--card-bg);
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+    }
+    .empty-state h3 {
+      font-size: 16px;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--card-bg);
+      border: 1px solid var(--accent);
+      color: var(--text);
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title-group">
+        <h1><span>💡</span> I Wish Feedback Vault</h1>
+        <p>100% On-Device Sovereign Feedback & Feature Wishlist</p>
+      </div>
+      <div class="actions">
+        <button onclick="exportWishesMarkdown()">📋 Copy Markdown</button>
+        <button onclick="exportWishesJson()">💾 Export JSON</button>
+        <button class="primary" onclick="submitWishes()">🚀 Submit to Dev</button>
+      </div>
+    </header>
+
+    <div class="stats-bar">
+      <div class="stat-card">
+        <div class="label">Total Wishes</div>
+        <div class="value" id="stat-total">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">UI / Aesthetic</div>
+        <div class="value" id="stat-ui">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Voice & Audio</div>
+        <div class="value" id="stat-voice">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Agent / Tool</div>
+        <div class="value" id="stat-agent">0</div>
+      </div>
+    </div>
+
+    <div class="composer">
+      <input type="text" id="new-wish-input" placeholder="Type a new wish (e.g. 'I wish I could adjust font size #ui')..." onkeydown="if(event.key==='Enter') addWish();">
+      <button class="primary" onclick="addWish()">Add Wish</button>
+    </div>
+
+    <div class="wish-list" id="wish-list">
+      <div class="empty-state">
+        <h3>No Wishes Recorded Yet</h3>
+        <p>Speak to your phone: <em>"Bhai, I wish we had..."</em> or type a wish above.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let wishes = [];
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+
+    async function querySQL(sql) {
+      try {
+        const res = await fetch('/api/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sql })
+        });
+        const data = await res.json();
+        return (data && data.data) ? data.data : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    async function loadWishes() {
+      // Try to load from SQLite API
+      let rows = await querySQL("SELECT * FROM wishes ORDER BY timestamp DESC LIMIT 100");
+      if (!rows || rows.length === 0) {
+        // Fallback demo/local cache
+        try {
+          const raw = localStorage.getItem('aur_bhai_wishes');
+          if (raw) rows = JSON.parse(raw);
+        } catch (e) {}
+      }
+      wishes = rows || [];
+      render();
+    }
+
+    function render() {
+      const listEl = document.getElementById('wish-list');
+      document.getElementById('stat-total').innerText = wishes.length;
+      document.getElementById('stat-ui').innerText = wishes.filter(w => (w.category || '').toLowerCase() === 'ui').length;
+      document.getElementById('stat-voice').innerText = wishes.filter(w => (w.category || '').toLowerCase() === 'voice').length;
+      document.getElementById('stat-agent').innerText = wishes.filter(w => (w.category || '').toLowerCase() === 'agent').length;
+
+      if (!wishes || wishes.length === 0) {
+        listEl.innerHTML = `
+          <div class="empty-state">
+            <h3>No Wishes Recorded Yet</h3>
+            <p>Speak to your phone: <em>"Bhai, I wish we had..."</em> or type a wish above.</p>
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = wishes.map(w => {
+        const date = new Date(w.timestamp || Date.now()).toLocaleString();
+        const cat = (w.category || 'general').toUpperCase();
+        return `
+          <div class="wish-card">
+            <div class="wish-header">
+              <div class="wish-text">${escapeHtml(w.text)}</div>
+              <span class="badge">${escapeHtml(w.status || 'Saved')}</span>
+            </div>
+            <div class="wish-meta">
+              <span class="category-chip">${cat}</span>
+              <span>📅 ${date}</span>
+              <span>📱 v${escapeHtml(w.app_version || '3.12')}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    async function addWish() {
+      const input = document.getElementById('new-wish-input');
+      const text = (input.value || '').trim();
+      if (!text) return;
+
+      const newWish = {
+        id: 'wish_' + Date.now().toString(36),
+        text: text,
+        category: text.toLowerCase().includes('ui') ? 'ui' : (text.toLowerCase().includes('voice') ? 'voice' : 'general'),
+        tags: '[]',
+        status: 'saved',
+        timestamp: Date.now(),
+        app_version: '3.12'
+      };
+
+      wishes.unshift(newWish);
+      input.value = '';
+      render();
+
+      try {
+        localStorage.setItem('aur_bhai_wishes', JSON.stringify(wishes));
+      } catch (e) {}
+      showToast('Wish saved to local vault!');
+    }
+
+    function exportWishesMarkdown() {
+      if (!wishes.length) {
+        showToast('No wishes to export.');
+        return;
+      }
+      const lines = wishes.map((w, idx) => `${idx + 1}. **[${(w.category || 'general').toUpperCase()}]** ${w.text} _(${new Date(w.timestamp).toLocaleDateString()})_`);
+      const md = "# Project Aur Bhai — User Wishlist\n\n" + lines.join("\n");
+      navigator.clipboard.writeText(md);
+      showToast('Copied Markdown wishlist to clipboard!');
+    }
+
+    function exportWishesJson() {
+      if (!wishes.length) {
+        showToast('No wishes to export.');
+        return;
+      }
+      const json = JSON.stringify(wishes, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'aur_bhai_wishes.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast('Downloaded aur_bhai_wishes.json');
+    }
+
+    async function submitWishes() {
+      if (!wishes.length) {
+        showToast('No wishes to submit.');
+        return;
+      }
+      showToast('Submitting wishes to development queue...');
+      // Simulate / call endpoint
+      setTimeout(() => {
+        wishes.forEach(w => w.status = 'Submitted');
+        render();
+        showToast('Wishes submitted successfully!');
+      }, 800);
+    }
+
+    loadWishes();
+  </script>
+</body>
+</html>

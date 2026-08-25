@@ -68,6 +68,12 @@ class JsAgentAdapter extends BroCode {
   /// When last refined/saved (ISO-8601).
   final DateTime? updatedAt;
 
+  /// Trigger keywords/action verbs (Bhai Words) that invoke this agent directly.
+  final List<String> bhaiWords;
+
+  /// Canonical example invocation prompt (e.g. "Note down [thought]").
+  final String invocationPrompt;
+
   /// Raw JS source (exposed for lifecycle / export).
   String get script => _script;
 
@@ -92,8 +98,46 @@ class JsAgentAdapter extends BroCode {
     this.diligencePassed = false,
     this.createdAt,
     this.updatedAt,
+    List<String>? bhaiWords,
+    String? invocationPrompt,
   }) : _name = name,
-       _assets = Map<String, String>.from(assets);
+       _assets = Map<String, String>.from(assets),
+       bhaiWords = bhaiWords ?? _defaultBhaiWordsFor(name),
+       invocationPrompt = invocationPrompt ?? _defaultInvocationPromptFor(name);
+
+  static List<String> _defaultBhaiWordsFor(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('accountant') || lower.contains('expense')) {
+      return const ['spent', 'expense', 'how much did i spend', 'expenditure'];
+    }
+    if (lower.contains('note')) {
+      return const ['note down', 'jot down', 'remember that', 'take a note', 'what did i note'];
+    }
+    if (lower.contains('telemet') || lower.contains('sensor')) {
+      return const ['telemetry', 'live speed', 'sensor map', 'show telemetry'];
+    }
+    if (lower.contains('calc')) {
+      return const ['calculate', 'what is', 'how much is'];
+    }
+    return [name.toLowerCase(), 'ask $lower', 'tell $lower'];
+  }
+
+  static String _defaultInvocationPromptFor(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('accountant') || lower.contains('expense')) {
+      return 'Spent 50 on chai';
+    }
+    if (lower.contains('note')) {
+      return 'Note down buy groceries tomorrow';
+    }
+    if (lower.contains('telemet') || lower.contains('sensor')) {
+      return 'Show telemetry dashboard';
+    }
+    if (lower.contains('calc')) {
+      return 'Calculate 15 * 84';
+    }
+    return 'Ask $name to run';
+  }
 
   /// Production RUN allowed only for Core (C1) or Verified (C2).
   bool get canExecute =>
