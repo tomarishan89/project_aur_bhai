@@ -2527,11 +2527,56 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
               ],
             ),
             _settingsSection(
-              title: 'VAULT SECURITY',
-              children: const [
-                Text(
+              title: 'VAULT SECURITY & CLEANSE',
+              children: [
+                const Text(
                   'Promoting unverified/sandbox agents into Mere Bhai uses your on-device screen lock, biometric fingerprint, or PIN. Your sovereign vault is encrypted locally on this device.',
                   style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.amberAccent,
+                    side: BorderSide(color: Colors.amberAccent.withValues(alpha: 0.5)),
+                  ),
+                  icon: const Icon(Icons.cleaning_services_outlined, size: 18),
+                  label: const Text('RESET / CLEANSE SANDBOX & VAULT'),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        backgroundColor: const Color(0xFF1E222D),
+                        title: const Text('Cleanse Legacy Vault & Sandbox?'),
+                        content: const Text(
+                          'This will remove deprecated historical demo agents and unpicked sandbox seeds, resetting Mere Bhai to the Core Calculator and restoring all seed listings in Sabke Bhai for fresh browsing.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('CANCEL'),
+                          ),
+                          TextButton(
+                            style: TextButton.styleFrom(foregroundColor: Colors.amberAccent),
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('RESET TO PRISTINE'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true && context.mounted) {
+                      final jsRegistry = ref.read(jsAgentRegistryProvider);
+                      await jsRegistry.resetVaultToPristineCatalog();
+                      await jsRegistry.loadAndRegisterAgents();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Vault and Sandbox cleansed to pristine state!'),
+                            backgroundColor: Color(0xFF10B981),
+                          ),
+                        );
+                      }
+                    }
+                  },
                 ),
               ],
             ),

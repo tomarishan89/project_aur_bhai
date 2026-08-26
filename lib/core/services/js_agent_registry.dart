@@ -66,7 +66,8 @@ class JsAgentRegistry {
           if (vaultEntry == null) continue;
 
           final agentName = key.substring(prefix.length);
-          if (agentName.isEmpty) continue;
+          if (agentName.isEmpty || agentName.contains(':')) continue;
+          if (_deprecatedLegacyAgents.contains(agentName)) continue;
 
           final schemaEntry = await telemetry.readVaultData('$key:schema');
           final schema = schemaEntry != null
@@ -543,11 +544,113 @@ class JsAgentRegistry {
     };
   }
 
+  static const Set<String> _deprecatedLegacyAgents = {
+    'CallDemo',
+    'DrivingCoach',
+    'FacebookPoster',
+    'TelemetryCounter',
+    'Xter',
+    'HelloCounter',
+    'TipJar',
+    'XterAgent',
+    'DrivingCoachAgent',
+  };
+
+  /// Prunes deprecated historical demo agents and invalid sub-resource keys from the vault.
+  Future<void> pruneDeprecatedLegacyAgents() async {
+    final telemetry = _ref.read(telemetryBusProvider);
+    final agentService = _ref.read(agentServiceProvider);
+
+    for (final prefix in [vaultPrefix, broVaultPrefix]) {
+      final keys = await telemetry.listVaultKeys(prefix: prefix);
+      for (final key in keys) {
+        if (key.endsWith(':schema')) continue;
+        final rawName = key.substring(prefix.length);
+
+        final isSubResource = rawName.contains(':');
+        final isDeprecated = _deprecatedLegacyAgents.contains(rawName);
+
+        if (isSubResource || isDeprecated) {
+          debugPrint(
+            '[JsAgentRegistry] Pruning deprecated/invalid vault agent: $rawName',
+          );
+          await telemetry.deleteVaultData(key);
+          await telemetry.deleteVaultData('$key:schema');
+          final assetKeys = await telemetry.listVaultKeys(
+            prefix: '$prefix$rawName:asset:',
+          );
+          for (final ak in assetKeys) {
+            await telemetry.deleteVaultData(ak);
+          }
+          agentService.remove(rawName);
+        }
+      }
+    }
+  }
+
+  /// Completely cleans up legacy C4 unpicked auto-installs and resets catalog state to pristine:
+  /// Calculator in C2 (Mere Bhai), and clean Sandbox.
+  Future<void> resetVaultToPristineCatalog() async {
+    final telemetry = _ref.read(telemetryBusProvider);
+    final agentService = _ref.read(agentServiceProvider);
+
+    await pruneDeprecatedLegacyAgents();
+
+    // Remove any C4 seed-catalog agents that were auto-installed into Sandbox
+    for (final prefix in [vaultPrefix, broVaultPrefix]) {
+      final keys = await telemetry.listVaultKeys(prefix: prefix);
+      for (final key in keys) {
+        if (key.endsWith(':schema')) continue;
+        final name = key.substring(prefix.length);
+        if (name.isEmpty || name.contains(':')) continue;
+
+        final schemaEntry = await telemetry.readVaultData('$key:schema');
+        if (schemaEntry != null) {
+          try {
+            final schema =
+                jsonDecode(schemaEntry['value']!) as Map<String, dynamic>;
+            final secClass = schema['securityClass']?.toString();
+            final source = schema['source']?.toString();
+            if (secClass == 'C4' &&
+                (source == 'pool' || source == 'catalog' || source == null)) {
+              await telemetry.deleteVaultData(key);
+              await telemetry.deleteVaultData('$key:schema');
+              final assetKeys = await telemetry.listVaultKeys(
+                prefix: '$prefix$name:asset:',
+              );
+              for (final ak in assetKeys) {
+                await telemetry.deleteVaultData(ak);
+              }
+              agentService.remove(name);
+              debugPrint(
+                '[JsAgentRegistry] Cleared legacy C4 sandbox seed: $name',
+              );
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    // Ensure Calculator is C2
+    await seedCoreAgentsIfMissing();
+  }
+
   /// Seeds the minimal core agent (Calculator) into the vault as
   /// a refinable JS agent pre-verified at C2 (MS-CORE-JS-MIGRATION).
   ///
   /// Guarded by "if missing" so user refinements are never overwritten on boot.
   Future<void> seedCoreAgentsIfMissing() async {
+    final telemetry = _ref.read(telemetryBusProvider);
+    final calcSchema = await telemetry.readVaultData(schemaKeyFor('Calculator'));
+    if (calcSchema != null) {
+      try {
+        final decoded =
+            jsonDecode(calcSchema['value']!) as Map<String, dynamic>;
+        if (decoded['securityClass'] != AgentSecurityClass.c2Verified.id) {
+          await updateSecurityClass('Calculator', AgentSecurityClass.c2Verified);
+        }
+      } catch (_) {}
+    }
     await _seedAgentIfMissing(
       name: 'Calculator',
       description:

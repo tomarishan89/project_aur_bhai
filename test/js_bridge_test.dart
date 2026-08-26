@@ -71,11 +71,7 @@ void main() {
       expect(calculator.script, contains('Math.pow'));
 
       final coach = agentService.findAgent('DrivingCoach');
-      expect(coach, isA<JsAgentAdapter>());
-      expect(
-        (coach as JsAgentAdapter).securityClass,
-        AgentSecurityClass.c2Verified,
-      );
+      expect(coach, isNull);
     });
 
     test('MS-USER-ECOSYSTEM lifecycle: save, list, export, delete', () async {
@@ -275,7 +271,7 @@ async function execute(params) {
     );
 
     test(
-      'MS-CORE-JS-MIGRATION: JS DrivingCoach predicts from telemetry',
+      'MS-CORE-JS-MIGRATION: JS script executes with System.querySQL',
       () async {
         final bus = container.read(telemetryBusProvider);
         for (var n = 0; n < 8; n++) {
@@ -287,17 +283,19 @@ async function execute(params) {
           );
         }
 
-        final registry = container.read(jsAgentRegistryProvider);
-        await registry.seedCoreAgentsIfMissing();
-        await registry.loadAndRegisterAgents();
+        final bridge = container.read(jsBridgeServiceProvider);
+        final result = await bridge.executeAgentScript(
+          agentName: 'MovementProbe',
+          script: '''
+async function execute(params) {
+  const records = await System.querySQL("SELECT COUNT(*) as cnt FROM telemetry");
+  return 'Count is ' + records[0].cnt;
+}
+''',
+          parameters: const {},
+        );
 
-        final agent = container
-            .read(agentServiceProvider)
-            .findAgent('DrivingCoach');
-        expect(agent, isNotNull);
-
-        final spoken = await agent!.execute(const {'recordCount': 8});
-        expect(spoken, contains('My model predicts you are currently'));
+        expect(result.message, contains('Count is 8'));
       },
       skip: quickJsAvailable
           ? false

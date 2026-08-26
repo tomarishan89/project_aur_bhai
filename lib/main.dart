@@ -55,6 +55,7 @@ void main() async {
   // Load Javascript agents from sovereign vault (MS-JS-BRIDGE-AGT1)
   try {
     final jsRegistry = container.read(jsAgentRegistryProvider);
+    await jsRegistry.pruneDeprecatedLegacyAgents();
     await jsRegistry.seedCoreAgentsIfMissing();
     await jsRegistry.consumeFriendInstallQueueIfPresent();
     final jsAgentCount = await jsRegistry.loadAndRegisterAgents();
