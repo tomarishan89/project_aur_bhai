@@ -3138,7 +3138,7 @@ class _PluginsPage extends ConsumerWidget {
                     ],
                     showOrigin: true,
                   ),
-                  _buildSabkeBrowseGrid(context, ref, sandboxInstalled),
+                  _buildSabkeBrowseGrid(context, ref, agents),
                   SandboxQueueTab(onOpenInstalled: _openAgentDetail),
                   const CircleMarketplaceTab(),
                 ],
@@ -3150,25 +3150,22 @@ class _PluginsPage extends ConsumerWidget {
     );
   }
 
-  /// Sabke Bhai: browse seed catalog only (not installed).
+  /// Sabke Bhai: ecosystem seed catalog showing all curated listings and their on-device status.
   Widget _buildSabkeBrowseGrid(
     BuildContext context,
     WidgetRef ref,
-    List<AurBhaiAgent> installed,
+    List<AurBhaiAgent> allInstalled,
   ) {
     final catalog = ref.watch(marketplaceCatalogProvider);
-    final installedNames = installed.map((a) => a.name).toSet();
-    final available = catalog
-        .listings()
-        .where((l) => !installedNames.contains(l.name))
-        .toList();
+    final listings = catalog.listings();
+    final installedMap = {for (final a in allInstalled) a.name: a};
 
-    if (available.isEmpty) {
+    if (listings.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(24),
           child: Text(
-            'No more seed listings to browse.\nFriend Circle has shared Bhai Codes from friends.',
+            'No seed listings available.\nFriend Circle has shared Bhai Codes from friends.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white30, fontSize: 13),
           ),
@@ -3182,29 +3179,56 @@ class _PluginsPage extends ConsumerWidget {
         crossAxisCount: 3,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 1.0,
+        childAspectRatio: 0.92,
       ),
-      itemCount: available.length,
+      itemCount: listings.length,
       itemBuilder: (context, index) {
-        final listing = available[index];
+        final listing = listings[index];
+        final installedAgent = installedMap[listing.name];
+
+        final bool inMereBhai = installedAgent is JsAgentAdapter &&
+            (installedAgent.securityClass == AgentSecurityClass.c1Core ||
+                installedAgent.securityClass == AgentSecurityClass.c2Verified);
+        final bool inSandbox = installedAgent is JsAgentAdapter &&
+            (installedAgent.securityClass == AgentSecurityClass.c4Unverified ||
+                installedAgent.securityClass == AgentSecurityClass.c3DueDiligence);
+
+        final Color borderColor = inMereBhai
+            ? Colors.greenAccent.withValues(alpha: 0.45)
+            : (inSandbox
+                ? Colors.amberAccent.withValues(alpha: 0.45)
+                : Colors.lightBlueAccent.withValues(alpha: 0.45));
+
+        final Color iconColor = inMereBhai
+            ? Colors.greenAccent
+            : (inSandbox ? Colors.amberAccent : Colors.lightBlueAccent);
+
+        final IconData icon = inMereBhai
+            ? Icons.verified_outlined
+            : (inSandbox ? Icons.shield_outlined : Icons.public);
+
+        final String statusLabel = inMereBhai
+            ? 'In Mere Bhai'
+            : (inSandbox ? 'In Sandbox' : 'Browse · Get');
+
         return GestureDetector(
-          onTap: () => BhaiCodePreviewSheet.open(context, listing: listing),
+          onTap: () {
+            if (installedAgent != null) {
+              _openAgentDetail(context, ref, installedAgent);
+            } else {
+              BhaiCodePreviewSheet.open(context, listing: listing);
+            }
+          },
           child: Container(
             decoration: BoxDecoration(
               color: const Color(0xFF161616),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.lightBlueAccent.withValues(alpha: 0.45),
-              ),
+              border: Border.all(color: borderColor),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.public,
-                  color: Colors.lightBlueAccent,
-                  size: 28,
-                ),
+                Icon(icon, color: iconColor, size: 26),
                 const SizedBox(height: 6),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -3221,9 +3245,13 @@ class _PluginsPage extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Browse',
-                  style: TextStyle(color: Colors.lightBlueAccent, fontSize: 7),
+                Text(
+                  statusLabel,
+                  style: TextStyle(
+                    color: iconColor,
+                    fontSize: 7,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
