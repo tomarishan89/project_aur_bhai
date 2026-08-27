@@ -52,6 +52,7 @@ class ByokService extends ChangeNotifier {
   static const String _migratedFlag = 'byok_secrets_migrated_v1';
   static const String _keyMultiSlot = 'byok_multi_slot_enabled';
   static const String _keySlotsJson = 'byok_slots_v1';
+  static const String _keyUserHandle = 'user_identity_handle';
 
   String _apiProvider = "Google Gemini";
   String _apiKey = "";
@@ -59,6 +60,7 @@ class ByokService extends ChangeNotifier {
   String _customUrl = "";
   String? _thinkingLevel;
   int? _maxOutputTokens;
+  String _userHandle = "@you";
 
   int _maxRecordingSeconds = 10;
   String _tapResponseMode = WakeHandshakeConfig.tapSpoken;
@@ -103,6 +105,7 @@ class ByokService extends ChangeNotifier {
   String get responseWord => _responseWord;
   String get voiceGender => _voiceGender;
   bool get mediaControlsToAurBhai => _mediaControlsToAurBhai;
+  String get userHandle => _userHandle;
 
   bool get hasApiKey {
     if (_multiSlotEnabled) {
@@ -228,6 +231,10 @@ class ByokService extends ChangeNotifier {
       _responseWord = prefs.getString(_keyResponseWord) ?? "Haan bhai";
       _voiceGender = prefs.getString(_keyVoiceGender) ?? "Male";
       _mediaControlsToAurBhai = prefs.getBool(_keyMediaControls) ?? true;
+      final rawHandle = prefs.getString(_keyUserHandle);
+      _userHandle = (rawHandle != null && rawHandle.trim().isNotEmpty)
+          ? (rawHandle.trim().startsWith('@') ? rawHandle.trim() : '@${rawHandle.trim()}')
+          : "@you";
 
       await _migratePlaintextSecretsIfNeeded(prefs);
 
@@ -393,6 +400,16 @@ class ByokService extends ChangeNotifier {
 
     await prefs.setBool(_migratedFlag, true);
     debugPrint('[ByokService] Migrated plaintext secrets → secure storage');
+  }
+
+  Future<void> updateUserHandle(String handle) async {
+    final trimmed = handle.trim();
+    _userHandle = trimmed.isEmpty
+        ? "@you"
+        : (trimmed.startsWith('@') ? trimmed : '@$trimmed');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyUserHandle, _userHandle);
+    notifyListeners();
   }
 
   Future<void> setMediaControlsToAurBhai(bool enabled) async {

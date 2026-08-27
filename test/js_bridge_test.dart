@@ -119,6 +119,64 @@ void main() {
       expect(agentService.findAgent('EchoAgent'), isNull);
       expect(await registry.listJsAgentNames(), isNot(contains('EchoAgent')));
     });
+
+    test('pruneDeprecatedLegacyAgents cleans legacy demo agents from vault on startup', () async {
+      final bus = container.read(telemetryBusProvider);
+      final registry = container.read(jsAgentRegistryProvider);
+
+      // Write mock legacy deprecated assets
+      await bus.writeVaultData('agent:CallDemo', 'async function execute(){}', mimeType: 'application/javascript');
+      await bus.writeVaultData('agent:CallDemo:schema', '{"securityClass":"C4"}', mimeType: 'application/json');
+      await bus.writeVaultData('agent:FacebookPoster', 'async function execute(){}', mimeType: 'application/javascript');
+
+      expect(await bus.readVaultData('agent:CallDemo'), isNotNull);
+      expect(await bus.readVaultData('agent:FacebookPoster'), isNotNull);
+
+      // Prune
+      await registry.pruneDeprecatedLegacyAgents();
+
+      expect(await bus.readVaultData('agent:CallDemo'), isNull);
+      expect(await bus.readVaultData('agent:CallDemo:schema'), isNull);
+      expect(await bus.readVaultData('agent:FacebookPoster'), isNull);
+    });
+
+    test('loadAndRegisterAgents filters out sub-resource colon keys like Accountant:inbox', () async {
+      final bus = container.read(telemetryBusProvider);
+      final registry = container.read(jsAgentRegistryProvider);
+      final agentService = container.read(agentServiceProvider);
+
+      // Write a colon-separated sub-resource
+      await bus.writeVaultData(
+        'agent:Accountant:inbox',
+        'async function execute(){}',
+        mimeType: 'application/javascript',
+      );
+
+      await registry.loadAndRegisterAgents();
+
+      expect(agentService.findAgent('Accountant:inbox'), isNull);
+      expect(agentService.findAgent('agent:Accountant:inbox'), isNull);
+    });
+
+    test('resetVaultToPristineCatalog cleanses unpicked sandbox seeds and preserves Calculator', () async {
+      final bus = container.read(telemetryBusProvider);
+      final registry = container.read(jsAgentRegistryProvider);
+      final agentService = container.read(agentServiceProvider);
+
+      // Plant an unpicked sandbox seed and a deprecated demo
+      await bus.writeVaultData('agent:UnpickedSandboxAgent', 'async function execute(){}', mimeType: 'application/javascript');
+      await bus.writeVaultData('agent:UnpickedSandboxAgent:schema', '{"securityClass":"C4","source":"pool"}', mimeType: 'application/json');
+      await bus.writeVaultData('agent:CallDemo', 'async function execute(){}', mimeType: 'application/javascript');
+
+      await registry.resetVaultToPristineCatalog();
+
+      expect(await bus.readVaultData('agent:UnpickedSandboxAgent'), isNull);
+      expect(await bus.readVaultData('agent:CallDemo'), isNull);
+      expect(await bus.readVaultData('agent:Calculator'), isNotNull);
+
+      await registry.loadAndRegisterAgents();
+      expect(agentService.findAgent('Calculator'), isNotNull);
+    });
   });
 
   group('MS-JS-BRIDGE — QuickJS sandbox & System API', () {

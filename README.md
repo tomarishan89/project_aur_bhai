@@ -68,6 +68,25 @@ Aur Bhai ships with a curated, inspectable seed catalog of official tools:
 
 ---
 
+## 🌐 Sovereign Sharing & Multi-Hop Lineage
+
+Aur Bhai rejects central app store gatekeeping and account tracking in favor of sovereign, decentralized distribution:
+
+1. **📦 Portable `.bundle.json` Export & Side-Loading:**
+   - Tap **EXPORT** on any Bhai Code to create a portable JSON bundle containing the QuickJS script, input schema, HTML dashboards, and audit records.
+   - Send via AirDrop, Bluetooth, messaging apps, or email; recipients can import and test directly in their Sandbox.
+2. **👥 Friend Circle Git Sync:**
+   - Connect your GitHub Personal Access Token (PAT) to sync community tools and file issue reports from the device.
+   - Publish your creations directly to your friend repository or pick up community tools in Sabke Bhai.
+3. **🏷️ Sovereign Handles (`@core`, `@you`, `@yourname`):**
+   - Customize your sovereign creator handle in **Settings → SOVEREIGN IDENTITY & HANDLE**.
+   - Your handle is cryptographically stamped on all new tools, remixes, and export bundles you author.
+4. **🔀 Immutable Multi-Hop Remix Lineage:**
+   - Every time a Bhai Code is remixed or modified, Aur Bhai appends a new `LineageEntry` (`@core → @alice → @bob → @you`).
+   - Root creators retain permanent attribution across infinite remix hops.
+
+---
+
 ## 🚀 Quickstart (Under 2 Minutes)
 
 ### 1. Install Android APK

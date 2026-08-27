@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/lineage_entry.dart';
+import '../services/bhai_code_origin.dart';
 import '../services/js_bridge_service.dart';
 import 'agent_base.dart';
 
@@ -59,6 +61,15 @@ class JsAgentAdapter extends BroCode {
   /// Vault schema `source`: self | pool | friend_circle (see [BhaiCodeOrigin]).
   final String source;
 
+  /// Author handle (e.g. '@core', '@you', '@ishan').
+  final String author;
+
+  /// Root creator handle if this agent was remixed from another agent.
+  final String? originalAuthor;
+
+  /// Multi-generation remix history (append-only timeline).
+  final List<LineageEntry> lineage;
+
   /// Last on-demand diligence scan passed (schema `diligencePassed`).
   final bool diligencePassed;
 
@@ -95,6 +106,9 @@ class JsAgentAdapter extends BroCode {
     Map<String, String> assets = const {},
     this.securityClass = AgentSecurityClass.c4Unverified,
     this.source = 'self',
+    String? author,
+    this.originalAuthor,
+    List<LineageEntry>? lineage,
     this.diligencePassed = false,
     this.createdAt,
     this.updatedAt,
@@ -102,8 +116,22 @@ class JsAgentAdapter extends BroCode {
     String? invocationPrompt,
   }) : _name = name,
        _assets = Map<String, String>.from(assets),
+       author = author ?? (source == 'pool' ? '@core' : '@you'),
+       lineage = lineage ?? const [],
        bhaiWords = bhaiWords ?? _defaultBhaiWordsFor(name),
        invocationPrompt = invocationPrompt ?? _defaultInvocationPromptFor(name);
+
+  /// Formatted handle for glanceable UI cards.
+  String displayHandle({String defaultUserHandle = '@you'}) {
+    return BhaiCodeOrigin.handleFor(
+      source: source,
+      author: author,
+      userHandle: defaultUserHandle,
+    );
+  }
+
+  /// Number of remixes / contributions in lineage beyond initial creation.
+  int get remixCount => lineage.length > 1 ? lineage.length - 1 : 0;
 
   static List<String> _defaultBhaiWordsFor(String name) {
     final lower = name.toLowerCase();

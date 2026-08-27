@@ -27,9 +27,49 @@ class BhaiCodeOrigin {
       case friendCircle:
         return 'Friend Circle';
       case pool:
-        return 'From pool';
+        return '@core';
       default:
-        return 'Yours';
+        return '@you';
     }
   }
+
+  /// Formats any string into a normalized `@handle`.
+  static String formatHandle(String? raw, {String fallback = '@you'}) {
+    if (raw == null || raw.trim().isEmpty) return fallback;
+    final trimmed = raw.trim();
+    return trimmed.startsWith('@') ? trimmed : '@$trimmed';
+  }
+
+  /// Resolves the glanceable author handle for UI badges and cards.
+  static String handleFor({
+    required String source,
+    String? author,
+    String userHandle = '@you',
+  }) {
+    final normalized = normalize(source);
+    if (normalized == pool) return '@core';
+    if (author != null && author.trim().isNotEmpty && author.trim() != 'Aur Bhai Team') {
+      return formatHandle(author);
+    }
+    if (normalized == self) return formatHandle(userHandle);
+    return '@friend';
+  }
+
+  static bool isCore(String? sourceOrHandle) {
+    if (sourceOrHandle == null) return false;
+    final normalized = normalize(sourceOrHandle);
+    if (normalized == pool) return true;
+    final formatted = formatHandle(sourceOrHandle);
+    return formatted.toLowerCase() == '@core';
+  }
+
+  static bool isSelf(String? sourceOrHandle, {String myHandle = '@you'}) {
+    if (sourceOrHandle == null) return false;
+    final normalized = normalize(sourceOrHandle);
+    if (normalized == self && sourceOrHandle == self) return true;
+    final formatted = formatHandle(sourceOrHandle);
+    final myFormatted = formatHandle(myHandle);
+    return formatted.toLowerCase() == myFormatted.toLowerCase() || formatted.toLowerCase() == '@you';
+  }
 }
+

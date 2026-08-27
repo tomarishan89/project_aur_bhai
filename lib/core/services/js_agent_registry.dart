@@ -6,10 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../agents/agent_base.dart';
 import '../agents/js_agent_adapter.dart';
+import '../models/lineage_entry.dart';
 import '../pipeline/authoring_trace.dart';
 import 'agent_service.dart';
 import 'agent_verification_service.dart';
 import 'bhai_code_origin.dart';
+import 'byok_service.dart';
 import 'js_bridge_service.dart';
 import 'model_studio/bro_code_ml_meta.dart';
 import 'telemetry_bus.dart';
@@ -19,6 +21,7 @@ class JsAgentRegistry {
   /// Canonical vault prefix for Bro Code units (legacy `agent:` still loaded).
   static const vaultPrefix = 'agent:';
   static const broVaultPrefix = 'bro:';
+  static const calculatorScript = _calculatorScript;
 
   final Ref _ref;
 
@@ -86,6 +89,19 @@ class JsAgentRegistry {
               ? bhaiWordsRaw.map((e) => e.toString()).toList()
               : null;
           final invocationPrompt = schema['invocationPrompt'] as String?;
+          final rawAuthor = schema['author'] as String?;
+          final rawOriginalAuthor = schema['originalAuthor'] as String?;
+          final rawLineage = schema['lineage'] as List?;
+          final lineage = rawLineage != null
+              ? rawLineage
+                  .whereType<Map>()
+                  .map(
+                    (m) => LineageEntry.fromJson(
+                      Map<String, dynamic>.from(m),
+                    ),
+                  )
+                  .toList()
+              : <LineageEntry>[];
 
           agentService.registerAgent(
             JsAgentAdapter(
@@ -99,6 +115,9 @@ class JsAgentRegistry {
                 schema['securityClass'] as String?,
               ),
               source: BhaiCodeOrigin.normalize(schema['source'] as String?),
+              author: rawAuthor,
+              originalAuthor: rawOriginalAuthor,
+              lineage: lineage,
               diligencePassed: schema['diligencePassed'] as bool? ?? false,
               createdAt: createdAt,
               updatedAt: updatedAt,
@@ -202,6 +221,10 @@ class JsAgentRegistry {
     Map<String, String>? vaultAssets,
     AgentSecurityClass securityClass = AgentSecurityClass.c4Unverified,
     String? source,
+    String? author,
+    String? originalAuthor,
+    List<LineageEntry>? lineage,
+    String? changeNote,
     bool? diligencePassed,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -220,11 +243,15 @@ class JsAgentRegistry {
 
     final telemetry = _ref.read(telemetryBusProvider);
     final agentService = _ref.read(agentServiceProvider);
+    final byok = _ref.read(byokServiceProvider);
     final now = DateTime.now().toIso8601String();
 
-    // Preserve existing createdAt / source / diligence / bhaiWords when overwriting.
+    // Preserve existing createdAt / source / diligence / bhaiWords / lineage when overwriting.
     String? existingCreatedAt;
     String? existingSource;
+    String? existingAuthor;
+    String? existingOriginalAuthor;
+    List<LineageEntry> existingLineage = [];
     bool? existingDiligence;
     List<String>? existingBhaiWords;
     String? existingInvocationPrompt;
@@ -236,6 +263,14 @@ class JsAgentRegistry {
             jsonDecode(priorSchema['value']!) as Map<String, dynamic>;
         existingCreatedAt = decoded['createdAt'] as String?;
         existingSource = decoded['source'] as String?;
+        existingAuthor = decoded['author'] as String?;
+        existingOriginalAuthor = decoded['originalAuthor'] as String?;
+        if (decoded['lineage'] is List) {
+          existingLineage = (decoded['lineage'] as List)
+              .whereType<Map>()
+              .map((m) => LineageEntry.fromJson(Map<String, dynamic>.from(m)))
+              .toList();
+        }
         existingDiligence = decoded['diligencePassed'] as bool?;
         if (decoded['bhaiWords'] is List) {
           existingBhaiWords = (decoded['bhaiWords'] as List)
@@ -254,6 +289,36 @@ class JsAgentRegistry {
     final resolvedSource = BhaiCodeOrigin.normalize(
       source ?? existingSource ?? BhaiCodeOrigin.self,
     );
+
+    // Resolve author handle and lineage chain
+    final currentHandle = author ??
+        (resolvedSource == BhaiCodeOrigin.pool ? '@core' : byok.userHandle);
+    final updatedLineage = List<LineageEntry>.from(lineage ?? existingLineage);
+
+    if (updatedLineage.isEmpty) {
+      updatedLineage.add(
+        LineageEntry(
+          author: currentHandle,
+          version: '1.0.0',
+          timestamp: DateTime.tryParse(created) ?? DateTime.now(),
+          note: changeNote ?? (resolvedSource == BhaiCodeOrigin.pool ? 'Official Core Seed' : 'Initial creation'),
+        ),
+      );
+    } else if (changeNote != null || (priorSchema != null && (author != null && author != existingAuthor))) {
+      final nextVer = '1.${updatedLineage.length}.0';
+      updatedLineage.add(
+        LineageEntry(
+          author: currentHandle,
+          version: nextVer,
+          timestamp: DateTime.now(),
+          note: changeNote ?? 'Remixed on device',
+        ),
+      );
+    }
+
+    final resolvedOriginalAuthor = originalAuthor ??
+        existingOriginalAuthor ??
+        (updatedLineage.isNotEmpty ? updatedLineage.first.author : currentHandle);
     
     // Automatically run due diligence scan if not explicitly given
     final scan = _ref.read(agentVerificationProvider).scanScript(script);
@@ -285,6 +350,9 @@ class JsAgentRegistry {
       'description': description,
       'securityClass': securityClass.id,
       'source': resolvedSource,
+      'author': currentHandle,
+      'originalAuthor': resolvedOriginalAuthor,
+      'lineage': updatedLineage.map((e) => e.toJson()).toList(),
       'diligencePassed': resolvedDiligence,
       'createdAt': created,
       'updatedAt': updated,
@@ -322,6 +390,9 @@ class JsAgentRegistry {
       assets: assets,
       securityClass: securityClass,
       source: resolvedSource,
+      author: currentHandle,
+      originalAuthor: resolvedOriginalAuthor,
+      lineage: updatedLineage,
       diligencePassed: resolvedDiligence,
       createdAt: DateTime.tryParse(created),
       updatedAt: DateTime.tryParse(updated),
@@ -330,7 +401,7 @@ class JsAgentRegistry {
     );
     agentService.registerAgent(adapter);
     debugPrint(
-      '[JsAgentRegistry] Saved & registered agent: $name (${securityClass.id}, diligence: $resolvedDiligence)',
+      '[JsAgentRegistry] Saved & registered agent: $name (${securityClass.id}, author: $currentHandle, lineage: ${updatedLineage.length})',
     );
     return adapter;
   }
@@ -472,6 +543,7 @@ class JsAgentRegistry {
       'script': scriptEntry['value'],
       'schema': schema,
       'description': schema['description'] as String? ?? '',
+      'securityClass': schema['securityClass'] as String? ?? 'C4',
     };
   }
 
@@ -531,16 +603,24 @@ class JsAgentRegistry {
     );
   }
 
-  /// Exports a vault agent bundle (script + schema) for laptop portability.
+  /// Exports a vault agent bundle (script + schema) for laptop portability and sharing.
   Future<Map<String, dynamic>?> exportAgentBundle(String name) async {
     final telemetry = _ref.read(telemetryBusProvider);
     final script = await telemetry.readVaultData(vaultKeyFor(name));
     if (script == null) return null;
-    final schema = await telemetry.readVaultData(schemaKeyFor(name));
+    final schemaEntry = await telemetry.readVaultData(schemaKeyFor(name));
+    final schema = schemaEntry != null ? jsonDecode(schemaEntry['value']!) as Map<String, dynamic> : null;
+    final isPool = schema != null && BhaiCodeOrigin.normalize(schema['source'] as String?) == BhaiCodeOrigin.pool;
     return {
       'name': name,
       'script': script['value'],
-      'schema': schema != null ? jsonDecode(schema['value']!) : null,
+      'schema': schema,
+      'author': schema?['author'] ?? (isPool ? '@core' : '@you'),
+      'originalAuthor': schema?['originalAuthor'],
+      'lineage': schema?['lineage'] ?? [],
+      'version': schema?['lineage'] != null && (schema!['lineage'] as List).isNotEmpty
+          ? (schema['lineage'] as List).last['version']
+          : '1.0.0',
     };
   }
 

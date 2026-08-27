@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/agents/agent_base.dart';
 import '../../core/agents/js_agent_adapter.dart';
+import '../../core/models/lineage_entry.dart';
 import '../../core/services/agent_verification_service.dart';
 import '../../core/services/circle_registry_service.dart';
 import '../../core/services/js_agent_registry.dart';
@@ -340,8 +341,8 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Creator: $author · ${listing.license}',
-              style: const TextStyle(color: Colors.white54, fontSize: 12),
+              'Author: ${listing.displayHandle} · ${listing.license}',
+              style: const TextStyle(color: Colors.cyanAccent, fontSize: 12, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
             const Text(
@@ -358,6 +359,52 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
               desc,
               style: const TextStyle(color: Colors.white70, fontSize: 13),
             ),
+            if (listing.lineage.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              const Text(
+                'REMIX LINEAGE & PROVENANCE',
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF141820),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Colors.cyanAccent.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    for (int i = listing.lineage.length - 1; i >= 0; i--) ...[
+                      _buildLineageRow(
+                        entry: listing.lineage[i],
+                        isCurrent: i == listing.lineage.length - 1,
+                        isOrigin: i == 0,
+                      ),
+                      if (i > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 7, top: 2, bottom: 2),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              width: 2,
+                              height: 10,
+                              color: Colors.cyanAccent.withValues(alpha: 0.3),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
             if (!widget.showPickup) ...[
               const SizedBox(height: 14),
               Container(
@@ -555,6 +602,91 @@ class _BhaiCodePreviewSheetState extends ConsumerState<BhaiCodePreviewSheet> {
       ),
     );
   }
+
+  Widget _buildLineageRow({
+    required LineageEntry entry,
+    required bool isCurrent,
+    required bool isOrigin,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          isCurrent
+              ? Icons.radio_button_checked
+              : (isOrigin ? Icons.star_rounded : Icons.subdirectory_arrow_right),
+          size: 16,
+          color: isCurrent
+              ? Colors.cyanAccent
+              : (isOrigin ? Colors.amberAccent : Colors.white54),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    entry.displayHandle,
+                    style: TextStyle(
+                      color: isCurrent ? Colors.cyanAccent : Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'v${entry.version}',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 9,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                  if (isOrigin) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.amberAccent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: Colors.amberAccent.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: const Text(
+                        'ORIGIN',
+                        style: TextStyle(
+                          color: Colors.amberAccent,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              if (entry.note.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  entry.note,
+                  style: const TextStyle(color: Colors.white54, fontSize: 11),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// Open preview for an already-installed agent (script from vault bundle).
@@ -586,13 +718,16 @@ Future<void> openInstalledBhaiPreview(
   } catch (_) {}
 
   if (!context.mounted) return;
+  final js = agent is JsAgentAdapter ? agent : null;
   final listing = MarketplaceListing(
     id: 'installed:${agent.name}',
     name: agent.name,
     description: desc,
     script: script,
     inputSchema: schema,
-    author: 'installed',
+    author: js?.author ?? 'installed',
+    originalAuthor: js?.originalAuthor,
+    lineage: js?.lineage ?? const [],
   );
   await BhaiCodePreviewSheet.open(context, listing: listing, showPickup: false);
 }

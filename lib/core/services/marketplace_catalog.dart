@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../agents/agent_base.dart';
 import '../agents/js_agent_adapter.dart';
+import '../models/lineage_entry.dart';
 import 'bhai_code_access.dart';
 import 'bhai_code_origin.dart';
 import 'js_agent_registry.dart';
@@ -21,6 +22,8 @@ class MarketplaceListing {
   final Map<String, dynamic> inputSchema;
   final String license;
   final String author;
+  final String? originalAuthor;
+  final List<LineageEntry> lineage;
   final String provenance;
   final List<String> bhaiWords;
   final String invocationPrompt;
@@ -35,7 +38,9 @@ class MarketplaceListing {
     required this.script,
     this.inputSchema = const {},
     this.license = 'remix_free',
-    this.author = 'Aur Bhai Team',
+    this.author = '@core',
+    this.originalAuthor,
+    this.lineage = const [],
     this.provenance = 'official',
     this.bhaiWords = const [],
     this.invocationPrompt = '',
@@ -43,6 +48,16 @@ class MarketplaceListing {
     this.vaultAssets = const {},
     this.assetBundleDir,
   });
+
+  /// Formatted handle ensuring '@' prefix.
+  String get displayHandle {
+    final trimmed = author.trim();
+    if (trimmed.isEmpty) return '@core';
+    return trimmed.startsWith('@') ? trimmed : '@$trimmed';
+  }
+
+  /// Number of remixes / contributions beyond the root creation.
+  int get remixCount => lineage.length > 1 ? lineage.length - 1 : 0;
 }
 
 /// Seed catalog of pick-upable Bhai Code (shown under Sabke Bhai).
@@ -52,93 +67,126 @@ class MarketplaceCatalog {
   final Ref _ref;
 
   static final List<MarketplaceListing> seedListings = [
-    const MarketplaceListing(
+    MarketplaceListing(
       id: 'pool-calculator',
       name: 'Calculator',
       description:
           'Sovereign mathematical evaluator for arithmetic expressions, percentages, and formulas.',
       license: 'remix_free',
-      author: 'Aur Bhai Team',
+      author: '@core',
       provenance: 'official',
-      bhaiWords: ['calculate', 'what is', 'how much is'],
+      lineage: [
+        LineageEntry(
+          author: '@core',
+          version: '1.0.0',
+          timestamp: DateTime(2026, 8, 1),
+          note: 'Official Project Aur Bhai Core Seed',
+        ),
+      ],
+      bhaiWords: const ['calculate', 'what is', 'how much is'],
       invocationPrompt: 'Calculate 15 * 84',
-      script: r'''
-async function execute(params) {
-  const expr = String((params && params.text) || (params && params.expression) || '').trim();
-  if (!expr) return 'Please provide a mathematical expression to calculate.';
-  try {
-    const sanitized = expr.replace(/[^0-9+\-*/().%^ ]/g, '');
-    const res = Function('"use strict"; return (' + sanitized + ')')();
-    return 'The result is ' + res;
-  } catch (e) {
-    return 'Could not calculate expression: ' + expr;
-  }
-}
-''',
-      inputSchema: {
-        'text': {'type': 'string', 'description': 'Math expression to evaluate'},
+      script: JsAgentRegistry.calculatorScript,
+      inputSchema: const {
+        'expression': {
+          'type': 'string',
+          'description':
+              'The standard mathematical expression to solve. Supports + - * / ^ and parentheses, e.g. "2+2" or "2^3".',
+          'required': true,
+        },
       },
     ),
-    const MarketplaceListing(
+    MarketplaceListing(
       id: 'pool-accountant',
       name: 'Accountant',
       description:
           'Sovereign expenditure logger & PWA dashboard. Multi-item voice feed, spend Q&A, and category charts.',
       license: 'remix_free',
-      author: 'Aur Bhai Team',
+      author: '@core',
       provenance: 'official',
-      bhaiWords: ['spent', 'expense', 'how much did i spend', 'expenditure'],
+      lineage: [
+        LineageEntry(
+          author: '@core',
+          version: '1.0.0',
+          timestamp: DateTime(2026, 8, 1),
+          note: 'Official Project Aur Bhai Core Seed',
+        ),
+      ],
+      bhaiWords: const ['spent', 'expense', 'how much did i spend', 'expenditure'],
       invocationPrompt: 'Spent 50 on chai',
       script: '',
       assetBundleDir: 'assets/bro_code/accountant',
-      inputSchema: {
+      inputSchema: const {
         'text': {'type': 'string', 'description': 'Expense statement or question'},
         'action': {'type': 'string', 'description': 'Action such as "dashboard"'},
       },
     ),
-    const MarketplaceListing(
+    MarketplaceListing(
       id: 'pool-telemeter',
       name: 'Telemeter',
       description:
           'Sovereign PWA telemetry dashboard for live motion, map, and CSV/GeoJSON exports.',
       license: 'remix_free',
-      author: 'Aur Bhai Team',
+      author: '@core',
       provenance: 'official',
-      bhaiWords: ['telemetry', 'live speed', 'sensor map', 'show telemetry'],
+      lineage: [
+        LineageEntry(
+          author: '@core',
+          version: '1.0.0',
+          timestamp: DateTime(2026, 8, 1),
+          note: 'Official Project Aur Bhai Core Seed',
+        ),
+      ],
+      bhaiWords: const ['telemetry', 'live speed', 'sensor map', 'show telemetry'],
       invocationPrompt: 'Show telemetry dashboard',
       script: '',
       assetBundleDir: 'assets/bro_code/telemeter',
     ),
-    const MarketplaceListing(
+    MarketplaceListing(
       id: 'pool-notetaker',
       name: 'NoteTaker',
       description:
           'Sovereign thought & idea vault with tag filtering, markdown search, and PWA dashboard.',
       license: 'remix_free',
-      author: 'Aur Bhai Team',
+      author: '@core',
       provenance: 'official',
-      bhaiWords: ['note down', 'jot down', 'remember that', 'take a note', 'what did i note'],
+      lineage: [
+        LineageEntry(
+          author: '@core',
+          version: '1.0.0',
+          timestamp: DateTime(2026, 8, 1),
+          note: 'Official Project Aur Bhai Core Seed',
+        ),
+      ],
+      bhaiWords: const ['note down', 'jot down', 'remember that', 'take a note', 'what did i note'],
       invocationPrompt: 'Note down buy groceries tomorrow',
       script: '',
       assetBundleDir: 'assets/bro_code/note_taker',
-      inputSchema: {
+      inputSchema: const {
         'text': {'type': 'string', 'description': 'Note content, question, or tag'},
         'action': {'type': 'string', 'description': 'Action such as "dashboard"'},
       },
     ),
-    const MarketplaceListing(
+    MarketplaceListing(
       id: 'pool-iwish',
       name: 'IWish',
       description:
           'Sovereign feedback & feature wishlist vault. 100% on-device wish recording and PWA dashboard.',
       license: 'remix_free',
-      author: 'Aur Bhai Team',
+      author: '@core',
       provenance: 'official',
-      bhaiWords: ['i wish', 'wish', 'feedback', 'feature request', 'bhai wish'],
+      lineage: [
+        LineageEntry(
+          author: '@core',
+          version: '1.0.0',
+          timestamp: DateTime(2026, 8, 1),
+          note: 'Official Project Aur Bhai Core Seed',
+        ),
+      ],
+      bhaiWords: const ['i wish', 'wish', 'feedback', 'feature request', 'bhai wish'],
       invocationPrompt: 'I wish we had dark red theme',
       script: '',
       assetBundleDir: 'assets/bro_code/i_wish',
-      inputSchema: {
+      inputSchema: const {
         'wish': {'type': 'string', 'description': 'Wish, feature request, or feedback text'},
         'action': {'type': 'string', 'description': 'Action such as "list", "summary", or "dashboard"'},
       },
@@ -177,8 +225,11 @@ async function execute(params) {
         final vaultAsset = await telemetry.readVaultData('$keyName.html') ??
             await telemetry.readVaultData('dashboard.html');
         if (storedScript != listing.script || vaultAsset == null) {
+          final schemaMap = bundle['schema'] as Map<String, dynamic>? ?? {};
           final existingSec = AgentSecurityClassX.fromId(
-            bundle['securityClass'] as String? ?? 'C4',
+            schemaMap['securityClass']?.toString() ??
+                bundle['securityClass']?.toString() ??
+                (listing.name == 'Calculator' ? 'C2' : 'C4'),
           );
           await _installListing(registry, listing, securityClass: existingSec);
         }

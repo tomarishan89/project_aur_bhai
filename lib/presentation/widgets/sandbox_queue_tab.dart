@@ -6,6 +6,7 @@ import '../../core/agents/agent_base.dart';
 import '../../core/agents/js_agent_adapter.dart';
 import '../../core/services/agent_service.dart';
 import '../../core/services/bhai_code_origin.dart';
+import '../../core/services/byok_service.dart';
 import '../../core/services/sandbox_queue_service.dart';
 import 'bhai_code_preview_sheet.dart';
 
@@ -103,7 +104,11 @@ class SandboxQueueTab extends ConsumerWidget {
             itemBuilder: (context, index) {
               final a = installed[index];
               final js = a as JsAgentAdapter;
-              final origin = BhaiCodeOrigin.label(js.source);
+              final myHandle = ref.watch(byokServiceProvider).userHandle;
+              final handleText = js.displayHandle(defaultUserHandle: myHandle);
+              final subtitle = js.remixCount > 0
+                  ? '$handleText · ${js.remixCount} remix${js.remixCount > 1 ? "es" : ""}'
+                  : handleText;
               return GestureDetector(
                 onTap: () => onOpenInstalled(context, ref, a),
                 onLongPress: () => openInstalledBhaiPreview(context, ref, a),
@@ -142,10 +147,11 @@ class SandboxQueueTab extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            origin,
+                            subtitle,
                             style: const TextStyle(
                               color: Colors.amberAccent,
                               fontSize: 7,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],

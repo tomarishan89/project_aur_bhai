@@ -950,6 +950,8 @@ class TelemetryBusService extends ChangeNotifier {
 
   // ── Expense Ledger Helpers ──────────────────────────────────────────────────
 
+  static int _expenseSeq = 0;
+
   Future<void> addExpense({
     required String item,
     required double amount,
@@ -961,7 +963,7 @@ class TelemetryBusService extends ChangeNotifier {
     final effectiveDb = _sandboxDb ?? _db;
     if (effectiveDb == null) throw StateError('Vault DB not initialized');
     final ts = (timestamp ?? DateTime.now()).toIso8601String();
-    final expenseId = id ?? 'exp-${DateTime.now().microsecondsSinceEpoch}';
+    final expenseId = id ?? 'exp-${DateTime.now().microsecondsSinceEpoch}-${_expenseSeq++}';
     await effectiveDb.insert(
       'expenses',
       {

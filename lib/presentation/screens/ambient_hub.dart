@@ -14,6 +14,7 @@ import '../../core/services/byok_service.dart';
 import '../../core/services/agent_service.dart';
 import '../../core/agents/agent_base.dart';
 import '../../core/agents/js_agent_adapter.dart';
+import '../../core/models/lineage_entry.dart';
 import '../../core/services/llm_service.dart';
 import '../../core/services/llm/llm_capability_catalog.dart';
 import '../../core/services/llm/llm_provider.dart';
@@ -1352,6 +1353,7 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
   final _modCtrl = TextEditingController();
   final _urlCtrl = TextEditingController();
   final _respWordCtrl = TextEditingController(text: "Haan bhai");
+  final _userHandleCtrl = TextEditingController(text: "@you");
   final _circleOwnerCtrl = TextEditingController();
   final _circleRepoCtrl = TextEditingController();
   final _circleTokenCtrl = TextEditingController();
@@ -1396,6 +1398,7 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
     _listenMode = wake.listenMode;
     _wakeBuiltin = wake.builtinKeywordId;
     _respWordCtrl.text = byok.responseWord;
+    _userHandleCtrl.text = byok.userHandle;
     _gender = byok.voiceGender;
     for (final platform in ExternalPlatform.values) {
       _externalKeyCtrls[platform.name]?.text = byok.externalKeyFor(platform);
@@ -1461,6 +1464,7 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
     _modCtrl.dispose();
     _urlCtrl.dispose();
     _respWordCtrl.dispose();
+    _userHandleCtrl.dispose();
     _circleOwnerCtrl.dispose();
     _circleRepoCtrl.dispose();
     _circleTokenCtrl.dispose();
@@ -1528,6 +1532,7 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
       final value = _externalKeyCtrls[platform.name]?.text.trim() ?? '';
       if (value.isNotEmpty) externalKeys[platform.name] = value;
     }
+    await ref.read(byokServiceProvider).updateUserHandle(_userHandleCtrl.text.trim());
     try {
       await ref
           .read(byokServiceProvider)
@@ -2527,6 +2532,33 @@ class _SettingsPageState extends ConsumerState<_SettingsPage> {
               ],
             ),
             _settingsSection(
+              title: 'SOVEREIGN IDENTITY & HANDLE',
+              children: [
+                const Text(
+                  'Your sovereign author handle stamped on newly created or remixed Bhai Codes (e.g. @ishan, @you, @dev).',
+                  style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _userHandleCtrl,
+                  style: const TextStyle(
+                    color: Colors.cyanAccent,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Author Handle',
+                    hintText: '@you or @yourname',
+                    labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
+                    hintStyle: TextStyle(color: Colors.white30, fontSize: 11),
+                  ),
+                  onChanged: (val) {
+                    ref.read(byokServiceProvider).updateUserHandle(val);
+                  },
+                ),
+              ],
+            ),
+            _settingsSection(
               title: 'VAULT SECURITY & CLEANSE',
               children: [
                 const Text(
@@ -3246,12 +3278,14 @@ class _PluginsPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  statusLabel,
+                  '${listing.displayHandle} · $statusLabel',
                   style: TextStyle(
                     color: iconColor,
                     fontSize: 7,
                     fontWeight: FontWeight.w600,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -3329,36 +3363,35 @@ class _PluginsPage extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (originLabel != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    originLabel,
-                    style: const TextStyle(color: Colors.white54, fontSize: 7),
-                    textAlign: TextAlign.center,
-                  ),
-                ] else if (diligenceChip != null) ...[
-                  const SizedBox(height: 4),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      diligenceChip,
-                      style: const TextStyle(
-                        color: Colors.amberAccent,
-                        fontSize: 7,
+                Builder(
+                  builder: (context) {
+                    final myHandle = ref.watch(byokServiceProvider).userHandle;
+                    final handleText = js?.displayHandle(defaultUserHandle: myHandle);
+                    final subtitle = handleText != null
+                        ? (js!.remixCount > 0
+                            ? '$handleText · ${js.remixCount} remix${js.remixCount > 1 ? "es" : ""}'
+                            : handleText)
+                        : (originLabel ?? 'built-in');
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 2, left: 2, right: 2),
+                      child: Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: js?.source == BhaiCodeOrigin.pool
+                              ? Colors.cyanAccent
+                              : (js?.source == BhaiCodeOrigin.self
+                                  ? Colors.greenAccent
+                                  : (js != null ? Colors.purpleAccent : Colors.white54)),
+                          fontSize: 7,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ] else if (builtAt != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    DateFormat('MMM d, HH:mm').format(builtAt.toLocal()),
-                    style: const TextStyle(color: Colors.white24, fontSize: 7),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -4648,7 +4681,9 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
                             ),
                           ),
                           child: Text(
-                            BhaiCodeOrigin.label(agent.source),
+                            agent.displayHandle(
+                              defaultUserHandle: ref.watch(byokServiceProvider).userHandle,
+                            ),
                             style: TextStyle(
                               color: agent.source == BhaiCodeOrigin.pool
                                   ? Colors.cyanAccent
@@ -4710,6 +4745,63 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
                         color: Colors.white30,
                         fontSize: 10,
                         fontFamily: 'Courier',
+                      ),
+                    ),
+                  ],
+                  if (agent is JsAgentAdapter && agent.lineage.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF141820),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.cyanAccent.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(
+                                Icons.account_tree_outlined,
+                                color: Colors.cyanAccent,
+                                size: 16,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'REMIX LINEAGE & PROVENANCE',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          for (int i = agent.lineage.length - 1; i >= 0; i--) ...[
+                            _buildLineageTimelineRow(
+                              entry: agent.lineage[i],
+                              isCurrent: i == agent.lineage.length - 1,
+                              isOrigin: i == 0,
+                            ),
+                            if (i > 0)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 7, top: 2, bottom: 2),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Container(
+                                    width: 2,
+                                    height: 10,
+                                    color: Colors.cyanAccent.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ],
                       ),
                     ),
                   ],
@@ -5288,6 +5380,91 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildLineageTimelineRow({
+    required LineageEntry entry,
+    required bool isCurrent,
+    required bool isOrigin,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          isCurrent
+              ? Icons.radio_button_checked
+              : (isOrigin ? Icons.star_rounded : Icons.subdirectory_arrow_right),
+          size: 16,
+          color: isCurrent
+              ? Colors.cyanAccent
+              : (isOrigin ? Colors.amberAccent : Colors.white54),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    entry.displayHandle,
+                    style: TextStyle(
+                      color: isCurrent ? Colors.cyanAccent : Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'v${entry.version}',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 9,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                  if (isOrigin) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.amberAccent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: Colors.amberAccent.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: const Text(
+                        'ORIGIN',
+                        style: TextStyle(
+                          color: Colors.amberAccent,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              if (entry.note.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  entry.note,
+                  style: const TextStyle(color: Colors.white54, fontSize: 11),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
