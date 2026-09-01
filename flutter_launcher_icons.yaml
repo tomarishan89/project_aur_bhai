@@ -1,0 +1,6 @@
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/aur_bhai_logo.png"
+  adaptive_icon_background: "#0B0F19"
+  adaptive_icon_foreground: "assets/images/aur_bhai_logo.png"
