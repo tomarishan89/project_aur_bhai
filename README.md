@@ -9,6 +9,37 @@
 
 Turn your Android smartphone into an autonomous, sovereign edge server. Aur Bhai lets you orally prompt your device to generate, test, and execute sandboxed JavaScript tools (**Bhai Codes**) locally on your phone's CPU with **100% Bring-Your-Own-Key (BYOK) privacy**.
 
+<p align="center">
+  <img src="docs/screenshots/command_center.jpg" width="23%" />
+  <img src="docs/screenshots/telemetry_mobile.jpg" width="23%" />
+  <img src="docs/screenshots/mere_bhai_agents.jpg" width="23%" />
+  <img src="docs/screenshots/sandbox_due_diligence.jpg" width="23%" />
+</p>
+
+---
+
+## 📸 Visual Tour & Capabilities
+
+| **🎙️ Voice Command Center** | **📊 Telemetry & Live Inertial Sensors** |
+|:---:|:---:|
+| <img src="docs/screenshots/command_center.jpg" width="320"/> | <img src="docs/screenshots/telemetry_mobile.jpg" width="320"/> |
+| Single-tap acoustic interface with zero cloud voice tracking. Spoken turn evaluation directly on device. | 50Hz real-time IMU streaming into encrypted ring buffers with on-device canvas charts. |
+
+| **🌐 Desktop Web Live Graphs (Edge Server)** | **📈 Multi-Metric Desktop Visualizer** |
+|:---:|:---:|
+| <img src="docs/screenshots/telemetry_web_live_graphs.jpg" width="460"/> | <img src="docs/screenshots/telemetry_web_dashboard.jpg" width="460"/> |
+| Real-time HTML5 dashboards served live from phone CPU over local Wi-Fi (`http://<PHONE_IP>:8080/`). | Multi-sensor live telemetry view in desktop Chrome with zero cloud relays. |
+
+| **⚡ Mere Bhai (Verified Agent Vault)** | **👥 Sabke Bhai (Community Catalog)** |
+|:---:|:---:|
+| <img src="docs/screenshots/mere_bhai_agents.jpg" width="320"/> | <img src="docs/screenshots/sabke_bhai_catalog.jpg" width="320"/> |
+| Installed C2 verified tools (Accountant, Telemeter, Calculator) with 1-tap export & execution. | Discover, sync, and fork community tools via GitHub Personal Access Tokens (PAT). |
+
+| **🛡️ QuickJS Sandbox & 7-Point Audit** | **⚙️ Sovereign Identity & BYOK Settings** |
+|:---:|:---:|
+| <img src="docs/screenshots/sandbox_due_diligence.jpg" width="320"/> | <img src="docs/screenshots/settings_sovereign.jpg" width="320"/> |
+| Quarantined C4 sandbox testing with automated policy checks against malicious SQL or network exfiltration. | Android Keystore BYOK (Gemini/OpenAI), custom creator handles (`@handle`), and LAN security. |
+
 ---
 
 ## 🌟 Key Pillars

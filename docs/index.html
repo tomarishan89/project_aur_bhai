@@ -745,23 +745,454 @@
       0%, 100% { transform: scale(1); box-shadow: 0 0 25px rgba(0, 240, 255, 0.4); }
       50% { transform: scale(1.05); box-shadow: 0 0 45px rgba(0, 240, 255, 0.8); }
     }
+
+    /* Gallery / Visual Tour — repurposed for inline use */
+    .gallery-img-wrap {
+      position: relative;
+      background: #030509;
+      overflow: hidden;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-md);
+    }
+
+    .gallery-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      transition: transform 0.4s ease;
+    }
+
+    .gallery-img-wrap:hover img {
+      transform: scale(1.04);
+    }
+
+    .img-tag {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(6, 8, 13, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border-glow);
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Lightbox Modal with Carousel Navigation */
+    .lightbox-modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background: rgba(3, 5, 9, 0.94);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: 1.5rem;
+    }
+    .lightbox-modal.active { display: flex; }
+    .lightbox-content-wrap {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      max-width: 92vw;
+      max-height: 88vh;
+    }
+    .lightbox-modal img {
+      max-width: min(92vw, 860px);
+      max-height: 74vh;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-glow);
+      box-shadow: 0 0 60px rgba(0, 240, 255, 0.35);
+      object-fit: contain;
+      transition: opacity 0.2s ease;
+    }
+    .lightbox-caption {
+      margin-top: 1rem; color: var(--text-main);
+      font-family: var(--font-display); font-size: 1rem;
+      font-weight: 600; text-align: center;
+      max-width: 800px;
+    }
+    .lightbox-counter {
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-top: 0.35rem;
+      letter-spacing: 1px;
+    }
+    .lightbox-close {
+      position: absolute; top: 20px; right: 30px;
+      color: var(--text-muted); font-size: 2.2rem; font-weight: 300;
+      cursor: pointer; transition: color 0.2s, transform 0.2s;
+      z-index: 1010; line-height: 1;
+    }
+    .lightbox-close:hover { color: var(--accent-cyan); transform: scale(1.1); }
+    .lightbox-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(6, 10, 18, 0.85);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      color: var(--text-main);
+      font-size: 1.6rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      z-index: 1010;
+      user-select: none;
+    }
+    .lightbox-nav:hover {
+      color: var(--accent-cyan);
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
+      transform: translateY(-50%) scale(1.1);
+    }
+    .lightbox-nav.prev { left: 20px; }
+    .lightbox-nav.next { right: 20px; }
+    @media (max-width: 600px) {
+      .lightbox-nav { width: 36px; height: 36px; font-size: 1.3rem; }
+      .lightbox-nav.prev { left: 8px; }
+      .lightbox-nav.next { right: 8px; }
+      .lightbox-close { top: 12px; right: 18px; font-size: 1.8rem; }
+    }
+
+    /* Walkthrough Sections */
+    .walkthrough-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+      margin-bottom: 3rem;
+    }
+    .walkthrough-row.reverse { direction: rtl; }
+    .walkthrough-row.reverse > * { direction: ltr; }
+
+    @media (max-width: 768px) {
+      .walkthrough-row, .walkthrough-row.reverse {
+        grid-template-columns: 1fr;
+        direction: ltr;
+      }
+    }
+
+    .walkthrough-text h3 {
+      font-family: var(--font-display);
+      font-size: 1.6rem; font-weight: 800;
+      margin-bottom: 0.75rem; line-height: 1.2;
+    }
+
+    .walkthrough-text p {
+      color: var(--text-muted); font-size: 0.98rem;
+      line-height: 1.65; margin-bottom: 1rem;
+    }
+
+    .walkthrough-text ul {
+      list-style: none; padding: 0;
+    }
+    .walkthrough-text ul li {
+      color: var(--text-muted); font-size: 0.92rem;
+      padding: 0.4rem 0; padding-left: 1.5rem;
+      position: relative; line-height: 1.5;
+    }
+    .walkthrough-text ul li::before {
+      content: '→'; position: absolute; left: 0;
+      color: var(--accent-cyan); font-weight: 700;
+    }
+
+    /* Responsive Viewport-Relative Screenshot & Slideshow System */
+    .screenshot-frame,
+    .slideshow-container {
+      position: relative;
+      max-width: 100%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .slideshow-container[data-slides-count="0"] {
+      display: none !important;
+    }
+
+    .screenshot-frame,
+    .slideshow-viewport {
+      position: relative;
+      max-height: min(46vh, 440px);
+      max-width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-lg);
+      background: rgba(8, 12, 20, 0.65);
+      border: 1px solid var(--border-glow);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 25px rgba(0, 240, 255, 0.12);
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+      user-select: none;
+    }
+    .screenshot-frame:hover,
+    .slideshow-viewport:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 35px rgba(0, 240, 255, 0.28);
+      border-color: rgba(0, 240, 255, 0.5);
+    }
+    .screenshot-frame img,
+    .slideshow-viewport img {
+      max-height: min(46vh, 440px);
+      max-width: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      display: block;
+      border-radius: calc(var(--radius-lg) - 2px);
+    }
+
+    /* Slideshow Multi-Slide Elements */
+    .slide-item {
+      display: none;
+      opacity: 0;
+      transition: opacity 0.35s ease, transform 0.35s ease;
+      transform: scale(0.98);
+      align-items: center;
+      justify-content: center;
+    }
+    .slide-item.active {
+      display: flex;
+      opacity: 1;
+      transform: scale(1);
+    }
+    .slide-item img {
+      max-height: min(46vh, 440px);
+      max-width: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+
+    .slide-badge {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      background: rgba(6, 10, 18, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(0, 240, 255, 0.35);
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+      z-index: 5;
+      pointer-events: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    .slide-nav-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: rgba(6, 10, 18, 0.8);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 240, 255, 0.35);
+      color: var(--text-main);
+      font-size: 1.35rem;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 6;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+      user-select: none;
+    }
+    .slide-nav-btn:hover {
+      background: rgba(0, 240, 255, 0.22);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.5);
+      transform: translateY(-50%) scale(1.08);
+    }
+    .slide-nav-btn.prev { left: 10px; }
+    .slide-nav-btn.next { right: 10px; }
+
+    .slide-dots {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      justify-content: center;
+      margin-top: 0.65rem;
+    }
+    .slide-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      transition: all 0.25s ease;
+      padding: 0;
+    }
+    .slide-dot:hover {
+      background: rgba(0, 240, 255, 0.5);
+    }
+    .slide-dot.active {
+      width: 22px;
+      background: var(--accent-cyan);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
+    }
+
+    .slide-caption-text {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-family: var(--font-mono);
+      text-align: center;
+      margin-top: 0.45rem;
+      max-width: 92%;
+      min-height: 1.2rem;
+      letter-spacing: 0.2px;
+    }
+
+    /* Split Panel for Author section */
+    .split-panel {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+    @media (max-width: 768px) {
+      .split-panel { grid-template-columns: 1fr; }
+    }
+    .split-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 2rem;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+    }
+    .split-card:hover {
+      border-color: var(--border-glow);
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-card);
+    }
+    .split-card .card-icon {
+      width: 52px; height: 52px;
+      border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem; margin-bottom: 1.25rem;
+    }
+    .split-card h3 {
+      font-family: var(--font-display);
+      font-size: 1.35rem; font-weight: 800;
+      margin-bottom: 0.5rem;
+    }
+    .split-card p {
+      color: var(--text-muted); font-size: 0.95rem;
+      line-height: 1.6; margin-bottom: 1.25rem; flex: 1;
+    }
+
+    /* Scroll connector lines */
+    .section-connector {
+      text-align: center; padding: 1.5rem 0;
+    }
+    .section-connector .line {
+      display: inline-block; width: 2px; height: 50px;
+      background: linear-gradient(180deg, var(--accent-cyan), transparent);
+      opacity: 0.4;
+    }
+
+    /* Hero path buttons */
+    .hero-paths {
+      display: flex; justify-content: center;
+      gap: 1rem; flex-wrap: wrap;
+      margin-top: 2rem;
+    }
+    .path-btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      font-family: var(--font-display);
+      font-size: 0.95rem; font-weight: 600;
+      cursor: pointer; transition: all 0.25s ease;
+      text-decoration: none;
+    }
+    .path-btn:hover {
+      color: var(--text-main);
+      border-color: var(--border-glow);
+      background: rgba(0, 240, 255, 0.06);
+      transform: translateY(-2px);
+      text-shadow: none;
+    }
+
+    /* Inline security mini-table */
+    .security-mini {
+      width: 100%; margin-top: 1.5rem;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .security-mini td {
+      padding: 0.6rem 0.8rem;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+    }
+    .security-mini td:first-child {
+      font-family: var(--font-mono);
+      font-weight: 700; white-space: nowrap;
+    }
+    .security-mini .c1 { color: var(--accent-cyan); }
+    .security-mini .c2 { color: var(--accent-emerald); }
+    .security-mini .c3 { color: var(--accent-amber); }
+    .security-mini .c4 { color: var(--accent-rose); }
   </style>
 </head>
 <body>
 
-  <!-- Top Header Navigation -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- TOP HEADER NAVIGATION                                      -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
   <header>
     <div class="nav-container">
       <div class="logo">
-        <div class="logo-ring"></div>
+        <img src="aur_bhai_logo.svg" alt="Aur Bhai Logo" style="width: 28px; height: 28px; filter: drop-shadow(0 0 8px rgba(245, 166, 35, 0.6));">
         <span>Project Aur Bhai</span>
         <span class="badge-pill">v3.12 SOVEREIGN</span>
       </div>
       <nav class="nav-links">
-        <a href="#features">Pillars</a>
-        <a href="#seed-catalog">Bhai Codes</a>
-        <a href="#sharing-distribution">Sharing &amp; Lineage</a>
-        <a href="#mcp-bridge">Developer Bridge</a>
+        <a href="#settings-walkthrough">Settings</a>
+        <a href="#bhai-codes-walkthrough">Bhai Codes</a>
+        <a href="#author-bhai-code">Author</a>
+        <a href="#capabilities">Capabilities</a>
         <a href="#quickstart">Quickstart</a>
         <a href="https://github.com/tomarishan89/project_aur_bhai" target="_blank" class="btn btn-secondary">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
@@ -772,7 +1203,9 @@
     </div>
   </header>
 
-  <!-- Hero Section -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- SECTION 1 — HERO: Landing App Screen                       -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
   <section class="hero">
     <div class="eyebrow">⚡ DECENTRALIZED · ZERO-MARGINAL-COST · 100% SOVEREIGN AI</div>
     <h1>Your Phone is an <span class="highlight">Autonomous Edge Server</span>.</h1>
@@ -785,107 +1218,234 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Download Android APK (v3.12)
       </a>
-      <a href="#mcp-bridge" class="btn btn-secondary">
+      <a href="#bhai-codes-walkthrough" class="btn btn-secondary">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-        Explore Developer MCP Bridge
+        Explore Bhai Codes
       </a>
     </div>
 
-    <!-- Interactive Mockup -->
-    <div class="mockup-wrapper">
-      <div class="mockup-header">
-        <div class="mockup-dots">
-          <div class="mockup-dot red"></div>
-          <div class="mockup-dot yellow"></div>
-          <div class="mockup-dot green"></div>
-        </div>
-        <div class="mockup-title">AUR_BHAI_EDGE_SHELL // PORT 8080 // QUICKJS RUNTIME</div>
-        <div class="badge-pill">LAN: PAIRED</div>
+    <!-- Command Center Screenshot Showcase -->
+    <div class="slideshow-container" data-slideshow style="max-width: 310px; margin: 0 auto;">
+      <div class="slideshow-viewport">
+        <img src="screenshots/command_center.jpg" alt="Aur Bhai Command Center — the landing app screen" data-caption="Voice Command Center · Tap to Speak" loading="lazy">
       </div>
-      <div class="mockup-body">
-        <div class="phone-preview-card">
-          <div class="pulse-aura">
-            <div class="pulse-inner">🎙️</div>
-          </div>
-          <div class="phone-state">"Haan Bhai, sun raha hoon"</div>
-          <div class="phone-sub">Pulsing Sovereign Core · Voice-Note Tap Gestures · Offline QuickJS Sandbox</div>
+    </div>
+
+    <!-- Two Path Branches -->
+    <div class="hero-paths">
+      <a href="#settings-walkthrough" class="path-btn">⚙️ Settings Walk Through</a>
+      <a href="#bhai-codes-walkthrough" class="path-btn">🧩 Bhai Codes Walk Through</a>
+    </div>
+  </section>
+
+  <div class="section-connector"><div class="line"></div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- SECTION 2 — SETTINGS WALK THROUGH                          -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="section" id="settings-walkthrough">
+    <div class="section-header">
+      <div class="eyebrow">⚙️ FIRST-TIME SETUP</div>
+      <h2>Settings Walk Through</h2>
+      <p>Sovereign configuration — plug in your free API key, set your creator handle, and lock down your privacy in under 60 seconds.</p>
+    </div>
+
+    <div class="walkthrough-row">
+      <div class="walkthrough-text">
+        <h3>🔑 Bring Your Own Key (BYOK)</h3>
+        <p>Paste your free Google Gemini or OpenAI API key into Settings → API / LLM. The key is encrypted and stored exclusively in the Android Hardware Keystore — never transmitted to any server, never logged, never shared.</p>
+        <ul>
+          <li>Generate a free key at <a href="https://aistudio.google.com/" target="_blank">Google AI Studio</a></li>
+          <li>Auto-validation confirms the key works before saving</li>
+          <li>Zero cloud subscriptions — zero middleman servers</li>
+        </ul>
+      </div>
+      <div class="slideshow-container" data-slideshow style="max-width: 290px;">
+        <div class="slideshow-viewport">
+          <img src="screenshots/settings_byok_api.jpg" alt="Google Gemini & LLM Key Auto-Validation" data-caption="Settings · Google Gemini & LLM Key Auto-Validation" loading="lazy">
+          <img src="screenshots/settings_sovereign.jpg" alt="Sovereign Identity and BYOK Settings" data-caption="Sovereign Settings · Hardware Keystore BYOK & Creator Handles" loading="lazy">
         </div>
-        <div class="terminal-side">
-          <div>
-            <div class="log-line">
-              <span class="log-tag">[SYSTEM]</span>
-              <span class="log-msg">Sovereign Vault SQLite initialized: <code>telemetry.db</code></span>
-            </div>
-            <div class="log-line">
-              <span class="log-tag js">[QUICKJS]</span>
-              <span class="log-msg">Mounted C2 agent: <code>Accountant</code> (Expenditure Logger)</span>
-            </div>
-            <div class="log-line">
-              <span class="log-tag exec">[INTENT]</span>
-              <span class="log-msg">Spoken turn: <em>"Bhai, log 250 rs for coffee"</em></span>
-            </div>
-            <div class="log-line">
-              <span class="log-tag js">[SQLITE]</span>
-              <span class="log-msg">INSERT INTO expenses (amount, desc) VALUES (250, 'coffee')</span>
-            </div>
-            <div class="log-line">
-              <span class="log-tag">[SERVER]</span>
-              <span class="log-msg">Live dashboard rendered at <code>http://localhost:8080/vault/expenses.html</code></span>
-            </div>
-          </div>
-          <div class="log-line" style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.5rem;">
-            <span class="log-tag warn">[MCP]</span>
-            <span class="log-msg">Antigravity desktop connected over Wi-Fi (Pair: <code>8NSVBE</code>)</span>
-          </div>
+      </div>
+    </div>
+
+    <div class="walkthrough-row reverse">
+      <div class="walkthrough-text">
+        <h3>🏷️ Sovereign Identity & Handle</h3>
+        <p>Customize your creator handle in Settings → Sovereign Identity (<code>@core</code>, <code>@you</code>, <code>@yourname</code>). This handle is cryptographically stamped on every tool you author, remix, or export.</p>
+        <ul>
+          <li>Immutable provenance lineage across infinite remix hops</li>
+          <li>Edge Server LAN toggle with pair-code security</li>
+          <li>Full sensor telemetry stays encrypted in the on-device SQLite vault</li>
+        </ul>
+      </div>
+      <div class="slideshow-container" data-slideshow style="max-width: 480px;">
+        <div class="slideshow-viewport">
+          <img src="screenshots/edge_server_portal.jpg" alt="Edge Server Developer Portal" data-caption="Edge Server Developer Portal · MCP Pairing & Configuration" loading="lazy">
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Three Core Pillars -->
-  <section class="section" id="features">
+  <div class="section-connector"><div class="line"></div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- SECTION 3 — BHAI CODES WALK THROUGH                        -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="section" id="bhai-codes-walkthrough">
     <div class="section-header">
-      <h2>Architectural Pillars</h2>
-      <p>Built from first principles for users who value data ownership, zero platform fees, and verifiable execution.</p>
+      <div class="eyebrow">🧩 UNDERSTANDING BHAI CODES</div>
+      <h2>What is a Bhai Code?</h2>
+      <p>A Bhai Code is a sandboxed JavaScript tool — generated by AI from a voice prompt, tested via an automated 7-point security audit, and executed locally on your phone's CPU inside the QuickJS runtime.</p>
     </div>
-    <div class="grid-3">
-      <div class="card">
-        <div class="card-icon">🛡️</div>
-        <h3>100% Sovereign & BYOK</h3>
-        <p>
-          Bring Your Own Key (BYOK) for Google Gemini or OpenAI. No cloud subscriptions, no middleman servers, and absolute zero telemetry tracking. Your data stays in an encrypted on-device SQLite vault.
-        </p>
+
+    <!-- Mere Bhai -->
+    <div class="walkthrough-row">
+      <div class="walkthrough-text">
+        <h3>⚡ Mere Bhai — Your Verified Vault</h3>
+        <p>All tools that pass the 7-point due diligence audit live in <strong>Mere Bhai</strong> (My Bhai) — your personal installed agent vault. Each is C2 Verified, meaning it has full ambient voice listening and background execution privileges.</p>
+        <ul>
+          <li>One-tap execute, inspect source code, or export as portable <code>.bundle.json</code></li>
+          <li>Share via AirDrop, Bluetooth, WhatsApp, or email</li>
+          <li>Root creators retain permanent attribution across multi-hop remixes</li>
+        </ul>
       </div>
-      <div class="card">
-        <div class="card-icon emerald">⚡</div>
-        <h3>Embedded QuickJS Sandbox</h3>
-        <p>
-          Aur Bhai writes dynamic JavaScript on the fly. User tools (Bhai Codes) execute locally on your phone CPU in an isolated C4→C2 security matrix with an automated 7-point due diligence security audit.
-        </p>
+      <div class="slideshow-container" data-slideshow style="max-width: 290px;">
+        <div class="slideshow-viewport">
+          <img src="screenshots/mere_bhai_agents.jpg" alt="Mere Bhai - Verified Agent Vault" data-caption="Mere Bhai · Installed & Verified Agent Vault" loading="lazy">
+          <img src="screenshots/mere_bhai_inspect.jpg" alt="Inspect QuickJS Code & Permissions" data-caption="Mere Bhai · QuickJS Source Code & Ambient Voice Permissions" loading="lazy">
+        </div>
       </div>
-      <div class="card">
-        <div class="card-icon violet">🌐</div>
-        <h3>On-Device Edge Server</h3>
-        <p>
-          A background Shelf HTTP server serves real-time HTML5 dashboards right from your phone over `http://localhost:8080/` or your local Wi-Fi. Access rich charts on desktop without cloud telemetry.
-        </p>
+    </div>
+
+    <!-- Sabke Bhai -->
+    <div class="walkthrough-row reverse">
+      <div class="walkthrough-text">
+        <h3>👥 Sabke Bhai — Community Catalog</h3>
+        <p>Discover community-authored tools in <strong>Sabke Bhai</strong> (Everyone's Bhai). Sync via your GitHub Personal Access Token (PAT) — browse, preview, and fork tools from your friend circle directly on-device.</p>
+        <ul>
+          <li>Decentralized distribution — no central app store gatekeeping</li>
+          <li>Immutable lineage chain: <code>@core → @alice → @bob → @you</code></li>
+          <li>File issue reports directly from the device to the friend repository</li>
+        </ul>
+      </div>
+      <div class="slideshow-container" data-slideshow style="max-width: 290px;">
+        <div class="slideshow-viewport">
+          <img src="screenshots/sabke_bhai_catalog.jpg" alt="Sabke Bhai - Community Catalog" data-caption="Sabke Bhai · Community Catalog & GitHub Sync" loading="lazy">
+        </div>
+      </div>
+    </div>
+
+    <!-- Sandbox & Security -->
+    <div class="walkthrough-row">
+      <div class="walkthrough-text">
+        <h3>🛡️ Sandbox & Due Diligence Gate</h3>
+        <p>Every untrusted tool enters a <strong>Class 4 Quarantined Sandbox</strong> — zero sensor access, in-memory execution only. It must pass the automated 7-point policy audit before promotion.</p>
+
+        <table class="security-mini">
+          <tr><td class="c1">C1 · CORE</td><td>Native Dart shell, hardware sensors, secure keystore</td></tr>
+          <tr><td class="c2">C2 · VERIFIED</td><td>Passed audit; ambient voice & background execution</td></tr>
+          <tr><td class="c3">C3 · DUE DILIGENCE</td><td>Restricted delegated scoping ("Ask [Agent] to…")</td></tr>
+          <tr><td class="c4">C4 · SANDBOX</td><td>Quarantined test zone; zero sensor access; in-memory only</td></tr>
+        </table>
+      </div>
+      <div class="slideshow-container" data-slideshow style="max-width: 290px;">
+        <div class="slideshow-viewport">
+          <img src="screenshots/sandbox_due_diligence.jpg" alt="QuickJS Sandbox and Due Diligence" data-caption="QuickJS Sandbox · 7-Point Due Diligence Audit" loading="lazy">
+          <img src="screenshots/sandbox_run.jpg" alt="Sandbox Quarantined In-Memory Execution" data-caption="Sandbox · In-Memory Execution & Sensor Access Lockdown" loading="lazy">
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- Seed Bhai Codes Showcase -->
-  <section class="section" id="seed-catalog">
+  <div class="section-connector"><div class="line"></div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- SECTION 4 — AUTHOR A BHAI CODE (Two Paths)                 -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="section" id="author-bhai-code">
     <div class="section-header">
-      <h2>The Seed Bhai Code Catalog</h2>
+      <div class="eyebrow">✍️ CREATE YOUR OWN</div>
+      <h2>Author a Bhai Code</h2>
+      <p>Two paths to build new tools — speak on the phone, or code from your desktop IDE.</p>
+    </div>
+
+    <div class="split-panel">
+      <!-- By App -->
+      <div class="split-card">
+        <div class="card-icon" style="background: rgba(0, 240, 255, 0.1); border: 1px solid rgba(0, 240, 255, 0.2);">🎙️</div>
+        <h3>By App <span style="color: var(--accent-cyan); font-size: 0.8rem; font-weight: 500;">(Voice on Phone)</span></h3>
+        <p>Tap the pulsing aura on the Command Center and speak naturally. The AI generates a sandboxed QuickJS tool on-the-fly, tests it via the 7-point audit, and deploys it to your Mere Bhai vault — all from a single spoken turn.</p>
+        <div class="bhai-voice-box">
+          "Haan Bhai, build me a pomodoro timer with 25-minute work sessions and 5-minute breaks"
+        </div>
+        <div style="margin-top: 1.5rem;">
+          <div class="slideshow-container" data-slideshow style="max-width: 250px; margin: 0 auto;">
+            <div class="slideshow-viewport">
+              <img src="screenshots/command_center.jpg" alt="Voice authoring on phone" data-caption="Voice Authoring · Single-Turn Tool Generation" loading="lazy">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- By IDE -->
+      <div class="split-card">
+        <div class="card-icon" style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.2);">💻</div>
+        <h3>By IDE <span style="color: var(--accent-violet); font-size: 0.8rem; font-weight: 500;">(MCP Desktop Bridge)</span></h3>
+        <p>Use <strong>Google Antigravity</strong>, <strong>Cursor</strong>, or <strong>Claude Desktop</strong> to author, debug, and hot-reload Bhai Codes on your phone over Wi-Fi via the Model Context Protocol (MCP). Zero repo access needed.</p>
+        <div class="code-container" style="margin-top: auto;">
+          <div class="code-top-bar">
+            <span class="code-lang">mcp_config.json</span>
+            <button class="copy-btn" onclick="copyMcpConfig()">Copy Config</button>
+          </div>
+          <pre id="mcp-code-block">{
+  "mcpServers": {
+    "aur-bhai-phone": {
+      "command": "python",
+      "args": [
+        "tool/mcp_proxy.py",
+        "--url", "http://192.168.1.50:8080/api/mcp",
+        "--token", "8NSVBE"
+      ]
+    }
+  }
+}</pre>
+        </div>
+        <ul style="margin-top: 1rem; list-style: none; padding: 0;">
+          <li style="color: var(--text-muted); font-size: 0.88rem; padding: 0.3rem 0; padding-left: 1.2rem; position: relative;">
+            <span style="position: absolute; left: 0; color: var(--accent-violet);">→</span>
+            Download <code>mcp_proxy.py</code> directly from your phone's edge server
+          </li>
+          <li style="color: var(--text-muted); font-size: 0.88rem; padding: 0.3rem 0; padding-left: 1.2rem; position: relative;">
+            <span style="position: absolute; left: 0; color: var(--accent-violet);">→</span>
+            Full <code>mcp_list_agents</code>, <code>mcp_read_agent</code>, <code>mcp_deploy_agent</code> API
+          </li>
+          <li style="color: var(--text-muted); font-size: 0.88rem; padding: 0.3rem 0; padding-left: 1.2rem; position: relative;">
+            <span style="position: absolute; left: 0; color: var(--accent-violet);">→</span>
+            <a href="DEVELOPER_MCP_GUIDE.md" target="_blank">Full Developer MCP Guide →</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-connector"><div class="line"></div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- SECTION 5 — CAPABILITIES (Seed Bhai Code Deep-Dive)        -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="section" id="capabilities">
+    <div class="section-header">
+      <div class="eyebrow">📦 SEED CATALOG</div>
+      <h2>Built-In Capabilities</h2>
       <p>Curated official tools that ship out of the box — fully inspectable, editable, and refinable by voice.</p>
     </div>
 
     <div class="bhai-tabs">
-      <button class="tab-btn active" onclick="switchBhai('accountant')">Accountant</button>
-      <button class="tab-btn" onclick="switchBhai('telemeter')">Telemeter</button>
-      <button class="tab-btn" onclick="switchBhai('calculator')">Calculator</button>
-      <button class="tab-btn" onclick="switchBhai('notetaker')">Note Taker</button>
-      <button class="tab-btn" onclick="switchBhai('iwish')">I Wish (Feedback)</button>
+      <button class="tab-btn active" onclick="switchBhai('accountant')">💰 Accountant</button>
+      <button class="tab-btn" onclick="switchBhai('telemeter')">📊 Telemeter</button>
+      <button class="tab-btn" onclick="switchBhai('calculator')">🧮 Calculator</button>
+      <button class="tab-btn" onclick="switchBhai('notetaker')">📝 Note Taker</button>
+      <button class="tab-btn" onclick="switchBhai('iwish')">🌟 I Wish</button>
     </div>
 
     <div class="bhai-display" id="bhai-content">
@@ -911,80 +1471,23 @@
         <div style="margin-top: 1rem; color: var(--accent-emerald);">✔ Live chart updated at http://localhost:8080/vault/expenses.html</div>
       </div>
     </div>
-  </section>
 
-  <!-- Developer Mode / MCP Bridge Showcase -->
-  <section class="section" id="mcp-bridge">
-    <div class="mcp-box">
-      <div class="mcp-header-grid">
-        <div>
-          <div class="eyebrow" style="margin-bottom: 0.75rem;">DEVELOPER BRIDGING</div>
-          <h2 style="font-family: var(--font-display); font-size: 2.2rem; font-weight: 800; line-height: 1.2; margin-bottom: 1rem;">
-            Code on Desktop.<br><span style="color: var(--accent-cyan);">Hot-Reload on Phone.</span>
-          </h2>
-          <p style="color: var(--text-muted); font-size: 0.98rem; line-height: 1.6; margin-bottom: 1.5rem;">
-            Use full desktop AI coding environments (**Google Antigravity**, **Cursor**, **Claude Desktop**) to author, debug, and inspect Bhai Codes on your Android device over Wi-Fi via Model Context Protocol (MCP).
-          </p>
-          <ul style="color: var(--text-muted); font-size: 0.92rem; list-style-position: inside; line-height: 1.8;">
-            <li>Zero repo access needed for external contributors (Download <code>mcp_proxy.py</code> directly from phone).</li>
-            <li>Real-time Server-Sent Events (SSE) auto-switch desktop dashboard tabs via phone voice.</li>
-            <li>Full access to <code>mcp_list_agents</code>, <code>mcp_read_agent</code>, and <code>mcp_deploy_agent</code>.</li>
-          </ul>
-        </div>
-        <div class="code-container">
-          <div class="code-top-bar">
-            <span class="code-lang">mcp_config.json</span>
-            <button class="copy-btn" onclick="copyMcpConfig()">Copy Config</button>
-          </div>
-          <pre id="mcp-code-block">{
-  "mcpServers": {
-    "aur-bhai-phone": {
-      "command": "python",
-      "args": [
-        "tool/mcp_proxy.py",
-        "--url", "http://192.168.1.50:8080/api/mcp",
-        "--token", "8NSVBE"
-      ]
-    }
-  }
-}</pre>
-        </div>
+    <!-- Capabilities Dynamic Slideshow Showcase -->
+    <div id="capabilities-slideshow-wrap" style="margin-top: 2.25rem;">
+      <p style="color: var(--text-muted); font-size: 0.92rem; text-align: center; margin-bottom: 1.25rem;">
+        Real device captures — verified agents, live telemetry stream, and desktop dashboards:
+      </p>
+      <div class="slideshow-container" id="capabilities-slideshow" data-slideshow style="max-width: 460px;">
+        <div class="slideshow-viewport"></div>
       </div>
     </div>
   </section>
 
-  <!-- Sovereign Sharing, Handles & Lineage -->
-  <section class="section" id="sharing-distribution">
-    <div class="section-header">
-      <h2>Sovereign Sharing &amp; Distribution</h2>
-      <p>Share, remix, and distribute Bhai Codes without central app store gatekeepers, platform tax, or lock-in.</p>
-    </div>
-    <div class="grid-3">
-      <div class="card">
-        <div class="card-icon cyan">📦</div>
-        <h3>1. Portable .bundle.json</h3>
-        <p>
-          Export any agent with one tap as a self-contained <code>.bundle.json</code> payload containing JS script, JSON schema, HTML dashboards, and full audit logs. Share via AirDrop, Bluetooth, WhatsApp, or email.
-        </p>
-      </div>
-      <div class="card">
-        <div class="card-icon emerald">👥</div>
-        <h3>2. Friend Circle Git Sync</h3>
-        <p>
-          Sync community tools and report issues directly to GitHub using your personal access token (PAT). Publish your creations to a shared friend repository or browse community contributions in Sabke Bhai.
-        </p>
-      </div>
-      <div class="card">
-        <div class="card-icon violet">🔀</div>
-        <h3>3. Multi-Hop Remix Lineage</h3>
-        <p>
-          Every agent records an immutable append-only provenance chain (<code>@core &rarr; @alice &rarr; @bob &rarr; @you</code>). Original authors retain permanent attribution across multi-hop community remixes.
-        </p>
-      </div>
-    </div>
-  </section>
+  <div class="section-connector"><div class="line"></div></div>
 
-  <!-- 60-Second Quickstart -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- SECTION 6 — QUICKSTART                                     -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
   <section class="section" id="quickstart">
     <div class="section-header">
       <h2>Get Started in 60 Seconds</h2>
@@ -994,7 +1497,7 @@
       <div class="step-card">
         <div class="step-number">01</div>
         <h4>Install Release APK</h4>
-        <p>Download <code>aur-bhai-v3.12.apk</code> from GitHub Releases and install on any Android 8.0+ smartphone.</p>
+        <p>Download <code>aur-bhai-v3.12.apk</code> from <a href="https://github.com/tomarishan89/project_aur_bhai/releases" target="_blank">GitHub Releases</a> and install on any Android 8.0+ smartphone.</p>
       </div>
       <div class="step-card">
         <div class="step-number">02</div>
@@ -1009,57 +1512,20 @@
     </div>
   </section>
 
-  <!-- 4-Tier Security Matrix -->
-  <section class="section">
-    <div class="section-header">
-      <h2>4-Tier Security &amp; Due Diligence</h2>
-      <p>Every generated script passes through strict automated policy and permission gates.</p>
-    </div>
-    <table class="security-table">
-      <thead>
-        <tr>
-          <th>Class</th>
-          <th>Designation</th>
-          <th>Execution Privileges &amp; Boundary</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td class="tier c1">Class 1</td>
-          <td>CORE</td>
-          <td>Native Dart shell, hardware sensors, secure keystore storage.</td>
-        </tr>
-        <tr>
-          <td class="tier c2">Class 2</td>
-          <td>VERIFIED (Mere Bhai)</td>
-          <td>Passed 7-point due diligence audit; ambient voice listening enabled; background execution.</td>
-        </tr>
-        <tr>
-          <td class="tier c3">Class 3</td>
-          <td>DUE DILIGENCE</td>
-          <td>Restricted to explicit delegated scoping ("Ask [Agent] to..."); deaf to general voice activity.</td>
-        </tr>
-        <tr>
-          <td class="tier c4">Class 4</td>
-          <td>SANDBOX (Sabke Bhai)</td>
-          <td>Quarantined test zone; zero sensor access; executes strictly in-memory or on simulated replays.</td>
-        </tr>
-      </tbody>
-    </table>
-  </section>
-
-  <!-- Footer -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- FOOTER                                                     -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
   <footer>
     <div class="footer-content">
       <div class="logo">
-        <div class="logo-ring"></div>
+        <img src="aur_bhai_logo.svg" alt="Aur Bhai Logo" style="width: 24px; height: 24px; filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.5));">
         <span>Project Aur Bhai</span>
       </div>
       <div class="footer-links">
         <a href="https://github.com/tomarishan89/project_aur_bhai" target="_blank">GitHub Repository</a>
         <a href="https://github.com/tomarishan89/project_aur_bhai/releases" target="_blank">Releases &amp; Changelog</a>
         <a href="https://github.com/tomarishan89/project_aur_bhai/discussions" target="_blank">Discussions &amp; Community</a>
-        <a href="https://github.com/tomarishan89/project_aur_bhai/blob/main/docs/DEVELOPER_MCP_GUIDE.md" target="_blank">Developer MCP Guide</a>
+        <a href="DEVELOPER_MCP_GUIDE.md" target="_blank">Developer MCP Guide</a>
       </div>
       <div class="footer-note">
         Open Source under the MIT / Apache 2.0 License · Zero Telemetry · 100% Sovereign Execution
@@ -1067,7 +1533,230 @@
     </div>
   </footer>
 
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- SCRIPTS                                                    -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
   <script>
+    /* ---- Lightbox Modal State & Carousel ---- */
+    let currentLightboxSlides = [];
+    let currentLightboxIndex = 0;
+
+    function openLightbox(srcOrSlides, captionOrIndex) {
+      const modal = document.getElementById('lightbox-modal');
+      if (Array.isArray(srcOrSlides)) {
+        currentLightboxSlides = srcOrSlides;
+        currentLightboxIndex = typeof captionOrIndex === 'number' ? captionOrIndex : 0;
+      } else {
+        currentLightboxSlides = [{ src: srcOrSlides, caption: captionOrIndex || '' }];
+        currentLightboxIndex = 0;
+      }
+      updateLightboxView();
+      modal.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function updateLightboxView() {
+      if (!currentLightboxSlides || currentLightboxSlides.length === 0) return;
+      const current = currentLightboxSlides[currentLightboxIndex];
+      const img = document.getElementById('lightbox-img');
+      const captionEl = document.getElementById('lightbox-caption');
+      const counterEl = document.getElementById('lightbox-counter');
+      const prevBtn = document.getElementById('lightbox-prev');
+      const nextBtn = document.getElementById('lightbox-next');
+
+      img.style.opacity = '0.3';
+      setTimeout(() => {
+        img.src = current.src;
+        img.alt = current.caption || 'Enlarged screenshot';
+        captionEl.textContent = current.caption || '';
+        img.style.opacity = '1';
+      }, 100);
+
+      if (currentLightboxSlides.length > 1) {
+        counterEl.textContent = `${currentLightboxIndex + 1} / ${currentLightboxSlides.length}`;
+        counterEl.style.display = 'block';
+        prevBtn.style.display = 'flex';
+        nextBtn.style.display = 'flex';
+      } else {
+        counterEl.style.display = 'none';
+        prevBtn.style.display = 'none';
+        nextBtn.style.display = 'none';
+      }
+    }
+
+    function stepLightbox(delta) {
+      if (currentLightboxSlides.length <= 1) return;
+      currentLightboxIndex = (currentLightboxIndex + delta + currentLightboxSlides.length) % currentLightboxSlides.length;
+      updateLightboxView();
+    }
+
+    function closeLightbox() {
+      const modal = document.getElementById('lightbox-modal');
+      modal.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', (e) => {
+      const modal = document.getElementById('lightbox-modal');
+      if (!modal.classList.contains('active')) return;
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowLeft') stepLightbox(-1);
+      if (e.key === 'ArrowRight') stepLightbox(1);
+    });
+
+    /* ---- Declarative Slideshow Engine ---- */
+    function initSlideshow(container) {
+      if (!container) return;
+      const viewport = container.querySelector('.slideshow-viewport');
+      if (!viewport) return;
+
+      // Clear any previously generated controls
+      container.querySelectorAll('.slide-nav-btn, .slide-badge, .slide-dots, .slide-caption-text').forEach(el => el.remove());
+
+      // Collect images
+      const rawImgs = Array.from(viewport.querySelectorAll('img'));
+      const count = rawImgs.length;
+      container.setAttribute('data-slides-count', count);
+
+      // Rule: 0 images -> Hide container cleanly (no slide show)
+      if (count === 0) {
+        container.style.display = 'none';
+        return;
+      }
+      container.style.display = 'flex';
+
+      const slidesData = rawImgs.map(img => ({
+        src: img.getAttribute('src'),
+        alt: img.getAttribute('alt') || '',
+        caption: img.getAttribute('data-caption') || img.getAttribute('alt') || ''
+      }));
+
+      // Ensure each image is inside a .slide-item wrapper
+      rawImgs.forEach((img, idx) => {
+        let item = img.closest('.slide-item');
+        if (!item) {
+          item = document.createElement('div');
+          item.className = 'slide-item';
+          img.parentNode.insertBefore(item, img);
+          item.appendChild(img);
+        }
+        item.classList.toggle('active', idx === 0);
+      });
+
+      const slideItems = Array.from(viewport.querySelectorAll('.slide-item'));
+      let activeIdx = 0;
+
+      function showSlide(index) {
+        activeIdx = (index + count) % count;
+        slideItems.forEach((item, idx) => {
+          item.classList.toggle('active', idx === activeIdx);
+        });
+        const badge = container.querySelector('.slide-badge');
+        if (badge) badge.textContent = `${activeIdx + 1} / ${count}`;
+        const dots = container.querySelectorAll('.slide-dot');
+        dots.forEach((d, idx) => d.classList.toggle('active', idx === activeIdx));
+        const captionEl = container.querySelector('.slide-caption-text');
+        if (captionEl) captionEl.textContent = slidesData[activeIdx].caption;
+      }
+
+      // Clicking viewport opens Lightbox at current slide
+      viewport.onclick = (e) => {
+        if (e.target.closest('.slide-nav-btn')) return;
+        openLightbox(slidesData, activeIdx);
+      };
+
+      // Rule: 1 image -> Show single highlighted image, NO slideshow controls
+      if (count === 1) {
+        if (slidesData[0].caption) {
+          const captionEl = document.createElement('div');
+          captionEl.className = 'slide-caption-text';
+          captionEl.textContent = slidesData[0].caption;
+          container.appendChild(captionEl);
+        }
+        return;
+      }
+
+      // Rule: >= 2 images -> Interactive Slideshow
+      // 1. Badge (1 / N)
+      const badge = document.createElement('div');
+      badge.className = 'slide-badge';
+      badge.textContent = `1 / ${count}`;
+      viewport.appendChild(badge);
+
+      // 2. Previous & Next buttons
+      const prevBtn = document.createElement('button');
+      prevBtn.className = 'slide-nav-btn prev';
+      prevBtn.innerHTML = '&#8249;';
+      prevBtn.setAttribute('aria-label', 'Previous Slide');
+      prevBtn.onclick = (e) => {
+        e.stopPropagation();
+        showSlide(activeIdx - 1);
+      };
+
+      const nextBtn = document.createElement('button');
+      nextBtn.className = 'slide-nav-btn next';
+      nextBtn.innerHTML = '&#8250;';
+      nextBtn.setAttribute('aria-label', 'Next Slide');
+      nextBtn.onclick = (e) => {
+        e.stopPropagation();
+        showSlide(activeIdx + 1);
+      };
+
+      viewport.appendChild(prevBtn);
+      viewport.appendChild(nextBtn);
+
+      // 3. Dot pagination
+      const dotsContainer = document.createElement('div');
+      dotsContainer.className = 'slide-dots';
+      for (let i = 0; i < count; i++) {
+        const dot = document.createElement('button');
+        dot.className = 'slide-dot' + (i === 0 ? ' active' : '');
+        dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
+        dot.onclick = (e) => {
+          e.stopPropagation();
+          showSlide(i);
+        };
+        dotsContainer.appendChild(dot);
+      }
+      container.appendChild(dotsContainer);
+
+      // 4. Caption strip below
+      const captionEl = document.createElement('div');
+      captionEl.className = 'slide-caption-text';
+      captionEl.textContent = slidesData[0].caption;
+      container.appendChild(captionEl);
+
+      // 5. Touch swipe gestures
+      let touchStartX = 0;
+      let touchStartY = 0;
+      viewport.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+      }, { passive: true });
+
+      viewport.addEventListener('touchend', (e) => {
+        const diffX = e.changedTouches[0].screenX - touchStartX;
+        const diffY = e.changedTouches[0].screenY - touchStartY;
+        if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY)) {
+          if (diffX < 0) {
+            showSlide(activeIdx + 1);
+          } else {
+            showSlide(activeIdx - 1);
+          }
+        }
+      }, { passive: true });
+    }
+
+    function initAllSlideshows() {
+      document.querySelectorAll('[data-slideshow]').forEach(el => {
+        // Skip capabilities slideshow since it is dynamically updated by switchBhai
+        if (el.id !== 'capabilities-slideshow') {
+          initSlideshow(el);
+        }
+      });
+    }
+
+    /* ---- Capabilities Dynamic Showcase ---- */
     const bhaiData = {
       accountant: {
         title: "Accountant 💰",
@@ -1078,7 +1767,11 @@
 <div style="color: var(--accent-cyan); margin-bottom: 0.5rem;">[DATABASE_VIEW: expenses]</div>
 <div>2026-08-26 13:20 | Food & Dining | ₹450.00 | Lunch with team</div>
 <div>2026-08-26 09:15 | Transport     | ₹120.00 | Metro recharge</div>
-<div style="margin-top: 1rem; color: var(--accent-emerald);">✔ Live chart updated at http://localhost:8080/vault/expenses.html</div>`
+<div style="margin-top: 1rem; color: var(--accent-emerald);">✔ Live chart updated at http://localhost:8080/vault/expenses.html</div>`,
+        screenshots: [
+          { src: 'screenshots/accountant_mobile.jpg', caption: 'Accountant · Voice Expense Logging on Device' },
+          { src: 'screenshots/accountant_web_dashboard.jpg', caption: 'Accountant · Live Expense Breakdown Dashboard on Desktop' }
+        ]
       },
       telemeter: {
         title: "Telemeter 📊",
@@ -1089,7 +1782,12 @@
 <div style="color: var(--accent-cyan); margin-bottom: 0.5rem;">[SENSOR_STREAM: 50Hz]</div>
 <div>ACCEL_Z: 9.81 m/s² | GYRO_Y: +0.02 rad/s | TEMP: 31.4°C</div>
 <div>BUFFER: 120 samples ring-buffered | SQLite Vault write clean</div>
-<div style="margin-top: 1rem; color: var(--accent-emerald);">✔ Desktop auto-switched to http://192.168.1.50:8080/vault/locator.html</div>`
+<div style="margin-top: 1rem; color: var(--accent-emerald);">✔ Desktop auto-switched to http://192.168.1.50:8080/vault/locator.html</div>`,
+        screenshots: [
+          { src: 'screenshots/telemetry_mobile.jpg', caption: 'Mobile Telemetry · 50Hz Inertial Sensor Stream' },
+          { src: 'screenshots/telemetry_web_live_graphs.jpg', caption: 'Desktop Browser · Shelf HTTP Server Live Charts' },
+          { src: 'screenshots/telemetry_web_dashboard.jpg', caption: 'Multi-Metric Desktop Dashboard · All Sensor Channels' }
+        ]
       },
       calculator: {
         title: "Calculator 🧮",
@@ -1100,7 +1798,10 @@
 <div style="color: var(--accent-cyan); margin-bottom: 0.5rem;">[QUICKJS_EVAL]</div>
 <div>EXPR: (2 ** 12) + Math.sqrt(625)</div>
 <div>RESULT: 4121</div>
-<div style="margin-top: 1rem; color: var(--accent-emerald);">✔ TTS Spoken: "Result is 4121, Bhai!"</div>`
+<div style="margin-top: 1rem; color: var(--accent-emerald);">✔ TTS Spoken: "Result is 4121, Bhai!"</div>`,
+        screenshots: [
+          { src: 'screenshots/calculator_mobile.jpg', caption: 'Calculator · QuickJS Arithmetic Evaluation & Spoken TTS' }
+        ]
       },
       notetaker: {
         title: "Note Taker 📝",
@@ -1111,7 +1812,10 @@
 <div style="color: var(--accent-cyan); margin-bottom: 0.5rem;">[VAULT_ASSET: note_20260826.md]</div>
 <div># Note: Buy groceries tomorrow</div>
 <div>Tags: #todo #home | Created: 2026-08-26T09:30:00Z</div>
-<div style="margin-top: 1rem; color: var(--accent-emerald);">✔ Markdown exported to sovereign vault</div>`
+<div style="margin-top: 1rem; color: var(--accent-emerald);">✔ Markdown exported to sovereign vault</div>`,
+        screenshots: [
+          { src: 'screenshots/notetaker_mobile.jpg', caption: 'Note Taker · Acoustic Notes with Hashtags & Markdown Vault' }
+        ]
       },
       iwish: {
         title: "I Wish 🌟",
@@ -1122,16 +1826,48 @@
 <div style="color: var(--accent-cyan); margin-bottom: 0.5rem;">[WISH_INGEST]</div>
 <div>WISH: "Offline currency converter" | CATEGORY: agent | TAGS: #finance #offline</div>
 <div>TRIAGE SCORE: 12.0 (Freq: 2 x Fit: 3 x Act: 2) -> Weekly Roadmap Digest</div>
-<div style="margin-top: 1rem; color: var(--accent-emerald);">✔ TTS: "Noted Bhai! Saved to your wishlist."</div>`
+<div style="margin-top: 1rem; color: var(--accent-emerald);">✔ TTS: "Noted Bhai! Saved to your wishlist."</div>`,
+        screenshots: [] // 0 images -> completely hides slideshow!
       }
     };
+
+    function renderCapabilitiesSlideshow(screenshotsList) {
+      const wrap = document.getElementById('capabilities-slideshow-wrap');
+      const container = document.getElementById('capabilities-slideshow');
+      if (!wrap || !container) return;
+
+      const viewport = container.querySelector('.slideshow-viewport');
+      viewport.innerHTML = '';
+
+      if (!screenshotsList || screenshotsList.length === 0) {
+        wrap.style.display = 'none';
+        container.style.display = 'none';
+        return;
+      }
+
+      wrap.style.display = 'block';
+      container.style.display = 'flex';
+
+      screenshotsList.forEach(item => {
+        const img = document.createElement('img');
+        img.src = item.src;
+        img.alt = item.caption || 'Capability screenshot';
+        img.setAttribute('data-caption', item.caption || '');
+        img.setAttribute('loading', 'lazy');
+        viewport.appendChild(img);
+      });
+
+      initSlideshow(container);
+    }
 
     function switchBhai(key) {
       const data = bhaiData[key];
       if (!data) return;
 
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      event.target.classList.add('active');
+      if (event && event.target) {
+        event.target.classList.add('active');
+      }
 
       document.getElementById('bhai-title').innerHTML = data.title;
       document.getElementById('bhai-desc').textContent = data.desc;
@@ -1146,8 +1882,12 @@
         span.textContent = c;
         chipsContainer.appendChild(span);
       });
+
+      // Update dynamic capabilities slideshow
+      renderCapabilitiesSlideshow(data.screenshots);
     }
 
+    /* ---- MCP Config Copy ---- */
     function copyMcpConfig() {
       const code = document.getElementById('mcp-code-block').innerText;
       navigator.clipboard.writeText(code).then(() => {
@@ -1156,6 +1896,30 @@
         setTimeout(() => btn.textContent = 'Copy Config', 2000);
       });
     }
+
+    // Initialize all slideshows and default capability reliably
+    function bootSlideshows() {
+      initAllSlideshows();
+      renderCapabilitiesSlideshow(bhaiData.accountant.screenshots);
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', bootSlideshows);
+    } else {
+      bootSlideshows();
+    }
   </script>
+
+  <!-- Lightbox Modal DOM with Carousel Navigation -->
+  <div id="lightbox-modal" class="lightbox-modal" onclick="closeLightbox()">
+    <span class="lightbox-close" title="Close (Esc)">&times;</span>
+    <button class="lightbox-nav prev" id="lightbox-prev" aria-label="Previous image" onclick="event.stopPropagation(); stepLightbox(-1)">&#8249;</button>
+    <button class="lightbox-nav next" id="lightbox-next" aria-label="Next image" onclick="event.stopPropagation(); stepLightbox(1)">&#8250;</button>
+    <div class="lightbox-content-wrap" onclick="event.stopPropagation()">
+      <img id="lightbox-img" src="" alt="Enlarged screenshot">
+      <div id="lightbox-caption" class="lightbox-caption"></div>
+      <div id="lightbox-counter" class="lightbox-counter"></div>
+    </div>
+  </div>
 </body>
 </html>
+
