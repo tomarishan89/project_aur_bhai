@@ -307,10 +307,70 @@ function copyMcpConfig() {
   });
 }
 
-// Initialize all slideshows and default capability reliably
+// Initialize all slideshows, capabilities, and dynamic release sync reliably
 function bootSlideshows() {
   initAllSlideshows();
   renderCapabilitiesSlideshow(bhaiData.accountant.screenshots);
+  initReleaseSync();
+}
+
+/* ==========================================================================
+   5. Dynamic Zero-Maintenance Release Sync
+   ========================================================================== */
+function initReleaseSync() {
+  const repo = 'tomarishan89/project_aur_bhai';
+
+  function applyReleaseData(tag, apkUrl, apkName) {
+    if (!tag) return;
+    const badge = document.getElementById('latest-version-badge');
+    if (badge) badge.textContent = tag;
+
+    const heroBtn = document.getElementById('hero-download-btn');
+    if (heroBtn) {
+      if (apkUrl) heroBtn.href = apkUrl;
+      const tagSpan = document.getElementById('hero-version-tag');
+      if (tagSpan) tagSpan.textContent = `(${tag})`;
+    }
+
+    const navBtn = document.getElementById('nav-download-btn');
+    if (navBtn && apkUrl) navBtn.href = apkUrl;
+
+    const codeLabel = document.getElementById('latest-apk-filename');
+    if (codeLabel && apkName) codeLabel.textContent = apkName;
+  }
+
+  // Fast restore from localStorage to avoid layout shift
+  try {
+    const cachedTag = localStorage.getItem('aur_bhai_latest_tag');
+    const cachedUrl = localStorage.getItem('aur_bhai_latest_apk_url');
+    if (cachedTag) {
+      applyReleaseData(cachedTag, cachedUrl, `aur-bhai-${cachedTag}.apk`);
+    }
+  } catch (_) {}
+
+  // Fetch real-time release from GitHub API
+  fetch(`https://api.github.com/repos/${repo}/releases/latest`, { cache: 'no-cache' })
+    .then(res => {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    })
+    .then(data => {
+      const tag = data.tag_name;
+      const apkAsset = (data.assets || []).find(a => a.name && a.name.endsWith('.apk'));
+      const apkUrl = apkAsset ? apkAsset.browser_download_url : `https://github.com/${repo}/releases/latest`;
+      const apkName = apkAsset ? apkAsset.name : (tag ? `aur-bhai-${tag}.apk` : null);
+
+      if (tag) {
+        try {
+          localStorage.setItem('aur_bhai_latest_tag', tag);
+          if (apkAsset) localStorage.setItem('aur_bhai_latest_apk_url', apkAsset.browser_download_url);
+        } catch (_) {}
+        applyReleaseData(tag, apkUrl, apkName);
+      }
+    })
+    .catch(() => {
+      // Graceful fallback to static HTML defaults
+    });
 }
 
 if (document.readyState === 'loading') {
@@ -318,3 +378,4 @@ if (document.readyState === 'loading') {
 } else {
   bootSlideshows();
 }
+

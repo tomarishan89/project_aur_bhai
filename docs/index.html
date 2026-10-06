@@ -26,7 +26,7 @@
         <img src="aur_bhai_logo.svg" alt="Aur Bhai Logo"
           style="width: 32px; height: 32px; border-radius: 8px; display: block; box-shadow: 0 0 10px rgba(105, 240, 174, 0.3);">
         <span>Project Aur Bhai</span>
-        <span class="badge-pill">v3.12</span>
+        <span class="badge-pill" id="latest-version-badge">v3.13</span>
       </div>
       <nav class="nav-links">
         <a href="#settings-walkthrough">Settings</a>
@@ -42,7 +42,7 @@
           </svg>
           GitHub
         </a>
-        <a href="#quickstart" class="btn btn-primary">Download APK</a>
+        <a href="https://github.com/tomarishan89/project_aur_bhai/releases/latest" class="btn btn-primary" id="nav-download-btn">Download APK</a>
       </nav>
     </div>
   </header>
@@ -59,13 +59,13 @@
     </p>
 
     <div class="hero-actions">
-      <a href="https://github.com/tomarishan89/project_aur_bhai/releases" target="_blank" class="btn btn-primary">
+      <a href="https://github.com/tomarishan89/project_aur_bhai/releases/latest" target="_blank" class="btn btn-primary" id="hero-download-btn">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
           <polyline points="7 10 12 15 17 10" />
           <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
-        Download Android APK (v3.12)
+        Download Android APK <span id="hero-version-tag">(v3.13)</span>
       </a>
       <a href="#bhai-codes-walkthrough" class="btn btn-secondary">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -466,8 +466,8 @@
       <div class="step-card">
         <div class="step-number">01</div>
         <h4>Install Release APK</h4>
-        <p>Download <code>aur-bhai-v3.12.apk</code> from <a
-            href="https://github.com/tomarishan89/project_aur_bhai/releases" target="_blank">GitHub Releases</a> and
+        <p>Download <code id="latest-apk-filename">aur-bhai-v3.13.apk</code> from <a
+            href="https://github.com/tomarishan89/project_aur_bhai/releases/latest" target="_blank">GitHub Releases</a> and
           install on any Android 8.0+ smartphone.</p>
       </div>
       <div class="step-card">
