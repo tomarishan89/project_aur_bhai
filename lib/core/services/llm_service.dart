@@ -260,13 +260,177 @@ class LlmService {
     }
   }
 
-  /// Arch v3.7 — single LLM call per turn (text path).
+  /// Fast-path deterministic intent routing for text turns (MS-FAST-PATH).
+  ///
+  /// Matches installed agents and standard commands directly on-device with zero
+  /// LLM tokens, zero latency, and zero cloud API key requirement.
+  TurnParsedResponse? _tryFastPathTurn(String rawText) {
+    final text = rawText.trim();
+    if (text.isEmpty) return null;
+    final lower = text.toLowerCase();
+
+    // 1. Never intercept author / conversational agent generation queries
+    final hasAuthorVerb = RegExp(
+      r'\b(build|make|create|author|write|generate|craft)\b',
+    ).hasMatch(lower);
+    final hasAuthorNoun = RegExp(
+      r'\b(agent|app|application|tool|dashboard|bot|plugin)\b',
+    ).hasMatch(lower);
+    if (hasAuthorVerb && hasAuthorNoun) return null;
+
+    final agentService = _ref.read(agentServiceProvider);
+    final installed = agentService.all;
+
+    // Helper: find agent matching target string (exact, trimmed, or space-stripped)
+    BroCode? matchAgentName(String candidate) {
+      final c = candidate.trim().toLowerCase();
+      if (c.isEmpty) return null;
+      final cNoSpace = c.replaceAll(' ', '');
+      for (final a in installed) {
+        final aLower = a.name.toLowerCase();
+        if (aLower == c || aLower.replaceAll(' ', '') == cNoSpace) {
+          return a;
+        }
+      }
+      return null;
+    }
+
+    // Helper: build execute response for a matched agent
+    TurnParsedResponse buildResponse(
+      BroCode agent, {
+      String? payload,
+      Map<String, dynamic>? extraParams,
+    }) {
+      final params = <String, dynamic>{};
+      final p = payload?.trim() ?? '';
+      if (p.isNotEmpty) {
+        if (agent.inputSchema.isNotEmpty) {
+          final firstKey = agent.inputSchema.keys.first;
+          params[firstKey] = p;
+        } else {
+          params['text'] = p;
+        }
+      }
+      if (extraParams != null) {
+        params.addAll(extraParams);
+      }
+      return TurnParsedResponse(
+        intent: AgentIntent.execute,
+        targetAgent: agent.name,
+        parameters: params,
+        payload: p.isNotEmpty ? p : null,
+        transcription: text,
+        confirmation: 'Running ${agent.name}…',
+        readyToBuild: false,
+      );
+    }
+
+    // 2. Explicit Ask/Tell syntax: "ask <agent> <payload>" or "tell <agent> <payload>"
+    final askTellMatch = RegExp(
+      r'^(?:ask|tell)\s+([a-zA-Z0-9_\-\s]+?)(?::|\s+that|\s+to|\s+)(.*)$',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (askTellMatch != null) {
+      final agentName = askTellMatch.group(1)!.trim();
+      final payload = askTellMatch.group(2)!.trim();
+      final agent = matchAgentName(agentName);
+      if (agent != null) {
+        return buildResponse(agent, payload: payload);
+      }
+    }
+
+    // 3. Action verbs: "open <agent>", "run <agent>", "launch <agent>", "start <agent>", "show <agent>"
+    final verbMatch = RegExp(
+      r'^(?:open|run|launch|start|show|execute)\s+([a-zA-Z0-9_\-\s]+)$',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (verbMatch != null) {
+      final candidate = verbMatch.group(1)!.trim();
+      final cleaned = candidate
+          .replaceAll(
+            RegExp(r'\s+(agent|dashboard|tool|app)$', caseSensitive: false),
+            '',
+          )
+          .trim();
+      final agent = matchAgentName(cleaned) ?? matchAgentName(candidate);
+      if (agent != null) {
+        return buildResponse(agent);
+      }
+    }
+
+    // 4. Direct match on agent name
+    final directAgent = matchAgentName(text);
+    if (directAgent != null) {
+      return buildResponse(directAgent);
+    }
+
+    // 5. Calculator specific shortcuts (e.g. "calc 25 * 4", "calculate 2^16", "what is 500 / 5", or pure arithmetic "2 + 2")
+    final calcAgent = matchAgentName('Calculator');
+    if (calcAgent != null) {
+      final calcPrefixMatch = RegExp(
+        r'^(?:calc|calculate|compute)\s+(.+)$',
+        caseSensitive: false,
+      ).firstMatch(text);
+      if (calcPrefixMatch != null) {
+        final expr = calcPrefixMatch.group(1)!.trim().replaceAll(RegExp(r'\?$'), '');
+        return buildResponse(
+          calcAgent,
+          payload: expr,
+          extraParams: {'expression': expr},
+        );
+      }
+
+      final whatIsMatch = RegExp(
+        r'^(?:what is|how much is)\s+(\(?\s*\d+[\d\.\s\+\-\*\/\^\(\)]*)\??$',
+        caseSensitive: false,
+      ).firstMatch(text);
+      if (whatIsMatch != null) {
+        final expr = whatIsMatch.group(1)!.trim();
+        return buildResponse(
+          calcAgent,
+          payload: expr,
+          extraParams: {'expression': expr},
+        );
+      }
+
+      // Pure math expression pattern: contains digits and arithmetic operators (+, -, *, /, ^)
+      final isPureMath = RegExp(
+        r'^\s*\(?\s*\d+(?:\.\d+)?\s*[\+\-\*\/\^]\s*[\d\.\s\+\-\*\/\^\(\)]+\s*\)?\s*$',
+      ).hasMatch(text);
+      if (isPureMath) {
+        return buildResponse(
+          calcAgent,
+          payload: text,
+          extraParams: {'expression': text},
+        );
+      }
+    }
+
+    return null;
+  }
+
+  /// Arch v3.7 — single LLM call per turn (text path), with local fast-path interception.
   Future<TurnParsedResponse> parseTurn({
     String? text,
     String? audioFilePath,
     AppSpec? existingSpec,
     bool authorSessionActive = false,
   }) async {
+    // Fast-path intent routing: evaluate local deterministic matches for text turns
+    // (e.g. "open calculator", "run telemeter", arithmetic formulas) without LLM latency or key requirements.
+    if (text != null &&
+        text.trim().isNotEmpty &&
+        !authorSessionActive &&
+        existingSpec == null) {
+      final fastPath = _tryFastPathTurn(text.trim());
+      if (fastPath != null) {
+        debugPrint(
+          '[LlmService parseTurn] Fast-path hit for "$text" -> ${fastPath.targetAgent}',
+        );
+        return fastPath;
+      }
+    }
+
     final byok = _ref.read(byokServiceProvider);
     final slot = audioFilePath != null ? LlmSlot.language : LlmSlot.intent;
 
@@ -274,7 +438,9 @@ class LlmService {
 
     if (!byok.hasKeyForSlot(slot)) {
       return TurnParsedResponse.fallback(
-        'Please configure your API Key (${slot.label}) in Settings to enable AI.',
+        audioFilePath != null
+            ? 'Voice commands require an API Key (${slot.label}) in Settings. You can also type commands or tap agents directly.'
+            : 'To ask open-ended questions or author new agents, please configure your API Key (${slot.label}) in Settings. Installed agents (like Calculator, Telemeter) can be run by name.',
       );
     }
 

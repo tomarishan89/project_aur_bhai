@@ -1,1181 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Project Aur Bhai — The Sovereign Voice-Orchestrated Mobile Agentic OS</title>
-  <meta name="description" content="Turn your Android phone into an autonomous edge server. A decentralized, voice-first mobile OS that writes, tests, and executes sandboxed JavaScript tools locally with Bring-Your-Own-Key privacy.">
+  <meta name="description"
+    content="Turn your Android phone into an autonomous edge server. A decentralized, voice-first mobile OS that writes, tests, and executes sandboxed JavaScript tools locally with Bring-Your-Own-Key privacy.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg-darkest: #06080d;
-      --bg-darker: #0b0f19;
-      --bg-card: rgba(16, 23, 38, 0.7);
-      --bg-card-hover: rgba(23, 33, 54, 0.85);
-      --border-subtle: rgba(255, 255, 255, 0.08);
-      --border-glow: rgba(0, 240, 255, 0.3);
-      --text-main: #f1f5f9;
-      --text-muted: #94a3b8;
-      --text-dim: #64748b;
-      --accent-cyan: #00f0ff;
-      --accent-emerald: #10b981;
-      --accent-violet: #a855f7;
-      --accent-amber: #f59e0b;
-      --accent-rose: #f43f5e;
-      --font-display: 'Outfit', sans-serif;
-      --font-body: 'Plus Jakarta Sans', sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
-      --radius-sm: 8px;
-      --radius-md: 14px;
-      --radius-lg: 22px;
-      --shadow-glow: 0 0 40px -10px rgba(0, 240, 255, 0.25);
-      --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      background-color: var(--bg-darkest);
-      color: var(--text-main);
-      font-family: var(--font-body);
-      line-height: 1.6;
-      overflow-x: hidden;
-      background-image: 
-        radial-gradient(circle at 50% 0%, rgba(0, 240, 255, 0.08) 0%, transparent 60%),
-        radial-gradient(circle at 10% 40%, rgba(168, 85, 247, 0.05) 0%, transparent 40%),
-        radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 40%);
-    }
-
-    a {
-      color: var(--accent-cyan);
-      text-decoration: none;
-      transition: all 0.2s ease;
-    }
-
-    a:hover {
-      text-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
-    }
-
-    /* Top Navigation */
-    header {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      background: rgba(6, 8, 13, 0.8);
-      border-bottom: 1px solid var(--border-subtle);
-    }
-
-    .nav-container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 1rem 1.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      font-family: var(--font-display);
-      font-size: 1.25rem;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      color: var(--text-main);
-    }
-
-    .logo-ring {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      border: 2.5px solid var(--accent-cyan);
-      box-shadow: 0 0 12px var(--accent-cyan);
-      animation: pulse 2.5s infinite ease-in-out;
-    }
-
-    .badge-pill {
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      background: rgba(0, 240, 255, 0.12);
-      color: var(--accent-cyan);
-      padding: 0.2rem 0.55rem;
-      border-radius: 20px;
-      border: 1px solid rgba(0, 240, 255, 0.3);
-      font-weight: 600;
-    }
-
-    nav.nav-links {
-      display: flex;
-      align-items: center;
-      gap: 1.75rem;
-    }
-
-    nav.nav-links a {
-      color: var(--text-muted);
-      font-size: 0.92rem;
-      font-weight: 500;
-    }
-
-    nav.nav-links a:hover {
-      color: var(--text-main);
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      padding: 0.65rem 1.3rem;
-      border-radius: var(--radius-sm);
-      font-family: var(--font-display);
-      font-weight: 600;
-      font-size: 0.95rem;
-      cursor: pointer;
-      transition: all 0.25s ease;
-      border: none;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, var(--accent-cyan), #00a2ff);
-      color: #030a14;
-      box-shadow: 0 0 25px rgba(0, 240, 255, 0.35);
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 0 35px rgba(0, 240, 255, 0.6);
-      color: #000;
-    }
-
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--text-main);
-      border: 1px solid var(--border-subtle);
-    }
-
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: rgba(255, 255, 255, 0.2);
-      transform: translateY(-2px);
-    }
-
-    /* Hero Section */
-    .hero {
-      padding: 5rem 1.5rem 4rem;
-      max-width: 1200px;
-      margin: 0 auto;
-      text-align: center;
-    }
-
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      color: var(--accent-cyan);
-      background: rgba(0, 240, 255, 0.08);
-      border: 1px solid rgba(0, 240, 255, 0.2);
-      padding: 0.35rem 0.9rem;
-      border-radius: 30px;
-      margin-bottom: 1.5rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .hero h1 {
-      font-family: var(--font-display);
-      font-size: clamp(2.5rem, 5.5vw, 4.2rem);
-      font-weight: 900;
-      letter-spacing: -1.5px;
-      line-height: 1.1;
-      margin-bottom: 1.5rem;
-      background: linear-gradient(180deg, #ffffff 40%, #94a3b8 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .hero h1 span.highlight {
-      background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-violet) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .hero-p {
-      font-size: clamp(1.05rem, 2vw, 1.25rem);
-      color: var(--text-muted);
-      max-width: 780px;
-      margin: 0 auto 2.5rem;
-      line-height: 1.65;
-    }
-
-    .hero-actions {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-      margin-bottom: 3.5rem;
-    }
-
-    /* Device / Shell Mockup */
-    .mockup-wrapper {
-      max-width: 960px;
-      margin: 0 auto;
-      background: var(--bg-card);
-      border: 1px solid var(--border-glow);
-      border-radius: var(--radius-lg);
-      padding: 1.5rem;
-      box-shadow: var(--shadow-glow), var(--shadow-card);
-      backdrop-filter: blur(20px);
-      text-align: left;
-    }
-
-    .mockup-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid var(--border-subtle);
-      margin-bottom: 1.25rem;
-    }
-
-    .mockup-dots {
-      display: flex;
-      gap: 6px;
-    }
-
-    .mockup-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.2);
-    }
-    .mockup-dot.red { background: #ef4444; }
-    .mockup-dot.yellow { background: #f59e0b; }
-    .mockup-dot.green { background: #10b981; }
-
-    .mockup-title {
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      color: var(--text-dim);
-    }
-
-    .mockup-body {
-      display: grid;
-      grid-template-columns: 1fr 1.3fr;
-      gap: 1.5rem;
-    }
-
-    @media (max-width: 768px) {
-      .mockup-body {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .phone-preview-card {
-      background: #04060a;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: var(--radius-md);
-      padding: 1.5rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 320px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .pulse-aura {
-      width: 110px;
-      height: 110px;
-      border-radius: 50%;
-      border: 2px solid var(--accent-cyan);
-      box-shadow: 0 0 35px var(--accent-cyan);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 1.5rem;
-      position: relative;
-      animation: pulse-ring 3s infinite;
-    }
-
-    .pulse-inner {
-      width: 70px;
-      height: 70px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(168, 85, 247, 0.3));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.8rem;
-    }
-
-    .phone-state {
-      font-family: var(--font-display);
-      font-size: 1.15rem;
-      font-weight: 700;
-      color: var(--text-main);
-      margin-bottom: 0.25rem;
-    }
-
-    .phone-sub {
-      font-size: 0.82rem;
-      color: var(--text-dim);
-      text-align: center;
-      max-width: 220px;
-    }
-
-    .terminal-side {
-      background: #05070c;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: var(--radius-md);
-      padding: 1.25rem;
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-
-    .log-line {
-      margin-bottom: 0.65rem;
-      display: flex;
-      gap: 0.5rem;
-    }
-
-    .log-tag {
-      color: var(--accent-cyan);
-      font-weight: 600;
-    }
-
-    .log-tag.exec { color: var(--accent-emerald); }
-    .log-tag.warn { color: var(--accent-amber); }
-    .log-tag.js { color: var(--accent-violet); }
-
-    .log-msg {
-      color: var(--text-muted);
-    }
-
-    /* Three Pillars Section */
-    .section {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 5rem 1.5rem;
-    }
-
-    .section-header {
-      text-align: center;
-      margin-bottom: 3.5rem;
-    }
-
-    .section-header h2 {
-      font-family: var(--font-display);
-      font-size: clamp(2rem, 3.5vw, 2.75rem);
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      margin-bottom: 0.75rem;
-    }
-
-    .section-header p {
-      color: var(--text-muted);
-      font-size: 1.05rem;
-      max-width: 640px;
-      margin: 0 auto;
-    }
-
-    .grid-3 {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 1.75rem;
-    }
-
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      padding: 2rem;
-      transition: all 0.3s ease;
-      position: relative;
-    }
-
-    .card:hover {
-      background: var(--bg-card-hover);
-      border-color: var(--border-glow);
-      transform: translateY(-4px);
-      box-shadow: var(--shadow-card);
-    }
-
-    .card-icon {
-      width: 48px;
-      height: 48px;
-      border-radius: var(--radius-sm);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.5rem;
-      margin-bottom: 1.25rem;
-      background: rgba(0, 240, 255, 0.1);
-      border: 1px solid rgba(0, 240, 255, 0.2);
-    }
-
-    .card-icon.emerald {
-      background: rgba(16, 185, 129, 0.1);
-      border-color: rgba(16, 185, 129, 0.2);
-    }
-
-    .card-icon.violet {
-      background: rgba(168, 85, 247, 0.1);
-      border-color: rgba(168, 85, 247, 0.2);
-    }
-
-    .card h3 {
-      font-family: var(--font-display);
-      font-size: 1.3rem;
-      font-weight: 700;
-      margin-bottom: 0.65rem;
-      color: var(--text-main);
-    }
-
-    .card p {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-      line-height: 1.6;
-    }
-
-    /* Seed Bhai Codes Showcase */
-    .bhai-tabs {
-      display: flex;
-      gap: 0.5rem;
-      overflow-x: auto;
-      padding-bottom: 0.5rem;
-      margin-bottom: 1.5rem;
-      border-bottom: 1px solid var(--border-subtle);
-    }
-
-    .tab-btn {
-      padding: 0.65rem 1.2rem;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: var(--radius-sm);
-      color: var(--text-muted);
-      font-family: var(--font-display);
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: all 0.2s ease;
-    }
-
-    .tab-btn:hover {
-      color: var(--text-main);
-      background: rgba(255, 255, 255, 0.05);
-    }
-
-    .tab-btn.active {
-      color: var(--accent-cyan);
-      background: rgba(0, 240, 255, 0.1);
-      border-color: rgba(0, 240, 255, 0.3);
-    }
-
-    .bhai-display {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      padding: 2rem;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-      align-items: center;
-    }
-
-    @media (max-width: 768px) {
-      .bhai-display {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .bhai-info h3 {
-      font-family: var(--font-display);
-      font-size: 1.5rem;
-      font-weight: 800;
-      margin-bottom: 0.5rem;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .bhai-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.4rem;
-      margin: 1rem 0;
-    }
-
-    .chip {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      padding: 0.2rem 0.6rem;
-      border-radius: 4px;
-      background: rgba(255, 255, 255, 0.06);
-      color: var(--text-muted);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .chip.cyan {
-      background: rgba(0, 240, 255, 0.08);
-      color: var(--accent-cyan);
-      border-color: rgba(0, 240, 255, 0.2);
-    }
-
-    .bhai-voice-box {
-      background: rgba(0, 0, 0, 0.4);
-      border-left: 3px solid var(--accent-cyan);
-      padding: 0.75rem 1rem;
-      margin-top: 1.25rem;
-      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-      font-style: italic;
-      font-size: 0.9rem;
-      color: var(--text-main);
-    }
-
-    .bhai-screen-preview {
-      background: #05080f;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: var(--radius-sm);
-      padding: 1.25rem;
-      min-height: 250px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-    }
-
-    /* Developer MCP Bridge Showcase */
-    .mcp-box {
-      background: linear-gradient(180deg, rgba(16, 23, 38, 0.9) 0%, rgba(8, 12, 20, 0.95) 100%);
-      border: 1px solid var(--border-glow);
-      border-radius: var(--radius-lg);
-      padding: 2.5rem;
-      box-shadow: var(--shadow-glow);
-    }
-
-    .mcp-header-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-      margin-bottom: 2rem;
-    }
-
-    @media (max-width: 768px) {
-      .mcp-header-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .code-container {
-      background: #030509;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: var(--radius-sm);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .code-top-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.5rem 1rem;
-      background: rgba(255, 255, 255, 0.03);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    }
-
-    .code-lang {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--text-dim);
-      text-transform: uppercase;
-    }
-
-    .copy-btn {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      padding: 0.25rem 0.6rem;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .copy-btn:hover {
-      background: var(--accent-cyan);
-      color: #000;
-    }
-
-    pre {
-      padding: 1rem;
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      color: #38bdf8;
-      overflow-x: auto;
-      line-height: 1.5;
-    }
-
-    /* 60s Quickstart */
-    .steps-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 1.5rem;
-    }
-
-    .step-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      padding: 1.75rem;
-      position: relative;
-    }
-
-    .step-number {
-      font-family: var(--font-mono);
-      font-size: 1.75rem;
-      font-weight: 900;
-      color: var(--accent-cyan);
-      opacity: 0.3;
-      margin-bottom: 0.75rem;
-    }
-
-    .step-card h4 {
-      font-family: var(--font-display);
-      font-size: 1.15rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-    }
-
-    .step-card p {
-      font-size: 0.9rem;
-      color: var(--text-muted);
-      line-height: 1.5;
-    }
-
-    /* Security Matrix */
-    .security-table {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      overflow: hidden;
-    }
-
-    .security-table th, .security-table td {
-      padding: 1rem 1.25rem;
-      text-align: left;
-      border-bottom: 1px solid var(--border-subtle);
-      font-size: 0.92rem;
-    }
-
-    .security-table th {
-      background: rgba(0, 0, 0, 0.4);
-      font-family: var(--font-display);
-      font-weight: 700;
-      color: var(--text-main);
-    }
-
-    .security-table td.tier {
-      font-family: var(--font-mono);
-      font-weight: 700;
-    }
-
-    .security-table td.tier.c1 { color: var(--accent-cyan); }
-    .security-table td.tier.c2 { color: var(--accent-emerald); }
-    .security-table td.tier.c3 { color: var(--accent-amber); }
-    .security-table td.tier.c4 { color: var(--accent-rose); }
-
-    /* Footer */
-    footer {
-      border-top: 1px solid var(--border-subtle);
-      padding: 3.5rem 1.5rem 2rem;
-      background: #030509;
-      text-align: center;
-    }
-
-    .footer-content {
-      max-width: 1200px;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1.5rem;
-    }
-
-    .footer-links {
-      display: flex;
-      gap: 1.5rem;
-      flex-wrap: wrap;
-      justify-content: center;
-      font-size: 0.9rem;
-    }
-
-    .footer-note {
-      color: var(--text-dim);
-      font-size: 0.82rem;
-      font-family: var(--font-mono);
-    }
-
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 10px var(--accent-cyan); }
-      50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 20px var(--accent-cyan); }
-    }
-
-    @keyframes pulse-ring {
-      0%, 100% { transform: scale(1); box-shadow: 0 0 25px rgba(0, 240, 255, 0.4); }
-      50% { transform: scale(1.05); box-shadow: 0 0 45px rgba(0, 240, 255, 0.8); }
-    }
-
-    /* Gallery / Visual Tour — repurposed for inline use */
-    .gallery-img-wrap {
-      position: relative;
-      background: #030509;
-      overflow: hidden;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: var(--radius-md);
-    }
-
-    .gallery-img-wrap img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: top center;
-      transition: transform 0.4s ease;
-    }
-
-    .gallery-img-wrap:hover img {
-      transform: scale(1.04);
-    }
-
-    .img-tag {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      background: rgba(6, 8, 13, 0.85);
-      backdrop-filter: blur(8px);
-      border: 1px solid var(--border-glow);
-      color: var(--accent-cyan);
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      font-weight: 700;
-      padding: 0.25rem 0.6rem;
-      border-radius: 6px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    /* Lightbox Modal with Carousel Navigation */
-    .lightbox-modal {
-      display: none;
-      position: fixed;
-      z-index: 1000;
-      left: 0; top: 0;
-      width: 100%; height: 100%;
-      background: rgba(3, 5, 9, 0.94);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      padding: 1.5rem;
-    }
-    .lightbox-modal.active { display: flex; }
-    .lightbox-content-wrap {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      max-width: 92vw;
-      max-height: 88vh;
-    }
-    .lightbox-modal img {
-      max-width: min(92vw, 860px);
-      max-height: 74vh;
-      border-radius: var(--radius-md);
-      border: 1px solid var(--border-glow);
-      box-shadow: 0 0 60px rgba(0, 240, 255, 0.35);
-      object-fit: contain;
-      transition: opacity 0.2s ease;
-    }
-    .lightbox-caption {
-      margin-top: 1rem; color: var(--text-main);
-      font-family: var(--font-display); font-size: 1rem;
-      font-weight: 600; text-align: center;
-      max-width: 800px;
-    }
-    .lightbox-counter {
-      color: var(--accent-cyan);
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-      font-weight: 600;
-      margin-top: 0.35rem;
-      letter-spacing: 1px;
-    }
-    .lightbox-close {
-      position: absolute; top: 20px; right: 30px;
-      color: var(--text-muted); font-size: 2.2rem; font-weight: 300;
-      cursor: pointer; transition: color 0.2s, transform 0.2s;
-      z-index: 1010; line-height: 1;
-    }
-    .lightbox-close:hover { color: var(--accent-cyan); transform: scale(1.1); }
-    .lightbox-nav {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: rgba(6, 10, 18, 0.85);
-      border: 1px solid rgba(0, 240, 255, 0.4);
-      color: var(--text-main);
-      font-size: 1.6rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      z-index: 1010;
-      user-select: none;
-    }
-    .lightbox-nav:hover {
-      color: var(--accent-cyan);
-      border-color: var(--accent-cyan);
-      box-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
-      transform: translateY(-50%) scale(1.1);
-    }
-    .lightbox-nav.prev { left: 20px; }
-    .lightbox-nav.next { right: 20px; }
-    @media (max-width: 600px) {
-      .lightbox-nav { width: 36px; height: 36px; font-size: 1.3rem; }
-      .lightbox-nav.prev { left: 8px; }
-      .lightbox-nav.next { right: 8px; }
-      .lightbox-close { top: 12px; right: 18px; font-size: 1.8rem; }
-    }
-
-    /* Walkthrough Sections */
-    .walkthrough-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 3rem;
-      align-items: center;
-      margin-bottom: 3rem;
-    }
-    .walkthrough-row.reverse { direction: rtl; }
-    .walkthrough-row.reverse > * { direction: ltr; }
-
-    @media (max-width: 768px) {
-      .walkthrough-row, .walkthrough-row.reverse {
-        grid-template-columns: 1fr;
-        direction: ltr;
-      }
-    }
-
-    .walkthrough-text h3 {
-      font-family: var(--font-display);
-      font-size: 1.6rem; font-weight: 800;
-      margin-bottom: 0.75rem; line-height: 1.2;
-    }
-
-    .walkthrough-text p {
-      color: var(--text-muted); font-size: 0.98rem;
-      line-height: 1.65; margin-bottom: 1rem;
-    }
-
-    .walkthrough-text ul {
-      list-style: none; padding: 0;
-    }
-    .walkthrough-text ul li {
-      color: var(--text-muted); font-size: 0.92rem;
-      padding: 0.4rem 0; padding-left: 1.5rem;
-      position: relative; line-height: 1.5;
-    }
-    .walkthrough-text ul li::before {
-      content: '→'; position: absolute; left: 0;
-      color: var(--accent-cyan); font-weight: 700;
-    }
-
-    /* Responsive Viewport-Relative Screenshot & Slideshow System */
-    .screenshot-frame,
-    .slideshow-container {
-      position: relative;
-      max-width: 100%;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-    .slideshow-container[data-slides-count="0"] {
-      display: none !important;
-    }
-
-    .screenshot-frame,
-    .slideshow-viewport {
-      position: relative;
-      max-height: min(46vh, 440px);
-      max-width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: var(--radius-lg);
-      background: rgba(8, 12, 20, 0.65);
-      border: 1px solid var(--border-glow);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 25px rgba(0, 240, 255, 0.12);
-      overflow: hidden;
-      cursor: pointer;
-      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
-      user-select: none;
-    }
-    .screenshot-frame:hover,
-    .slideshow-viewport:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 35px rgba(0, 240, 255, 0.28);
-      border-color: rgba(0, 240, 255, 0.5);
-    }
-    .screenshot-frame img,
-    .slideshow-viewport img {
-      max-height: min(46vh, 440px);
-      max-width: 100%;
-      width: auto;
-      height: auto;
-      object-fit: contain;
-      display: block;
-      border-radius: calc(var(--radius-lg) - 2px);
-    }
-
-    /* Slideshow Multi-Slide Elements */
-    .slide-item {
-      display: none;
-      opacity: 0;
-      transition: opacity 0.35s ease, transform 0.35s ease;
-      transform: scale(0.98);
-      align-items: center;
-      justify-content: center;
-    }
-    .slide-item.active {
-      display: flex;
-      opacity: 1;
-      transform: scale(1);
-    }
-    .slide-item img {
-      max-height: min(46vh, 440px);
-      max-width: 100%;
-      width: auto;
-      height: auto;
-      object-fit: contain;
-      display: block;
-    }
-
-    .slide-badge {
-      position: absolute;
-      top: 10px;
-      right: 12px;
-      background: rgba(6, 10, 18, 0.85);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(0, 240, 255, 0.35);
-      color: var(--accent-cyan);
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      font-weight: 700;
-      padding: 0.2rem 0.55rem;
-      border-radius: 6px;
-      letter-spacing: 0.5px;
-      z-index: 5;
-      pointer-events: none;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-    }
-
-    .slide-nav-btn {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      background: rgba(6, 10, 18, 0.8);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1px solid rgba(0, 240, 255, 0.35);
-      color: var(--text-main);
-      font-size: 1.35rem;
-      line-height: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      z-index: 6;
-      transition: all 0.2s ease;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
-      user-select: none;
-    }
-    .slide-nav-btn:hover {
-      background: rgba(0, 240, 255, 0.22);
-      border-color: var(--accent-cyan);
-      color: var(--accent-cyan);
-      box-shadow: 0 0 16px rgba(0, 240, 255, 0.5);
-      transform: translateY(-50%) scale(1.08);
-    }
-    .slide-nav-btn.prev { left: 10px; }
-    .slide-nav-btn.next { right: 10px; }
-
-    .slide-dots {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-      justify-content: center;
-      margin-top: 0.65rem;
-    }
-    .slide-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 4px;
-      background: rgba(255, 255, 255, 0.2);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      cursor: pointer;
-      transition: all 0.25s ease;
-      padding: 0;
-    }
-    .slide-dot:hover {
-      background: rgba(0, 240, 255, 0.5);
-    }
-    .slide-dot.active {
-      width: 22px;
-      background: var(--accent-cyan);
-      box-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
-    }
-
-    .slide-caption-text {
-      color: var(--text-muted);
-      font-size: 0.82rem;
-      font-family: var(--font-mono);
-      text-align: center;
-      margin-top: 0.45rem;
-      max-width: 92%;
-      min-height: 1.2rem;
-      letter-spacing: 0.2px;
-    }
-
-    /* Split Panel for Author section */
-    .split-panel {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-    }
-    @media (max-width: 768px) {
-      .split-panel { grid-template-columns: 1fr; }
-    }
-    .split-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      padding: 2rem;
-      transition: all 0.3s ease;
-      display: flex;
-      flex-direction: column;
-    }
-    .split-card:hover {
-      border-color: var(--border-glow);
-      transform: translateY(-4px);
-      box-shadow: var(--shadow-card);
-    }
-    .split-card .card-icon {
-      width: 52px; height: 52px;
-      border-radius: var(--radius-sm);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.6rem; margin-bottom: 1.25rem;
-    }
-    .split-card h3 {
-      font-family: var(--font-display);
-      font-size: 1.35rem; font-weight: 800;
-      margin-bottom: 0.5rem;
-    }
-    .split-card p {
-      color: var(--text-muted); font-size: 0.95rem;
-      line-height: 1.6; margin-bottom: 1.25rem; flex: 1;
-    }
-
-    /* Scroll connector lines */
-    .section-connector {
-      text-align: center; padding: 1.5rem 0;
-    }
-    .section-connector .line {
-      display: inline-block; width: 2px; height: 50px;
-      background: linear-gradient(180deg, var(--accent-cyan), transparent);
-      opacity: 0.4;
-    }
-
-    /* Hero path buttons */
-    .hero-paths {
-      display: flex; justify-content: center;
-      gap: 1rem; flex-wrap: wrap;
-      margin-top: 2rem;
-    }
-    .path-btn {
-      display: inline-flex; align-items: center; gap: 0.5rem;
-      padding: 0.75rem 1.5rem;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
-      color: var(--text-muted);
-      font-family: var(--font-display);
-      font-size: 0.95rem; font-weight: 600;
-      cursor: pointer; transition: all 0.25s ease;
-      text-decoration: none;
-    }
-    .path-btn:hover {
-      color: var(--text-main);
-      border-color: var(--border-glow);
-      background: rgba(0, 240, 255, 0.06);
-      transform: translateY(-2px);
-      text-shadow: none;
-    }
-
-    /* Inline security mini-table */
-    .security-mini {
-      width: 100%; margin-top: 1.5rem;
-      border-collapse: collapse;
-      font-size: 0.85rem;
-    }
-    .security-mini td {
-      padding: 0.6rem 0.8rem;
-      border-bottom: 1px solid var(--border-subtle);
-      color: var(--text-muted);
-    }
-    .security-mini td:first-child {
-      font-family: var(--font-mono);
-      font-weight: 700; white-space: nowrap;
-    }
-    .security-mini .c1 { color: var(--accent-cyan); }
-    .security-mini .c2 { color: var(--accent-emerald); }
-    .security-mini .c3 { color: var(--accent-amber); }
-    .security-mini .c4 { color: var(--accent-rose); }
-  </style>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
@@ -1184,7 +23,8 @@
   <header>
     <div class="nav-container">
       <div class="logo">
-        <img src="aur_bhai_logo.svg" alt="Aur Bhai Logo" style="width: 28px; height: 28px; filter: drop-shadow(0 0 8px rgba(245, 166, 35, 0.6));">
+        <img src="aur_bhai_logo.svg" alt="Aur Bhai Logo"
+          style="width: 28px; height: 28px; filter: drop-shadow(0 0 8px rgba(245, 166, 35, 0.6));">
         <span>Project Aur Bhai</span>
         <span class="badge-pill">v3.12 SOVEREIGN</span>
       </div>
@@ -1195,7 +35,10 @@
         <a href="#capabilities">Capabilities</a>
         <a href="#quickstart">Quickstart</a>
         <a href="https://github.com/tomarishan89/project_aur_bhai" target="_blank" class="btn btn-secondary">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+          </svg>
           GitHub
         </a>
         <a href="#quickstart" class="btn btn-primary">Download APK</a>
@@ -1210,24 +53,33 @@
     <div class="eyebrow">⚡ DECENTRALIZED · ZERO-MARGINAL-COST · 100% SOVEREIGN AI</div>
     <h1>Your Phone is an <span class="highlight">Autonomous Edge Server</span>.</h1>
     <p class="hero-p">
-      Project Aur Bhai is a voice-orchestrated mobile operating system that generates, tests, and executes sandboxed JavaScript tools locally on your Android device with zero cloud telemetry.
+      Project Aur Bhai is a voice-orchestrated mobile operating system that generates, tests, and executes sandboxed
+      JavaScript tools locally on your Android device with zero cloud telemetry.
     </p>
 
     <div class="hero-actions">
       <a href="https://github.com/tomarishan89/project_aur_bhai/releases" target="_blank" class="btn btn-primary">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
         Download Android APK (v3.12)
       </a>
       <a href="#bhai-codes-walkthrough" class="btn btn-secondary">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="16 18 22 12 16 6" />
+          <polyline points="8 6 2 12 8 18" />
+        </svg>
         Explore Bhai Codes
       </a>
     </div>
 
     <!-- Command Center Screenshot Showcase -->
-    <div class="slideshow-container" data-slideshow style="max-width: 310px; margin: 0 auto;">
+    <div class="slideshow-container size-phone" data-slideshow>
       <div class="slideshow-viewport">
-        <img src="screenshots/command_center.jpg" alt="Aur Bhai Command Center — the landing app screen" data-caption="Voice Command Center · Tap to Speak" loading="lazy">
+        <img src="screenshots/command_center.jpg" alt="Aur Bhai Command Center — the landing app screen"
+          data-caption="Voice Command Center · Tap to Speak" loading="lazy">
       </div>
     </div>
 
@@ -1238,7 +90,48 @@
     </div>
   </section>
 
-  <div class="section-connector"><div class="line"></div></div>
+  <div class="section-connector">
+    <div class="line"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- SECTION 1.5 — OVERVIEW                                     -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="section" id="overview">
+    <div class="section-header">
+      <div class="eyebrow">📖 OVERVIEW</div>
+      <h2>In Short...</h2>
+      <p style="text-align: center; max-width: 800px; margin: 0 auto; line-height: 1.8; color: var(--text-muted);">
+        <strong>Project Aur Bhai</strong> is an open-source Flutter app that allows you to use voice commands to generate, test, and run sandboxed JavaScript tools (called <strong>Bhai Codes</strong>) directly on your phone.
+      </p>
+    </div>
+    
+    <div class="steps-grid" style="margin-top: 2rem;">
+      <div class="step-card">
+        <h4>🛡️ 100% Privacy (Sovereignty)</h4>
+        <p>Uses a Bring-Your-Own-Key (BYOK) model for LLMs. All data, telemetry, and voice recordings remain encrypted locally in an SQLite vault.</p>
+      </div>
+      <div class="step-card">
+        <h4>🧠 On-Device Sandbox</h4>
+        <p>Tools are run locally using an embedded QuickJS engine with a 7-point security check to prevent malicious network access or data leaks.</p>
+      </div>
+      <div class="step-card">
+        <h4>🌐 Local Edge Server</h4>
+        <p>Runs a background HTTP server so you can view real-time HTML5 dashboards and live charts on your desktop browser over your local Wi-Fi.</p>
+      </div>
+      <div class="step-card">
+        <h4>💻 Desktop IDE Bridge</h4>
+        <p>Connect desktop AI tools directly to your phone using the Model Context Protocol (MCP) to write, debug, and hot-reload code.</p>
+      </div>
+    </div>
+    <p style="text-align: center; margin-top: 2.5rem; color: var(--text-muted); font-size: 0.95rem; max-width: 800px; margin-left: auto; margin-right: auto;">
+      It comes pre-packaged with several seed tools out of the box, including an expense tracker (<strong>Accountant</strong>), a sensor visualization tool (<strong>Telemeter</strong>), a pure JavaScript <strong>Calculator</strong>, a voice-dictated <strong>Note Taker</strong>, and an offline roadmap triage pipeline (<strong>I Wish</strong>).
+    </p>
+  </section>
+
+  <div class="section-connector">
+    <div class="line"></div>
+  </div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- SECTION 2 — SETTINGS WALK THROUGH                          -->
@@ -1247,23 +140,29 @@
     <div class="section-header">
       <div class="eyebrow">⚙️ FIRST-TIME SETUP</div>
       <h2>Settings Walk Through</h2>
-      <p>Sovereign configuration — plug in your free API key, set your creator handle, and lock down your privacy in under 60 seconds.</p>
+      <p>Sovereign configuration — plug in your API key, set your creator handle, and lock down your privacy in under 60
+        seconds.</p>
     </div>
 
     <div class="walkthrough-row">
       <div class="walkthrough-text">
         <h3>🔑 Bring Your Own Key (BYOK)</h3>
-        <p>Paste your free Google Gemini or OpenAI API key into Settings → API / LLM. The key is encrypted and stored exclusively in the Android Hardware Keystore — never transmitted to any server, never logged, never shared.</p>
+        <p>Paste your AI Model API Key (Google Gemini, OpenAI API, Claude, etc) into Settings → API / LLM. The key is
+          encrypted and stored exclusively in the Android Hardware Keystore — never transmitted to any server, never
+          logged, never shared.</p>
+        <h4>Steps for generating a free API key at Google AI Studio</h4>
         <ul>
           <li>Generate a free key at <a href="https://aistudio.google.com/" target="_blank">Google AI Studio</a></li>
           <li>Auto-validation confirms the key works before saving</li>
           <li>Zero cloud subscriptions — zero middleman servers</li>
         </ul>
       </div>
-      <div class="slideshow-container" data-slideshow style="max-width: 290px;">
+      <div class="slideshow-container size-md" data-slideshow>
         <div class="slideshow-viewport">
-          <img src="screenshots/settings_byok_api.jpg" alt="Google Gemini & LLM Key Auto-Validation" data-caption="Settings · Google Gemini & LLM Key Auto-Validation" loading="lazy">
-          <img src="screenshots/settings_sovereign.jpg" alt="Sovereign Identity and BYOK Settings" data-caption="Sovereign Settings · Hardware Keystore BYOK & Creator Handles" loading="lazy">
+          <img src="screenshots/settings_byok_api.jpg" alt="Google Gemini & LLM Key Auto-Validation"
+            data-caption="Settings · Google Gemini & LLM Key Auto-Validation" loading="lazy">
+          <img src="screenshots/settings_sovereign.jpg" alt="Sovereign Identity and BYOK Settings"
+            data-caption="Sovereign Settings · Hardware Keystore BYOK & Creator Handles" loading="lazy">
         </div>
       </div>
     </div>
@@ -1271,22 +170,47 @@
     <div class="walkthrough-row reverse">
       <div class="walkthrough-text">
         <h3>🏷️ Sovereign Identity & Handle</h3>
-        <p>Customize your creator handle in Settings → Sovereign Identity (<code>@core</code>, <code>@you</code>, <code>@yourname</code>). This handle is cryptographically stamped on every tool you author, remix, or export.</p>
+        <p>Customize your creator handle in Settings → Sovereign Identity (<code>@core</code>, <code>@you</code>,
+          <code>@yourname</code>). This handle is cryptographically stamped on every tool you author, remix, or export.
+        </p>
         <ul>
           <li>Immutable provenance lineage across infinite remix hops</li>
           <li>Edge Server LAN toggle with pair-code security</li>
           <li>Full sensor telemetry stays encrypted in the on-device SQLite vault</li>
         </ul>
       </div>
-      <div class="slideshow-container" data-slideshow style="max-width: 480px;">
+      <div class="slideshow-container size-wide" data-slideshow>
         <div class="slideshow-viewport">
-          <img src="screenshots/edge_server_portal.jpg" alt="Edge Server Developer Portal" data-caption="Edge Server Developer Portal · MCP Pairing & Configuration" loading="lazy">
+          <img src="screenshots/edge_server_portal.jpg" alt="Edge Server Developer Portal"
+            data-caption="Edge Server Developer Portal · MCP Pairing & Configuration" loading="lazy">
+        </div>
+      </div>
+    </div>
+
+    <div class="walkthrough-row">
+      <div class="walkthrough-text">
+        <h3>📱 QR Code Pairing & Desktop App Mode</h3>
+        <p>View live telemetry and HTML5 dashboards on your laptop without typing IP addresses or pairing codes.</p>
+        <ul>
+          <li><strong>Instant QR Pairing:</strong> Tap the QR icon in the mobile app or Web Hub to scan with your laptop webcam and launch instantly.</li>
+          <li><strong>Standalone Desktop App (PWA):</strong> In Chrome, Edge, or Brave, click <code>Menu (⋮) → Save and share → Install page as app</code> to run the dashboard as a borderless desktop application.</li>
+          <li><strong>Zero-Key Tool Runner:</strong> Run seed tools (Calculator, Telemeter, Accountant, Note Taker) out-of-the-box with zero API keys required.</li>
+        </ul>
+      </div>
+      <div class="slideshow-container size-wide" data-slideshow>
+        <div class="slideshow-viewport">
+          <img src="screenshots/telemetry_web_dashboard.jpg" alt="Standalone Desktop App Mode and Live Telemetry"
+            data-caption="Desktop App Mode · Borderless Standalone Dashboard" loading="lazy">
+          <img src="screenshots/telemetry_web_live_graphs.jpg" alt="Live HTML5 Graphs from Local Edge Server"
+            data-caption="Local Edge Server · Live 50Hz Sensor Stream" loading="lazy">
         </div>
       </div>
     </div>
   </section>
 
-  <div class="section-connector"><div class="line"></div></div>
+  <div class="section-connector">
+    <div class="line"></div>
+  </div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- SECTION 3 — BHAI CODES WALK THROUGH                        -->
@@ -1295,24 +219,29 @@
     <div class="section-header">
       <div class="eyebrow">🧩 UNDERSTANDING BHAI CODES</div>
       <h2>What is a Bhai Code?</h2>
-      <p>A Bhai Code is a sandboxed JavaScript tool — generated by AI from a voice prompt, tested via an automated 7-point security audit, and executed locally on your phone's CPU inside the QuickJS runtime.</p>
+      <p>A Bhai Code is a sandboxed JavaScript tool — generated by AI from a voice prompt, tested via an automated
+        7-point security audit, and executed locally on your phone's CPU inside the QuickJS runtime.</p>
     </div>
 
     <!-- Mere Bhai -->
     <div class="walkthrough-row">
       <div class="walkthrough-text">
         <h3>⚡ Mere Bhai — Your Verified Vault</h3>
-        <p>All tools that pass the 7-point due diligence audit live in <strong>Mere Bhai</strong> (My Bhai) — your personal installed agent vault. Each is C2 Verified, meaning it has full ambient voice listening and background execution privileges.</p>
+        <p>All tools that pass the 7-point due diligence audit live in <strong>Mere Bhai</strong> (My Bhai) — your
+          personal installed agent vault. Each is C2 Verified, meaning it has full ambient voice listening and
+          background execution privileges.</p>
         <ul>
           <li>One-tap execute, inspect source code, or export as portable <code>.bundle.json</code></li>
           <li>Share via AirDrop, Bluetooth, WhatsApp, or email</li>
           <li>Root creators retain permanent attribution across multi-hop remixes</li>
         </ul>
       </div>
-      <div class="slideshow-container" data-slideshow style="max-width: 290px;">
+      <div class="slideshow-container size-phone" data-slideshow>
         <div class="slideshow-viewport">
-          <img src="screenshots/mere_bhai_agents.jpg" alt="Mere Bhai - Verified Agent Vault" data-caption="Mere Bhai · Installed & Verified Agent Vault" loading="lazy">
-          <img src="screenshots/mere_bhai_inspect.jpg" alt="Inspect QuickJS Code & Permissions" data-caption="Mere Bhai · QuickJS Source Code & Ambient Voice Permissions" loading="lazy">
+          <img src="screenshots/mere_bhai_agents.jpg" alt="Mere Bhai - Verified Agent Vault"
+            data-caption="Mere Bhai · Installed & Verified Agent Vault" loading="lazy">
+          <img src="screenshots/mere_bhai_inspect.jpg" alt="Inspect QuickJS Code & Permissions"
+            data-caption="Mere Bhai · QuickJS Source Code & Ambient Voice Permissions" loading="lazy">
         </div>
       </div>
     </div>
@@ -1321,16 +250,18 @@
     <div class="walkthrough-row reverse">
       <div class="walkthrough-text">
         <h3>👥 Sabke Bhai — Community Catalog</h3>
-        <p>Discover community-authored tools in <strong>Sabke Bhai</strong> (Everyone's Bhai). Sync via your GitHub Personal Access Token (PAT) — browse, preview, and fork tools from your friend circle directly on-device.</p>
+        <p>Discover community-authored tools in <strong>Sabke Bhai</strong> (Everyone's Bhai). Sync via your GitHub
+          Personal Access Token (PAT) — browse, preview, and fork tools from your friend circle directly on-device.</p>
         <ul>
           <li>Decentralized distribution — no central app store gatekeeping</li>
           <li>Immutable lineage chain: <code>@core → @alice → @bob → @you</code></li>
           <li>File issue reports directly from the device to the friend repository</li>
         </ul>
       </div>
-      <div class="slideshow-container" data-slideshow style="max-width: 290px;">
+      <div class="slideshow-container size-phone" data-slideshow>
         <div class="slideshow-viewport">
-          <img src="screenshots/sabke_bhai_catalog.jpg" alt="Sabke Bhai - Community Catalog" data-caption="Sabke Bhai · Community Catalog & GitHub Sync" loading="lazy">
+          <img src="screenshots/sabke_bhai_catalog.jpg" alt="Sabke Bhai - Community Catalog"
+            data-caption="Sabke Bhai · Community Catalog & GitHub Sync" loading="lazy">
         </div>
       </div>
     </div>
@@ -1339,25 +270,42 @@
     <div class="walkthrough-row">
       <div class="walkthrough-text">
         <h3>🛡️ Sandbox & Due Diligence Gate</h3>
-        <p>Every untrusted tool enters a <strong>Class 4 Quarantined Sandbox</strong> — zero sensor access, in-memory execution only. It must pass the automated 7-point policy audit before promotion.</p>
+        <p>Every untrusted tool enters a <strong>Class 4 Quarantined Sandbox</strong> — zero sensor access, in-memory
+          execution only. It must pass the automated 7-point policy audit before promotion.</p>
 
         <table class="security-mini">
-          <tr><td class="c1">C1 · CORE</td><td>Native Dart shell, hardware sensors, secure keystore</td></tr>
-          <tr><td class="c2">C2 · VERIFIED</td><td>Passed audit; ambient voice & background execution</td></tr>
-          <tr><td class="c3">C3 · DUE DILIGENCE</td><td>Restricted delegated scoping ("Ask [Agent] to…")</td></tr>
-          <tr><td class="c4">C4 · SANDBOX</td><td>Quarantined test zone; zero sensor access; in-memory only</td></tr>
+          <tr>
+            <td class="c1">C1 · CORE</td>
+            <td>Native Dart shell, hardware sensors, secure keystore</td>
+          </tr>
+          <tr>
+            <td class="c2">C2 · VERIFIED</td>
+            <td>Passed audit; ambient voice & background execution</td>
+          </tr>
+          <tr>
+            <td class="c3">C3 · DUE DILIGENCE</td>
+            <td>Restricted delegated scoping ("Ask [Agent] to…")</td>
+          </tr>
+          <tr>
+            <td class="c4">C4 · SANDBOX</td>
+            <td>Quarantined test zone; zero sensor access; in-memory only</td>
+          </tr>
         </table>
       </div>
-      <div class="slideshow-container" data-slideshow style="max-width: 290px;">
+      <div class="slideshow-container size-phone" data-slideshow>
         <div class="slideshow-viewport">
-          <img src="screenshots/sandbox_due_diligence.jpg" alt="QuickJS Sandbox and Due Diligence" data-caption="QuickJS Sandbox · 7-Point Due Diligence Audit" loading="lazy">
-          <img src="screenshots/sandbox_run.jpg" alt="Sandbox Quarantined In-Memory Execution" data-caption="Sandbox · In-Memory Execution & Sensor Access Lockdown" loading="lazy">
+          <img src="screenshots/sandbox_due_diligence.jpg" alt="QuickJS Sandbox and Due Diligence"
+            data-caption="QuickJS Sandbox · 7-Point Due Diligence Audit" loading="lazy">
+          <img src="screenshots/sandbox_run.jpg" alt="Sandbox Quarantined In-Memory Execution"
+            data-caption="Sandbox · In-Memory Execution & Sensor Access Lockdown" loading="lazy">
         </div>
       </div>
     </div>
   </section>
 
-  <div class="section-connector"><div class="line"></div></div>
+  <div class="section-connector">
+    <div class="line"></div>
+  </div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- SECTION 4 — AUTHOR A BHAI CODE (Two Paths)                 -->
@@ -1372,16 +320,21 @@
     <div class="split-panel">
       <!-- By App -->
       <div class="split-card">
-        <div class="card-icon" style="background: rgba(0, 240, 255, 0.1); border: 1px solid rgba(0, 240, 255, 0.2);">🎙️</div>
-        <h3>By App <span style="color: var(--accent-cyan); font-size: 0.8rem; font-weight: 500;">(Voice on Phone)</span></h3>
-        <p>Tap the pulsing aura on the Command Center and speak naturally. The AI generates a sandboxed QuickJS tool on-the-fly, tests it via the 7-point audit, and deploys it to your Mere Bhai vault — all from a single spoken turn.</p>
+        <div class="card-icon" style="background: rgba(0, 240, 255, 0.1); border: 1px solid rgba(0, 240, 255, 0.2);">🎙️
+        </div>
+        <h3>By App <span style="color: var(--accent-cyan); font-size: 0.8rem; font-weight: 500;">(Voice on Phone)</span>
+        </h3>
+        <p>Tap the pulsing aura on the Command Center and speak naturally. The AI generates a sandboxed QuickJS tool
+          on-the-fly, tests it via the 7-point audit, and deploys it to your Mere Bhai vault — all from a single spoken
+          turn.</p>
         <div class="bhai-voice-box">
           "Haan Bhai, build me a pomodoro timer with 25-minute work sessions and 5-minute breaks"
         </div>
         <div style="margin-top: 1.5rem;">
-          <div class="slideshow-container" data-slideshow style="max-width: 250px; margin: 0 auto;">
+          <div class="slideshow-container size-xs" data-slideshow>
             <div class="slideshow-viewport">
-              <img src="screenshots/command_center.jpg" alt="Voice authoring on phone" data-caption="Voice Authoring · Single-Turn Tool Generation" loading="lazy">
+              <img src="screenshots/command_center.jpg" alt="Voice authoring on phone"
+                data-caption="Voice Authoring · Single-Turn Tool Generation" loading="lazy">
             </div>
           </div>
         </div>
@@ -1389,9 +342,13 @@
 
       <!-- By IDE -->
       <div class="split-card">
-        <div class="card-icon" style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.2);">💻</div>
-        <h3>By IDE <span style="color: var(--accent-violet); font-size: 0.8rem; font-weight: 500;">(MCP Desktop Bridge)</span></h3>
-        <p>Use <strong>Google Antigravity</strong>, <strong>Cursor</strong>, or <strong>Claude Desktop</strong> to author, debug, and hot-reload Bhai Codes on your phone over Wi-Fi via the Model Context Protocol (MCP). Zero repo access needed.</p>
+        <div class="card-icon" style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.2);">
+          💻</div>
+        <h3>By IDE <span style="color: var(--accent-violet); font-size: 0.8rem; font-weight: 500;">(MCP Desktop
+            Bridge)</span></h3>
+        <p>Use <strong>Google Antigravity</strong>, <strong>Cursor</strong>, or <strong>Claude Desktop</strong> to
+          author, debug, and hot-reload Bhai Codes on your phone over Wi-Fi via the Model Context Protocol (MCP). Zero
+          repo access needed.</p>
         <div class="code-container" style="margin-top: auto;">
           <div class="code-top-bar">
             <span class="code-lang">mcp_config.json</span>
@@ -1411,15 +368,18 @@
 }</pre>
         </div>
         <ul style="margin-top: 1rem; list-style: none; padding: 0;">
-          <li style="color: var(--text-muted); font-size: 0.88rem; padding: 0.3rem 0; padding-left: 1.2rem; position: relative;">
+          <li
+            style="color: var(--text-muted); font-size: 0.88rem; padding: 0.3rem 0; padding-left: 1.2rem; position: relative;">
             <span style="position: absolute; left: 0; color: var(--accent-violet);">→</span>
             Download <code>mcp_proxy.py</code> directly from your phone's edge server
           </li>
-          <li style="color: var(--text-muted); font-size: 0.88rem; padding: 0.3rem 0; padding-left: 1.2rem; position: relative;">
+          <li
+            style="color: var(--text-muted); font-size: 0.88rem; padding: 0.3rem 0; padding-left: 1.2rem; position: relative;">
             <span style="position: absolute; left: 0; color: var(--accent-violet);">→</span>
             Full <code>mcp_list_agents</code>, <code>mcp_read_agent</code>, <code>mcp_deploy_agent</code> API
           </li>
-          <li style="color: var(--text-muted); font-size: 0.88rem; padding: 0.3rem 0; padding-left: 1.2rem; position: relative;">
+          <li
+            style="color: var(--text-muted); font-size: 0.88rem; padding: 0.3rem 0; padding-left: 1.2rem; position: relative;">
             <span style="position: absolute; left: 0; color: var(--accent-violet);">→</span>
             <a href="DEVELOPER_MCP_GUIDE.md" target="_blank">Full Developer MCP Guide →</a>
           </li>
@@ -1428,7 +388,9 @@
     </div>
   </section>
 
-  <div class="section-connector"><div class="line"></div></div>
+  <div class="section-connector">
+    <div class="line"></div>
+  </div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- SECTION 5 — CAPABILITIES (Seed Bhai Code Deep-Dive)        -->
@@ -1452,7 +414,8 @@
       <div class="bhai-info">
         <h3 id="bhai-title">Accountant <span>💰</span></h3>
         <p id="bhai-desc">
-          Structured expense logging directly into an on-device SQLite database. Automatically categorizes food, travel, and bills while hosting a live glassmorphism spending breakdown dashboard.
+          Structured expense logging directly into an on-device SQLite database. Automatically categorizes food, travel,
+          and bills while hosting a live glassmorphism spending breakdown dashboard.
         </p>
         <div class="bhai-chips" id="bhai-chips">
           <span class="chip cyan">C2 Verified</span>
@@ -1467,8 +430,9 @@
       <div class="bhai-screen-preview" id="bhai-preview">
         <div style="color: var(--accent-cyan); margin-bottom: 0.5rem;">[DATABASE_VIEW: expenses]</div>
         <div>2026-08-26 13:20 | Food & Dining | ₹450.00 | Lunch with team</div>
-        <div>2026-08-26 09:15 | Transport     | ₹120.00 | Metro recharge</div>
-        <div style="margin-top: 1rem; color: var(--accent-emerald);">✔ Live chart updated at http://localhost:8080/vault/expenses.html</div>
+        <div>2026-08-26 09:15 | Transport | ₹120.00 | Metro recharge</div>
+        <div style="margin-top: 1rem; color: var(--accent-emerald);">✔ Live chart updated at
+          http://localhost:8080/vault/expenses.html</div>
       </div>
     </div>
 
@@ -1477,13 +441,15 @@
       <p style="color: var(--text-muted); font-size: 0.92rem; text-align: center; margin-bottom: 1.25rem;">
         Real device captures — verified agents, live telemetry stream, and desktop dashboards:
       </p>
-      <div class="slideshow-container" id="capabilities-slideshow" data-slideshow style="max-width: 460px;">
+      <div class="slideshow-container size-tablet" id="capabilities-slideshow" data-slideshow>
         <div class="slideshow-viewport"></div>
       </div>
     </div>
   </section>
 
-  <div class="section-connector"><div class="line"></div></div>
+  <div class="section-connector">
+    <div class="line"></div>
+  </div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- SECTION 6 — QUICKSTART                                     -->
@@ -1497,17 +463,21 @@
       <div class="step-card">
         <div class="step-number">01</div>
         <h4>Install Release APK</h4>
-        <p>Download <code>aur-bhai-v3.12.apk</code> from <a href="https://github.com/tomarishan89/project_aur_bhai/releases" target="_blank">GitHub Releases</a> and install on any Android 8.0+ smartphone.</p>
+        <p>Download <code>aur-bhai-v3.12.apk</code> from <a
+            href="https://github.com/tomarishan89/project_aur_bhai/releases" target="_blank">GitHub Releases</a> and
+          install on any Android 8.0+ smartphone.</p>
       </div>
       <div class="step-card">
         <div class="step-number">02</div>
         <h4>Add Free Gemini Key</h4>
-        <p>Generate a free API key at <a href="https://aistudio.google.com/" target="_blank">Google AI Studio</a> and paste it into Settings &rarr; API / LLM.</p>
+        <p>Generate a free API key at <a href="https://aistudio.google.com/" target="_blank">Google AI Studio</a> and
+          paste it into Settings &rarr; API / LLM.</p>
       </div>
       <div class="step-card">
         <div class="step-number">03</div>
         <h4>Tap &amp; Speak</h4>
-        <p>Single-tap the glowing ring and say <em>"Haan Bhai, calculate 2^16"</em> or <em>"Bhai, I wish we had a pomodoro timer"</em>.</p>
+        <p>Single-tap the glowing ring and say <em>"Haan Bhai, calculate 2^16"</em> or <em>"Bhai, I wish we had a
+            pomodoro timer"</em>.</p>
       </div>
     </div>
   </section>
@@ -1518,13 +488,16 @@
   <footer>
     <div class="footer-content">
       <div class="logo">
-        <img src="aur_bhai_logo.svg" alt="Aur Bhai Logo" style="width: 24px; height: 24px; filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.5));">
+        <img src="aur_bhai_logo.svg" alt="Aur Bhai Logo"
+          style="width: 24px; height: 24px; filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.5));">
         <span>Project Aur Bhai</span>
       </div>
       <div class="footer-links">
+        <a href="https://tomarishan89.github.io/project_aur_bhai/" target="_blank">Live Website</a>
         <a href="https://github.com/tomarishan89/project_aur_bhai" target="_blank">GitHub Repository</a>
         <a href="https://github.com/tomarishan89/project_aur_bhai/releases" target="_blank">Releases &amp; Changelog</a>
-        <a href="https://github.com/tomarishan89/project_aur_bhai/discussions" target="_blank">Discussions &amp; Community</a>
+        <a href="https://github.com/tomarishan89/project_aur_bhai/discussions" target="_blank">Discussions &amp;
+          Community</a>
         <a href="DEVELOPER_MCP_GUIDE.md" target="_blank">Developer MCP Guide</a>
       </div>
       <div class="footer-note">
@@ -1533,393 +506,25 @@
     </div>
   </footer>
 
-  <!-- ═══════════════════════════════════════════════════════════ -->
-  <!-- SCRIPTS                                                    -->
-  <!-- ═══════════════════════════════════════════════════════════ -->
-  <script>
-    /* ---- Lightbox Modal State & Carousel ---- */
-    let currentLightboxSlides = [];
-    let currentLightboxIndex = 0;
-
-    function openLightbox(srcOrSlides, captionOrIndex) {
-      const modal = document.getElementById('lightbox-modal');
-      if (Array.isArray(srcOrSlides)) {
-        currentLightboxSlides = srcOrSlides;
-        currentLightboxIndex = typeof captionOrIndex === 'number' ? captionOrIndex : 0;
-      } else {
-        currentLightboxSlides = [{ src: srcOrSlides, caption: captionOrIndex || '' }];
-        currentLightboxIndex = 0;
-      }
-      updateLightboxView();
-      modal.classList.add('active');
-      document.body.style.overflow = 'hidden';
-    }
-
-    function updateLightboxView() {
-      if (!currentLightboxSlides || currentLightboxSlides.length === 0) return;
-      const current = currentLightboxSlides[currentLightboxIndex];
-      const img = document.getElementById('lightbox-img');
-      const captionEl = document.getElementById('lightbox-caption');
-      const counterEl = document.getElementById('lightbox-counter');
-      const prevBtn = document.getElementById('lightbox-prev');
-      const nextBtn = document.getElementById('lightbox-next');
-
-      img.style.opacity = '0.3';
-      setTimeout(() => {
-        img.src = current.src;
-        img.alt = current.caption || 'Enlarged screenshot';
-        captionEl.textContent = current.caption || '';
-        img.style.opacity = '1';
-      }, 100);
-
-      if (currentLightboxSlides.length > 1) {
-        counterEl.textContent = `${currentLightboxIndex + 1} / ${currentLightboxSlides.length}`;
-        counterEl.style.display = 'block';
-        prevBtn.style.display = 'flex';
-        nextBtn.style.display = 'flex';
-      } else {
-        counterEl.style.display = 'none';
-        prevBtn.style.display = 'none';
-        nextBtn.style.display = 'none';
-      }
-    }
-
-    function stepLightbox(delta) {
-      if (currentLightboxSlides.length <= 1) return;
-      currentLightboxIndex = (currentLightboxIndex + delta + currentLightboxSlides.length) % currentLightboxSlides.length;
-      updateLightboxView();
-    }
-
-    function closeLightbox() {
-      const modal = document.getElementById('lightbox-modal');
-      modal.classList.remove('active');
-      document.body.style.overflow = '';
-    }
-
-    document.addEventListener('keydown', (e) => {
-      const modal = document.getElementById('lightbox-modal');
-      if (!modal.classList.contains('active')) return;
-      if (e.key === 'Escape') closeLightbox();
-      if (e.key === 'ArrowLeft') stepLightbox(-1);
-      if (e.key === 'ArrowRight') stepLightbox(1);
-    });
-
-    /* ---- Declarative Slideshow Engine ---- */
-    function initSlideshow(container) {
-      if (!container) return;
-      const viewport = container.querySelector('.slideshow-viewport');
-      if (!viewport) return;
-
-      // Clear any previously generated controls
-      container.querySelectorAll('.slide-nav-btn, .slide-badge, .slide-dots, .slide-caption-text').forEach(el => el.remove());
-
-      // Collect images
-      const rawImgs = Array.from(viewport.querySelectorAll('img'));
-      const count = rawImgs.length;
-      container.setAttribute('data-slides-count', count);
-
-      // Rule: 0 images -> Hide container cleanly (no slide show)
-      if (count === 0) {
-        container.style.display = 'none';
-        return;
-      }
-      container.style.display = 'flex';
-
-      const slidesData = rawImgs.map(img => ({
-        src: img.getAttribute('src'),
-        alt: img.getAttribute('alt') || '',
-        caption: img.getAttribute('data-caption') || img.getAttribute('alt') || ''
-      }));
-
-      // Ensure each image is inside a .slide-item wrapper
-      rawImgs.forEach((img, idx) => {
-        let item = img.closest('.slide-item');
-        if (!item) {
-          item = document.createElement('div');
-          item.className = 'slide-item';
-          img.parentNode.insertBefore(item, img);
-          item.appendChild(img);
-        }
-        item.classList.toggle('active', idx === 0);
-      });
-
-      const slideItems = Array.from(viewport.querySelectorAll('.slide-item'));
-      let activeIdx = 0;
-
-      function showSlide(index) {
-        activeIdx = (index + count) % count;
-        slideItems.forEach((item, idx) => {
-          item.classList.toggle('active', idx === activeIdx);
-        });
-        const badge = container.querySelector('.slide-badge');
-        if (badge) badge.textContent = `${activeIdx + 1} / ${count}`;
-        const dots = container.querySelectorAll('.slide-dot');
-        dots.forEach((d, idx) => d.classList.toggle('active', idx === activeIdx));
-        const captionEl = container.querySelector('.slide-caption-text');
-        if (captionEl) captionEl.textContent = slidesData[activeIdx].caption;
-      }
-
-      // Clicking viewport opens Lightbox at current slide
-      viewport.onclick = (e) => {
-        if (e.target.closest('.slide-nav-btn')) return;
-        openLightbox(slidesData, activeIdx);
-      };
-
-      // Rule: 1 image -> Show single highlighted image, NO slideshow controls
-      if (count === 1) {
-        if (slidesData[0].caption) {
-          const captionEl = document.createElement('div');
-          captionEl.className = 'slide-caption-text';
-          captionEl.textContent = slidesData[0].caption;
-          container.appendChild(captionEl);
-        }
-        return;
-      }
-
-      // Rule: >= 2 images -> Interactive Slideshow
-      // 1. Badge (1 / N)
-      const badge = document.createElement('div');
-      badge.className = 'slide-badge';
-      badge.textContent = `1 / ${count}`;
-      viewport.appendChild(badge);
-
-      // 2. Previous & Next buttons
-      const prevBtn = document.createElement('button');
-      prevBtn.className = 'slide-nav-btn prev';
-      prevBtn.innerHTML = '&#8249;';
-      prevBtn.setAttribute('aria-label', 'Previous Slide');
-      prevBtn.onclick = (e) => {
-        e.stopPropagation();
-        showSlide(activeIdx - 1);
-      };
-
-      const nextBtn = document.createElement('button');
-      nextBtn.className = 'slide-nav-btn next';
-      nextBtn.innerHTML = '&#8250;';
-      nextBtn.setAttribute('aria-label', 'Next Slide');
-      nextBtn.onclick = (e) => {
-        e.stopPropagation();
-        showSlide(activeIdx + 1);
-      };
-
-      viewport.appendChild(prevBtn);
-      viewport.appendChild(nextBtn);
-
-      // 3. Dot pagination
-      const dotsContainer = document.createElement('div');
-      dotsContainer.className = 'slide-dots';
-      for (let i = 0; i < count; i++) {
-        const dot = document.createElement('button');
-        dot.className = 'slide-dot' + (i === 0 ? ' active' : '');
-        dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
-        dot.onclick = (e) => {
-          e.stopPropagation();
-          showSlide(i);
-        };
-        dotsContainer.appendChild(dot);
-      }
-      container.appendChild(dotsContainer);
-
-      // 4. Caption strip below
-      const captionEl = document.createElement('div');
-      captionEl.className = 'slide-caption-text';
-      captionEl.textContent = slidesData[0].caption;
-      container.appendChild(captionEl);
-
-      // 5. Touch swipe gestures
-      let touchStartX = 0;
-      let touchStartY = 0;
-      viewport.addEventListener('touchstart', (e) => {
-        touchStartX = e.changedTouches[0].screenX;
-        touchStartY = e.changedTouches[0].screenY;
-      }, { passive: true });
-
-      viewport.addEventListener('touchend', (e) => {
-        const diffX = e.changedTouches[0].screenX - touchStartX;
-        const diffY = e.changedTouches[0].screenY - touchStartY;
-        if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY)) {
-          if (diffX < 0) {
-            showSlide(activeIdx + 1);
-          } else {
-            showSlide(activeIdx - 1);
-          }
-        }
-      }, { passive: true });
-    }
-
-    function initAllSlideshows() {
-      document.querySelectorAll('[data-slideshow]').forEach(el => {
-        // Skip capabilities slideshow since it is dynamically updated by switchBhai
-        if (el.id !== 'capabilities-slideshow') {
-          initSlideshow(el);
-        }
-      });
-    }
-
-    /* ---- Capabilities Dynamic Showcase ---- */
-    const bhaiData = {
-      accountant: {
-        title: "Accountant 💰",
-        desc: "Structured expense logging directly into an on-device SQLite database. Automatically categorizes food, travel, and bills while hosting a live glassmorphism spending breakdown dashboard.",
-        chips: ["C2 Verified", "Category: Finance", "SQLite Vault", "HTML5 Dashboard"],
-        prompt: '"Bhai, log 450 rupees for lunch with team"',
-        preview: `
-<div style="color: var(--accent-cyan); margin-bottom: 0.5rem;">[DATABASE_VIEW: expenses]</div>
-<div>2026-08-26 13:20 | Food & Dining | ₹450.00 | Lunch with team</div>
-<div>2026-08-26 09:15 | Transport     | ₹120.00 | Metro recharge</div>
-<div style="margin-top: 1rem; color: var(--accent-emerald);">✔ Live chart updated at http://localhost:8080/vault/expenses.html</div>`,
-        screenshots: [
-          { src: 'screenshots/accountant_mobile.jpg', caption: 'Accountant · Voice Expense Logging on Device' },
-          { src: 'screenshots/accountant_web_dashboard.jpg', caption: 'Accountant · Live Expense Breakdown Dashboard on Desktop' }
-        ]
-      },
-      telemeter: {
-        title: "Telemeter 📊",
-        desc: "Captures high-frequency inertial sensor data and hardware telemetry into an encrypted ring buffer. Serves a real-time charting dashboard on your local Wi-Fi.",
-        chips: ["C2 Verified", "Category: Sensors", "Inertial Telemetry", "Real-Time Canvas"],
-        prompt: '"Bhai, start telemetry recording and open dashboard on desktop"',
-        preview: `
-<div style="color: var(--accent-cyan); margin-bottom: 0.5rem;">[SENSOR_STREAM: 50Hz]</div>
-<div>ACCEL_Z: 9.81 m/s² | GYRO_Y: +0.02 rad/s | TEMP: 31.4°C</div>
-<div>BUFFER: 120 samples ring-buffered | SQLite Vault write clean</div>
-<div style="margin-top: 1rem; color: var(--accent-emerald);">✔ Desktop auto-switched to http://192.168.1.50:8080/vault/locator.html</div>`,
-        screenshots: [
-          { src: 'screenshots/telemetry_mobile.jpg', caption: 'Mobile Telemetry · 50Hz Inertial Sensor Stream' },
-          { src: 'screenshots/telemetry_web_live_graphs.jpg', caption: 'Desktop Browser · Shelf HTTP Server Live Charts' },
-          { src: 'screenshots/telemetry_web_dashboard.jpg', caption: 'Multi-Metric Desktop Dashboard · All Sensor Channels' }
-        ]
-      },
-      calculator: {
-        title: "Calculator 🧮",
-        desc: "Pure JavaScript mathematics engine supporting trigonometric calculations, matrix power operators (^), and instant spoken acoustic feedback.",
-        chips: ["C2 Verified", "Category: Math", "QuickJS Sandbox", "Instant Spoken Voice"],
-        prompt: '"Ask Calculator what is 2 to the power of 12 plus sqrt(625)"',
-        preview: `
-<div style="color: var(--accent-cyan); margin-bottom: 0.5rem;">[QUICKJS_EVAL]</div>
-<div>EXPR: (2 ** 12) + Math.sqrt(625)</div>
-<div>RESULT: 4121</div>
-<div style="margin-top: 1rem; color: var(--accent-emerald);">✔ TTS Spoken: "Result is 4121, Bhai!"</div>`,
-        screenshots: [
-          { src: 'screenshots/calculator_mobile.jpg', caption: 'Calculator · QuickJS Arithmetic Evaluation & Spoken TTS' }
-        ]
-      },
-      notetaker: {
-        title: "Note Taker 📝",
-        desc: "Acoustic speech-to-note engine with automatic hashtag extraction (#ideas, #todo) and local Markdown document export.",
-        chips: ["C2 Verified", "Category: Productivity", "Tag Extraction", "Markdown Vault"],
-        prompt: '"Bhai, take a note: buy groceries tomorrow #todo #home"',
-        preview: `
-<div style="color: var(--accent-cyan); margin-bottom: 0.5rem;">[VAULT_ASSET: note_20260826.md]</div>
-<div># Note: Buy groceries tomorrow</div>
-<div>Tags: #todo #home | Created: 2026-08-26T09:30:00Z</div>
-<div style="margin-top: 1rem; color: var(--accent-emerald);">✔ Markdown exported to sovereign vault</div>`,
-        screenshots: [
-          { src: 'screenshots/notetaker_mobile.jpg', caption: 'Note Taker · Acoustic Notes with Hashtags & Markdown Vault' }
-        ]
-      },
-      iwish: {
-        title: "I Wish 🌟",
-        desc: "Built-in sovereign feedback loop. Captures user feature wishes, categorizes them locally, and feeds an offline AI clustering triage pipeline to guide roadmap prioritization.",
-        chips: ["C2 Verified", "Category: Feedback", "Priority Scoring", "Offline AI Triage"],
-        prompt: '"Bhai, I wish we had an offline currency converter with live cached rates"',
-        preview: `
-<div style="color: var(--accent-cyan); margin-bottom: 0.5rem;">[WISH_INGEST]</div>
-<div>WISH: "Offline currency converter" | CATEGORY: agent | TAGS: #finance #offline</div>
-<div>TRIAGE SCORE: 12.0 (Freq: 2 x Fit: 3 x Act: 2) -> Weekly Roadmap Digest</div>
-<div style="margin-top: 1rem; color: var(--accent-emerald);">✔ TTS: "Noted Bhai! Saved to your wishlist."</div>`,
-        screenshots: [] // 0 images -> completely hides slideshow!
-      }
-    };
-
-    function renderCapabilitiesSlideshow(screenshotsList) {
-      const wrap = document.getElementById('capabilities-slideshow-wrap');
-      const container = document.getElementById('capabilities-slideshow');
-      if (!wrap || !container) return;
-
-      const viewport = container.querySelector('.slideshow-viewport');
-      viewport.innerHTML = '';
-
-      if (!screenshotsList || screenshotsList.length === 0) {
-        wrap.style.display = 'none';
-        container.style.display = 'none';
-        return;
-      }
-
-      wrap.style.display = 'block';
-      container.style.display = 'flex';
-
-      screenshotsList.forEach(item => {
-        const img = document.createElement('img');
-        img.src = item.src;
-        img.alt = item.caption || 'Capability screenshot';
-        img.setAttribute('data-caption', item.caption || '');
-        img.setAttribute('loading', 'lazy');
-        viewport.appendChild(img);
-      });
-
-      initSlideshow(container);
-    }
-
-    function switchBhai(key) {
-      const data = bhaiData[key];
-      if (!data) return;
-
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      if (event && event.target) {
-        event.target.classList.add('active');
-      }
-
-      document.getElementById('bhai-title').innerHTML = data.title;
-      document.getElementById('bhai-desc').textContent = data.desc;
-      document.getElementById('bhai-prompt').textContent = data.prompt;
-      document.getElementById('bhai-preview').innerHTML = data.preview;
-
-      const chipsContainer = document.getElementById('bhai-chips');
-      chipsContainer.innerHTML = '';
-      data.chips.forEach((c, idx) => {
-        const span = document.createElement('span');
-        span.className = 'chip' + (idx === 0 ? ' cyan' : '');
-        span.textContent = c;
-        chipsContainer.appendChild(span);
-      });
-
-      // Update dynamic capabilities slideshow
-      renderCapabilitiesSlideshow(data.screenshots);
-    }
-
-    /* ---- MCP Config Copy ---- */
-    function copyMcpConfig() {
-      const code = document.getElementById('mcp-code-block').innerText;
-      navigator.clipboard.writeText(code).then(() => {
-        const btn = document.querySelector('.copy-btn');
-        btn.textContent = 'Copied! ✔';
-        setTimeout(() => btn.textContent = 'Copy Config', 2000);
-      });
-    }
-
-    // Initialize all slideshows and default capability reliably
-    function bootSlideshows() {
-      initAllSlideshows();
-      renderCapabilitiesSlideshow(bhaiData.accountant.screenshots);
-    }
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', bootSlideshows);
-    } else {
-      bootSlideshows();
-    }
-  </script>
 
   <!-- Lightbox Modal DOM with Carousel Navigation -->
   <div id="lightbox-modal" class="lightbox-modal" onclick="closeLightbox()">
     <span class="lightbox-close" title="Close (Esc)">&times;</span>
-    <button class="lightbox-nav prev" id="lightbox-prev" aria-label="Previous image" onclick="event.stopPropagation(); stepLightbox(-1)">&#8249;</button>
-    <button class="lightbox-nav next" id="lightbox-next" aria-label="Next image" onclick="event.stopPropagation(); stepLightbox(1)">&#8250;</button>
+    <button class="lightbox-nav prev" id="lightbox-prev" aria-label="Previous image"
+      onclick="event.stopPropagation(); stepLightbox(-1)">&#8249;</button>
+    <button class="lightbox-nav next" id="lightbox-next" aria-label="Next image"
+      onclick="event.stopPropagation(); stepLightbox(1)">&#8250;</button>
     <div class="lightbox-content-wrap" onclick="event.stopPropagation()">
       <img id="lightbox-img" src="" alt="Enlarged screenshot">
       <div id="lightbox-caption" class="lightbox-caption"></div>
       <div id="lightbox-counter" class="lightbox-counter"></div>
     </div>
   </div>
-</body>
-</html>
 
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- APPLICATION SCRIPT                                          -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <script src="app.js"></script>
+</body>
+
+</html>

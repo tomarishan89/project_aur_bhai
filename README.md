@@ -2,12 +2,25 @@
 **The Sovereign, Voice-Orchestrated Mobile Agentic OS & Local Edge Server**
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Website](https://img.shields.io/badge/Website-Live_Demo-4B4B4B.svg)](https://tomarishan89.github.io/project_aur_bhai/)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](https://flutter.dev)
 [![QuickJS](https://img.shields.io/badge/Runtime-Embedded_QuickJS-F7DF1E?logo=javascript)](https://bellard.org/quickjs/)
 [![MCP](https://img.shields.io/badge/Bridge-Model_Context_Protocol-00F0FF)](docs/DEVELOPER_MCP_GUIDE.md)
 [![Privacy](https://img.shields.io/badge/Telemetry-Zero_Cloud_Storage-10B981)](#sovereign-philosophy)
 
-Turn your Android smartphone into an autonomous, sovereign edge server. Aur Bhai lets you orally prompt your device to generate, test, and execute sandboxed JavaScript tools (**Bhai Codes**) locally on your phone's CPU with **100% Bring-Your-Own-Key (BYOK) privacy**.
+## 📖 Overview
+
+**Project Aur Bhai** is an open-source Flutter app that turns your Android smartphone into an autonomous, voice-orchestrated local edge server. 
+
+In short, it allows you to use voice commands to generate, test, and run sandboxed JavaScript tools (called **Bhai Codes**) directly on your phone.
+
+### Key Features
+1. **100% Privacy (Sovereignty)**: It uses a Bring-Your-Own-Key (BYOK) model for LLMs like Gemini or OpenAI. All data, telemetry, and voice recordings remain encrypted locally on your device in an SQLite vault.
+2. **On-Device Sandbox**: Tools are run locally using an embedded QuickJS engine with a 7-point security check to prevent malicious network access or data leaks.
+3. **Local Edge Server**: It runs a background HTTP server so you can view real-time HTML5 dashboards and live charts on your desktop browser over your local Wi-Fi.
+4. **Desktop IDE Bridge**: Using the Model Context Protocol (MCP), you can connect desktop AI tools (like Google Antigravity, Cursor, or Claude) directly to your phone to write, debug, and hot-reload code on the device.
+
+It comes pre-packaged with several seed tools out of the box, including an expense tracker (**Accountant**), a sensor visualization tool (**Telemeter**), a pure JavaScript **Calculator**, a voice-dictated **Note Taker**, and an offline roadmap triage pipeline (**I Wish**).
 
 <p align="center">
   <img src="docs/screenshots/command_center.jpg" width="23%" />
@@ -45,13 +58,16 @@ Turn your Android smartphone into an autonomous, sovereign edge server. Aur Bhai
 ## 🌟 Key Pillars
 
 1. **🛡️ 100% Sovereign & Zero-Liability BYOK:**
-   - Plug in your free Google Gemini or OpenAI API key.
+   - **Zero-Key Fast-Path Execution:** Pre-installed seed tools (Calculator, Telemeter, Accountant, Note Taker) and installed Bhai Codes execute 100% locally with **zero cloud API keys** or subscriptions required.
+   - **Optional BYOK for Generative Authoring:** Plug in your free Google Gemini or OpenAI API key whenever you want the AI to author brand-new tools from conversational voice prompts.
    - Sensor telemetry, voice recordings, and database tables stay encrypted in an on-device SQLite vault. Zero platform tracking.
 2. **🧠 Embedded QuickJS Sandbox:**
    - The AI writes dynamic JavaScript on the fly.
    - Tools run directly on your phone with an automated 7-point due diligence security check (blocking malicious SQL, network exfiltration, or `eval`).
 3. **🌐 Local Edge Server & HTML5 Dashboards:**
-   - Built-in background Shelf HTTP server serves real-time HTML5/PWA dashboards directly from `http://localhost:8080/` or your local Wi-Fi.
+   - Built-in background Shelf HTTP server serves real-time HTML5 dashboards directly from `http://localhost:8080/` or your local Wi-Fi.
+   - **📱 QR Code Instant LAN Pairing:** Scan on-screen QR codes in the mobile app or Web Hub (`/`) using your laptop webcam to open any dashboard without typing IP addresses or pairing tokens.
+   - **🖥️ Standalone Desktop App Mode (PWA):** In Chrome, Edge, or Brave, click `Menu (⋮) → Save and share → Install page as app` (or `Create shortcut → Open as window`) to run any phone-hosted dashboard as a dedicated, borderless desktop application.
 4. **🔌 Desktop Developer Bridge via MCP:**
    - Author, debug, and hot-reload Bhai Code directly from **Google Antigravity**, **Cursor**, or **Claude Desktop** straight to your phone over Wi-Fi.
 
@@ -165,7 +181,8 @@ To author tools on your phone using desktop AI agents:
 ---
 
 ## 📄 Documentation & Links
-* 🌐 **Showcase Landing Page:** [`docs/index.html`](docs/index.html)
+* 🌐 **Showcase Landing Page (Live):** [https://tomarishan89.github.io/project_aur_bhai/](https://tomarishan89.github.io/project_aur_bhai/)
+* 🏠 **Showcase Landing Page (Local):** [`docs/index.html`](docs/index.html)
 * 📖 **Master Ecosystem Manifest:** [`AUR_BHAI_MANIFEST.md`](AUR_BHAI_MANIFEST.md)
 * 🛠️ **Developer MCP Guide:** [`docs/DEVELOPER_MCP_GUIDE.md`](docs/DEVELOPER_MCP_GUIDE.md)
 

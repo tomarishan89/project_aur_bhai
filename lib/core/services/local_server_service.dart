@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
+import 'package:qr/qr.dart';
 import 'sql_query_guard.dart';
 import 'telemetry_bus.dart';
 import 'telemetry_collector.dart';
@@ -159,6 +160,7 @@ if __name__ == "__main__":
   static const List<String> coreEndpoints = [
     'GET /',
     'GET /api/status',
+    'GET /api/qr',
     'POST /api/query',
     'GET /vault/<key>',
     'GET /sw.js',
@@ -474,7 +476,15 @@ function copySnippet(id){
           final buildBadge = build.isNotEmpty
               ? '<span class="badge">build ${_htmlEscape(build)}</span>'
               : '';
-          return '<a href="$href" class="dash-card"><div class="dash-icon">📊</div><div class="dash-info"><h3>${_htmlEscape(name)}</h3><p>/vault/${_htmlEscape(key)}</p></div>$buildBadge</a>';
+          final fullUrl = vaultUrl(key);
+          return '''<div class="dash-card-item">
+<a href="$href" class="dash-card">
+  <div class="dash-icon">📊</div>
+  <div class="dash-info"><h3>${_htmlEscape(name)}</h3><p>/vault/${_htmlEscape(key)}</p></div>
+  $buildBadge
+</a>
+<button class="qr-btn" onclick="openQrModal('${_htmlEscape(fullUrl)}', '${_htmlEscape(name)}')" title="Scan QR Code on Mobile / Tablet">📱 QR</button>
+</div>''';
         }).join('\n');
 
         final body = '''<!DOCTYPE html>
@@ -488,16 +498,22 @@ body{background:var(--bg);color:var(--text);padding:24px;line-height:1.5}
 header{border-bottom:1px solid var(--border);padding-bottom:18px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
 h1{font-size:24px;font-weight:800;display:flex;align-items:center;gap:10px}
 .badge{background:rgba(56,189,248,0.15);color:var(--accent);border:1px solid rgba(56,189,248,0.3);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:24px}
-.dash-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;text-decoration:none;color:var(--text);display:flex;align-items:center;gap:14px;transition:all 0.2s}
-.dash-card:hover{border-color:var(--accent);transform:translateY(-2px);background:rgba(56,189,248,0.05)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:24px}
+.dash-card-item{display:flex;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:all 0.2s}
+.dash-card-item:hover{border-color:var(--accent);transform:translateY(-2px)}
+.dash-card{background:transparent;border:none;border-radius:0;padding:16px;text-decoration:none;color:var(--text);display:flex;align-items:center;gap:14px;flex:1}
 .dash-icon{font-size:24px;background:rgba(255,255,255,0.05);padding:10px;border-radius:10px}
 .dash-info h3{font-size:15px;font-weight:700}
 .dash-info p{color:var(--muted);font-size:12px;margin-top:2px}
+.qr-btn{background:rgba(56,189,248,0.08);border:none;border-left:1px solid var(--border);color:var(--accent);padding:0 14px;align-self:stretch;cursor:pointer;font-weight:700;font-size:12px;display:flex;align-items:center;gap:4px;transition:all 0.2s}
+.qr-btn:hover{background:var(--accent);color:#030712}
 .dev-banner{background:linear-gradient(135deg,rgba(56,189,248,0.1),rgba(17,24,39,1));border:1px solid var(--accent);border-radius:12px;padding:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
 .btn{background:var(--accent);color:#030712;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
 .btn:hover{opacity:0.9}
+.btn-sec{background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer}
 .empty-state{text-align:center;padding:40px 20px;color:var(--muted);background:var(--card);border:1px dashed var(--border);border-radius:12px}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.75);display:none;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(4px);padding:20px}
+.modal-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:380px;width:100%;box-shadow:0 10px 25px rgba(0,0,0,0.5)}
 </style></head><body>
 <div class="container">
 <header>
@@ -511,7 +527,42 @@ ${dashboards.isEmpty ? '<div class="empty-state"><p>No dashboards published yet.
 <a href="/dev" class="btn">Open Developer Portal 🛠️</a>
 </div>
 </div>
+
+<div id="qr-modal" class="modal-backdrop" onclick="closeQrModal(event)">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h3 id="qr-title" style="font-size:16px;font-weight:700">Scan QR Code</h3>
+      <button class="btn-sec" onclick="document.getElementById('qr-modal').style.display='none'">✕</button>
+    </div>
+    <div style="background:#fff;padding:16px;border-radius:12px;display:flex;justify-content:center;margin-bottom:14px">
+      <img id="qr-img" src="" width="200" height="200" alt="QR Code" style="display:block" />
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:12px;font-family:monospace;word-break:break-all" id="qr-url-txt"></p>
+    <div style="background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.3);padding:10px;border-radius:8px;font-size:11px;color:var(--text);margin-bottom:14px;line-height:1.4">
+      💡 <b>Run as Desktop App:</b> In Chrome or Edge on this computer, click <b>Menu (⋮) → Save and share → Install page as app</b> to launch this dashboard in a dedicated window.
+    </div>
+    <button class="btn" style="width:100%;justify-content:center" onclick="copyQrUrl()">📋 Copy Full URL</button>
+  </div>
+</div>
+
 <script>
+function openQrModal(url, title) {
+  document.getElementById('qr-title').innerText = title + ' // QR';
+  document.getElementById('qr-img').src = '/api/qr?data=' + encodeURIComponent(url);
+  document.getElementById('qr-url-txt').innerText = url;
+  document.getElementById('qr-modal').style.display = 'flex';
+}
+function closeQrModal(e) {
+  if (e.target.id === 'qr-modal') {
+    document.getElementById('qr-modal').style.display = 'none';
+  }
+}
+function copyQrUrl() {
+  const url = document.getElementById('qr-url-txt').innerText;
+  navigator.clipboard.writeText(url);
+  alert('Copied URL with pairing token to clipboard!');
+}
+
 // Auto-switch dashboard when user speaks into phone
 try {
   const evtSource = new EventSource("/api/events");
@@ -549,6 +600,26 @@ try {
           'port': _server?.port,
         }),
         headers: {'Content-Type': 'application/json'},
+      );
+    });
+
+    // Vector SVG QR Code generation endpoint (MS-QR-GENERATOR)
+    _router.get('/api/qr', (Request request) {
+      final raw = request.url.queryParameters['data'] ??
+          request.url.queryParameters['url'] ??
+          '';
+      if (raw.isEmpty) {
+        return Response(400, body: 'Missing "data" or "url" query parameter.');
+      }
+      final fg = request.url.queryParameters['fg'] ?? '#000000';
+      final bg = request.url.queryParameters['bg'] ?? '#ffffff';
+      final svg = generateQrSvg(raw, fgColor: fg, bgColor: bg);
+      return Response.ok(
+        svg,
+        headers: {
+          'Content-Type': 'image/svg+xml; charset=utf-8',
+          'Cache-Control': 'public, max-age=3600',
+        },
       );
     });
 
@@ -832,6 +903,44 @@ try {
     if (key.toLowerCase().endsWith('.json')) return 'application/json';
     if (key.toLowerCase().endsWith('.js')) return 'application/javascript';
     return stored ?? 'text/plain';
+  }
+
+  /// Generates a crisp, pure vector SVG string for QR code data with zero dependencies.
+  static String generateQrSvg(
+    String data, {
+    int margin = 2,
+    String fgColor = '#000000',
+    String bgColor = '#ffffff',
+  }) {
+    if (data.trim().isEmpty) return '';
+    final qrCode = QrCode.fromData(
+      data: data,
+      errorCorrectLevel: QrErrorCorrectLevel.M,
+    );
+    final qrImage = QrImage(qrCode);
+    final count = qrImage.moduleCount;
+    final totalSize = count + (margin * 2);
+
+    final sb = StringBuffer();
+    sb.writeln(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 $totalSize $totalSize" shape-rendering="crispEdges">',
+    );
+    if (bgColor.isNotEmpty && bgColor != 'transparent') {
+      sb.writeln('<rect width="100%" height="100%" fill="$bgColor"/>');
+    }
+    for (var r = 0; r < count; r++) {
+      for (var c = 0; c < count; c++) {
+        if (qrImage.isDark(r, c)) {
+          final x = c + margin;
+          final y = r + margin;
+          sb.writeln(
+            '<rect x="$x" y="$y" width="1" height="1" fill="$fgColor"/>',
+          );
+        }
+      }
+    }
+    sb.writeln('</svg>');
+    return sb.toString();
   }
 
   static String _htmlEscape(String s) => const HtmlEscape().convert(s);

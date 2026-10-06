@@ -47,6 +47,7 @@ import '../widgets/llm_provider_capability_notice.dart';
 import '../widgets/llm_slot_editors.dart';
 import '../widgets/circle_marketplace_tab.dart';
 import '../widgets/bhai_code_preview_sheet.dart';
+import '../widgets/qr_dashboard_dialog.dart';
 import '../widgets/sandbox_queue_tab.dart';
 import '../widgets/publish_to_circle_dialog.dart';
 import '../../core/config/app_config.dart';
@@ -3751,6 +3752,31 @@ class _VaultDashboardsBannerState
                                     }
                                   : null,
                             ),
+                            IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                              tooltip: 'Scan QR on Laptop',
+                              icon: Icon(
+                                Icons.qr_code_2,
+                                color: canOpen
+                                    ? Colors.cyanAccent
+                                    : Colors.white24,
+                                size: 18,
+                              ),
+                              onPressed: canOpen
+                                  ? () {
+                                      final url = server.vaultUrl(key);
+                                      QrDashboardDialog.show(
+                                        context,
+                                        url: url,
+                                        title: key,
+                                      );
+                                    }
+                                  : null,
+                            ),
                             PopupMenuButton<String>(
                               padding: EdgeInsets.zero,
                               icon: const Icon(
@@ -5085,20 +5111,47 @@ class _AgentDetailSheetState extends ConsumerState<_AgentDetailSheet> {
                       final url = server.isRunning ? server.vaultUrl(key) : null;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 4),
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.greenAccent,
-                            side: const BorderSide(color: Colors.greenAccent),
-                          ),
-                          onPressed: url == null
-                              ? null
-                              : () => launchVaultDashboard(context, url),
-                          icon: const Icon(Icons.open_in_browser, size: 16),
-                          label: Text(
-                            key,
-                            style: const TextStyle(fontSize: 11),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.greenAccent,
+                                  side: const BorderSide(color: Colors.greenAccent),
+                                ),
+                                onPressed: url == null
+                                    ? null
+                                    : () => launchVaultDashboard(context, url),
+                                icon: const Icon(Icons.open_in_browser, size: 16),
+                                label: Text(
+                                  key,
+                                  style: const TextStyle(fontSize: 11),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                            if (url != null) ...[
+                              const SizedBox(width: 4),
+                              IconButton(
+                                constraints: const BoxConstraints(
+                                  minWidth: 32,
+                                  minHeight: 32,
+                                ),
+                                padding: EdgeInsets.zero,
+                                icon: const Icon(
+                                  Icons.qr_code_2,
+                                  color: Colors.greenAccent,
+                                  size: 18,
+                                ),
+                                tooltip: 'Scan QR on Laptop',
+                                onPressed: () => QrDashboardDialog.show(
+                                  context,
+                                  url: url,
+                                  title: key,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       );
                     }),
