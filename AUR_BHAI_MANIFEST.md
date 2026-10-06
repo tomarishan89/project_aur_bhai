@@ -730,17 +730,17 @@ Use Kanban: **Bold (targeted) → *Italic* (in review) → <u>Underline</u> (acc
 *   **Ecosystem & Agents:**
     *   [ ] **`[MS-INTRO-SURFACE-AGT1]`** Friend can follow how-to without you narrating every tap.
 
-### - [ ] **`[MS-FEEDBACK-NETWORK]`** MILESTONE: **Human feedback network (not ambient analytics) [TARGETED — with FRIEND ops]**
+### - [x] **`[MS-FEEDBACK-NETWORK]`** MILESTONE: **Human feedback network (not ambient analytics) [ACTIVE — with FRIEND ops]**
 *   **Scope:** Place humans talk. Prefer smallest channel you will read. Discord optional later (chat app with channels — not required for alpha).
 *   **User Perspective (UI/UX):**
-    *   [ ] **`[MS-FEEDBACK-NETWORK-UX1]`** Primary channel chosen and linked from intro + friend pack:
-        *   [ ] **`[MS-FEEDBACK-NETWORK-UX1a]`** Default alpha: WhatsApp or Telegram group, **or** GitHub Discussions — pick one.
+    *   [x] **`[MS-FEEDBACK-NETWORK-UX1]`** Primary channel chosen and linked from intro + friend pack:
+        *   [x] **`[MS-FEEDBACK-NETWORK-UX1a]`** Default alpha: GitHub Discussions (https://github.com/tomarishan89/project_aur_bhai/discussions) active with architecture categories (Wishes, Showcase, Q&A, Bugs).
         *   [ ] **`[MS-FEEDBACK-NETWORK-UX1b]`** Discord only if ≥~10 people ask for a lounge; document channels (`#bugs`, `#ideas`) if created.
-    *   [ ] **`[MS-FEEDBACK-NETWORK-UX2]`** Intake rules: prefer **I Wish** in-app; paste screenshots to the human channel; no requirement to enable device analytics.
+    *   [x] **`[MS-FEEDBACK-NETWORK-UX2]`** Intake rules: prefer **I Wish** in-app; paste screenshots to the human channel; no requirement to enable device analytics.
     *   [ ] **`[MS-FEEDBACK-NETWORK-UX3]`** Triage rhythm: weekly review of I Wish + channel → `feedback/inbox/` notes for Eng.
 *   **Engineering & Architecture:**
-    *   [ ] **`[MS-FEEDBACK-NETWORK-ENG1]`** Links/config strings in `AppConfig` or friend pack (not hardcoded secrets).
-    *   [ ] **`[MS-FEEDBACK-NETWORK-ENG2]`** No dependency on Canny/Featurebase for alpha (add only if volume hurts).
+    *   [x] **`[MS-FEEDBACK-NETWORK-ENG1]`** Links/config strings in `AppConfig` (`discussionsUrl`, `liveWebsiteUrl`) and landing pages.
+    *   [x] **`[MS-FEEDBACK-NETWORK-ENG2]`** No dependency on Canny/Featurebase for alpha (add only if volume hurts).
 *   **Ecosystem & Agents:**
     *   [ ] **`[MS-FEEDBACK-NETWORK-AGT1]`** At least one non-you message received and filed during friend alpha.
 

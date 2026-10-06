@@ -104,4 +104,10 @@ class AppConfig {
   // --- Social seed Bhai Codes (MVP-S13) ---
   static const String socialXterName = 'Xter';
   static const String socialFacebookName = 'FacebookPoster';
+
+  // --- Community & Human Feedback (MS-FEEDBACK-NETWORK) ---
+  static const String discussionsUrl =
+      'https://github.com/tomarishan89/project_aur_bhai/discussions';
+  static const String liveWebsiteUrl =
+      'https://tomarishan89.github.io/project_aur_bhai/';
 }
