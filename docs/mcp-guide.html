@@ -18,9 +18,9 @@
   <link rel="stylesheet" href="style.css">
   <style>
     .guide-container {
-      max-width: 1000px;
+      max-width: 1200px;
       margin: 0 auto;
-      padding: 2.5rem 1.5rem 6rem;
+      padding: 2.5rem 2rem 6rem;
     }
 
     .guide-hero {
@@ -76,13 +76,13 @@
       background: #04060a;
       border: 1px solid rgba(0, 240, 255, 0.2);
       border-radius: var(--radius-md);
-      padding: 1.5rem;
+      padding: 1.5rem 1.75rem;
       font-family: var(--font-mono);
-      font-size: 0.85rem;
+      font-size: clamp(0.75rem, 1.05vw, 0.85rem);
       color: var(--accent-cyan);
       overflow-x: auto;
       white-space: pre;
-      line-height: 1.45;
+      line-height: 1.5;
       margin: 1.5rem 0;
     }
 
@@ -229,6 +229,18 @@
       border-radius: 12px;
       margin-bottom: 1rem;
     }
+
+    @media (max-width: 768px) {
+      .guide-container {
+        padding: 1.5rem 1rem 4rem;
+      }
+      .guide-section {
+        padding: 1.25rem;
+      }
+      .nav-links a:not(:first-child) {
+        display: none;
+      }
+    }
   </style>
 </head>
 
@@ -239,7 +251,7 @@
       <div class="logo">
         <a href="index.html" style="display: flex; align-items: center; gap: 0.6rem; color: inherit;">
           <img src="aur_bhai_logo.svg" alt="Aur Bhai Logo"
-            style="width: 28px; height: 28px; filter: drop-shadow(0 0 8px rgba(245, 166, 35, 0.6));">
+            style="width: 32px; height: 32px; border-radius: 8px; display: block; box-shadow: 0 0 10px rgba(245, 166, 35, 0.25);">
           <span>Project Aur Bhai</span>
         </a>
         <span class="badge-pill">MCP GUIDE</span>
@@ -279,15 +291,15 @@
         sandbox.
       </p>
 
-      <div class="arch-diagram">┌───────────────────────────┐           Wi-Fi (HTTP / JSON-RPC)          ┌───────────────────────────────────┐
-│        Desktop IDE        │ ◄────────────────────────────────────────► │     Aur Bhai Android Device       │
-│ (Antigravity / Cursor)    │                                            │ (Local Shelf Server on Port 8080) │
-│             │             │                                            └─────────────────┬─────────────────┘
-│       stdio │             │                                                              │
-│             ▼             │                                                              │
-│      mcp_proxy.py         │                                                              ▼
-│  (JSON-RPC stdio adapter) │                                                    Sovereign Vault & QuickJS
-└───────────────────────────┘                                                   (JS Agent Registry & SQLite)</div>
+      <div class="arch-diagram">┌───────────────────────────┐   Wi-Fi (HTTP / JSON-RPC)   ┌───────────────────────────────────┐
+│        Desktop IDE        │ ◄─────────────────────────► │     Aur Bhai Android Device       │
+│  (Antigravity / Cursor)   │                             │ (Local Shelf Server on Port 8080) │
+│             │             │                             └─────────────────┬─────────────────┘
+│       stdio │             │                                               │
+│             ▼             │                                               │
+│       mcp_proxy.py        │                                               ▼
+│  (JSON-RPC stdio adapter) │                                   Sovereign Vault & QuickJS
+└───────────────────────────┘                                  (JS Agent Registry & SQLite)</div>
 
       <p>
         The lightweight <code>mcp_proxy.py</code> script translates standard MCP stdio messages from your desktop IDE into
@@ -469,7 +481,7 @@
     <div class="footer-content">
       <div class="logo">
         <img src="aur_bhai_logo.svg" alt="Aur Bhai Logo"
-          style="width: 24px; height: 24px; filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.5));">
+          style="width: 28px; height: 28px; border-radius: 6px; display: block; box-shadow: 0 0 8px rgba(245, 166, 35, 0.2);">
         <span>Project Aur Bhai</span>
       </div>
       <div class="footer-links">
