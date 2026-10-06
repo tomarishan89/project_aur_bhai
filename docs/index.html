@@ -24,9 +24,9 @@
     <div class="nav-container">
       <div class="logo">
         <img src="aur_bhai_logo.svg" alt="Aur Bhai Logo"
-          style="width: 32px; height: 32px; border-radius: 8px; display: block; box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);">
+          style="width: 32px; height: 32px; border-radius: 8px; display: block; box-shadow: 0 0 10px rgba(105, 240, 174, 0.3);">
         <span>Project Aur Bhai</span>
-        <span class="badge-pill">v3.12 SOVEREIGN</span>
+        <span class="badge-pill">v3.12</span>
       </div>
       <nav class="nav-links">
         <a href="#settings-walkthrough">Settings</a>
@@ -76,9 +76,11 @@
       </a>
     </div>
 
-    <!-- Command Center Screenshot Showcase -->
+    <!-- App Launch & Command Center Showcase -->
     <div class="slideshow-container size-phone" data-slideshow>
       <div class="slideshow-viewport">
+        <img src="screenshots/splash_screen.jpg" alt="Aur Bhai Native Splash — Sovereign Edge Boot"
+          data-caption="Sovereign Boot · Instant Edge Engine Launch" loading="lazy">
         <img src="screenshots/command_center.jpg" alt="Aur Bhai Command Center — the landing app screen"
           data-caption="Voice Command Center · Tap to Speak" loading="lazy">
       </div>
@@ -321,7 +323,7 @@
     <div class="split-panel">
       <!-- By App -->
       <div class="split-card">
-        <div class="card-icon" style="background: rgba(0, 240, 255, 0.1); border: 1px solid rgba(0, 240, 255, 0.2);">🎙️
+        <div class="card-icon" style="background: rgba(105, 240, 174, 0.1); border: 1px solid rgba(105, 240, 174, 0.2);">🎙️
         </div>
         <h3>By App <span style="color: var(--accent-cyan); font-size: 0.8rem; font-weight: 500;">(Voice on Phone)</span>
         </h3>
@@ -496,7 +498,7 @@
     <div class="footer-content">
       <div class="logo">
         <img src="aur_bhai_logo.svg" alt="Aur Bhai Logo"
-          style="width: 28px; height: 28px; border-radius: 6px; display: block; box-shadow: 0 0 8px rgba(0, 240, 255, 0.25);">
+          style="width: 28px; height: 28px; border-radius: 6px; display: block; box-shadow: 0 0 8px rgba(105, 240, 174, 0.25);">
         <span>Project Aur Bhai</span>
       </div>
       <div class="footer-links">
@@ -513,20 +515,6 @@
     </div>
   </footer>
 
-
-  <!-- Lightbox Modal DOM with Carousel Navigation -->
-  <div id="lightbox-modal" class="lightbox-modal" onclick="closeLightbox()">
-    <span class="lightbox-close" title="Close (Esc)">&times;</span>
-    <button class="lightbox-nav prev" id="lightbox-prev" aria-label="Previous image"
-      onclick="event.stopPropagation(); stepLightbox(-1)">&#8249;</button>
-    <button class="lightbox-nav next" id="lightbox-next" aria-label="Next image"
-      onclick="event.stopPropagation(); stepLightbox(1)">&#8250;</button>
-    <div class="lightbox-content-wrap" onclick="event.stopPropagation()">
-      <img id="lightbox-img" src="" alt="Enlarged screenshot">
-      <div id="lightbox-caption" class="lightbox-caption"></div>
-      <div id="lightbox-counter" class="lightbox-counter"></div>
-    </div>
-  </div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- APPLICATION SCRIPT                                          -->

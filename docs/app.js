@@ -3,92 +3,13 @@
  * Interactive Documentation Application Script
  * 
  * Modules:
- * 1. Lightbox Modal Controller (touch, keyboard & carousel navigation)
- * 2. Declarative Multi-Slide Showcase Engine
- * 3. Seed Capabilities Data & Dynamic Switcher
- * 4. MCP Config Clipboard Copy & Bootstrap
+ * 1. Declarative Multi-Slide Showcase Engine (with touch swipe & pagination dots)
+ * 2. Seed Capabilities Data & Dynamic Switcher
+ * 3. MCP Config Clipboard Copy & Bootstrap
  */
 
 /* ==========================================================================
-   1. Lightbox Modal Controller
-   ========================================================================== */
-let currentLightboxSlides = [];
-let currentLightboxIndex = 0;
-
-function openLightbox(srcOrSlides, captionOrIndex) {
-  const modal = document.getElementById('lightbox-modal');
-  if (!modal) return;
-
-  if (Array.isArray(srcOrSlides)) {
-    currentLightboxSlides = srcOrSlides;
-    currentLightboxIndex = typeof captionOrIndex === 'number' ? captionOrIndex : 0;
-  } else {
-    currentLightboxSlides = [{ src: srcOrSlides, caption: captionOrIndex || '' }];
-    currentLightboxIndex = 0;
-  }
-
-  updateLightboxView();
-  modal.classList.add('active');
-  document.body.style.overflow = 'hidden';
-}
-
-function updateLightboxView() {
-  if (!currentLightboxSlides || currentLightboxSlides.length === 0) return;
-  const current = currentLightboxSlides[currentLightboxIndex];
-  const img = document.getElementById('lightbox-img');
-  const captionEl = document.getElementById('lightbox-caption');
-  const counterEl = document.getElementById('lightbox-counter');
-  const prevBtn = document.getElementById('lightbox-prev');
-  const nextBtn = document.getElementById('lightbox-next');
-
-  if (!img) return;
-
-  img.style.opacity = '0.3';
-  setTimeout(() => {
-    img.src = current.src;
-    img.alt = current.caption || 'Enlarged screenshot';
-    if (captionEl) captionEl.textContent = current.caption || '';
-    img.style.opacity = '1';
-  }, 100);
-
-  if (currentLightboxSlides.length > 1) {
-    if (counterEl) {
-      counterEl.textContent = `${currentLightboxIndex + 1} / ${currentLightboxSlides.length}`;
-      counterEl.style.display = 'block';
-    }
-    if (prevBtn) prevBtn.style.display = 'flex';
-    if (nextBtn) nextBtn.style.display = 'flex';
-  } else {
-    if (counterEl) counterEl.style.display = 'none';
-    if (prevBtn) prevBtn.style.display = 'none';
-    if (nextBtn) nextBtn.style.display = 'none';
-  }
-}
-
-function stepLightbox(delta) {
-  if (currentLightboxSlides.length <= 1) return;
-  currentLightboxIndex = (currentLightboxIndex + delta + currentLightboxSlides.length) % currentLightboxSlides.length;
-  updateLightboxView();
-}
-
-function closeLightbox() {
-  const modal = document.getElementById('lightbox-modal');
-  if (modal) {
-    modal.classList.remove('active');
-  }
-  document.body.style.overflow = '';
-}
-
-document.addEventListener('keydown', (e) => {
-  const modal = document.getElementById('lightbox-modal');
-  if (!modal || !modal.classList.contains('active')) return;
-  if (e.key === 'Escape') closeLightbox();
-  if (e.key === 'ArrowLeft') stepLightbox(-1);
-  if (e.key === 'ArrowRight') stepLightbox(1);
-});
-
-/* ==========================================================================
-   2. Declarative Slideshow Engine
+   1. Declarative Slideshow Engine
    ========================================================================== */
 function initSlideshow(container) {
   if (!container) return;
@@ -96,7 +17,7 @@ function initSlideshow(container) {
   if (!viewport) return;
 
   // Clear any previously generated controls
-  container.querySelectorAll('.slide-nav-btn, .slide-badge, .slide-dots, .slide-caption-text').forEach(el => el.remove());
+  container.querySelectorAll('.slide-nav-btn, .slide-dots, .slide-caption-text').forEach(el => el.remove());
 
   // Collect raw images
   const rawImgs = Array.from(viewport.querySelectorAll('img'));
@@ -136,19 +57,11 @@ function initSlideshow(container) {
     slideItems.forEach((item, idx) => {
       item.classList.toggle('active', idx === activeIdx);
     });
-    const badge = container.querySelector('.slide-badge');
-    if (badge) badge.textContent = `${activeIdx + 1} / ${count}`;
     const dots = container.querySelectorAll('.slide-dot');
     dots.forEach((d, idx) => d.classList.toggle('active', idx === activeIdx));
     const captionEl = container.querySelector('.slide-caption-text');
     if (captionEl) captionEl.textContent = slidesData[activeIdx].caption;
   }
-
-  // Clicking viewport opens Lightbox at current slide
-  viewport.onclick = (e) => {
-    if (e.target.closest('.slide-nav-btn')) return;
-    openLightbox(slidesData, activeIdx);
-  };
 
   // Rule: 1 image -> Show single highlighted image, NO slideshow controls
   if (count === 1) {
@@ -162,13 +75,7 @@ function initSlideshow(container) {
   }
 
   // Rule: >= 2 images -> Interactive Slideshow
-  // 1. Badge (1 / N)
-  const badge = document.createElement('div');
-  badge.className = 'slide-badge';
-  badge.textContent = `1 / ${count}`;
-  viewport.appendChild(badge);
-
-  // 2. Previous & Next buttons
+  // 1. Previous & Next buttons
   const prevBtn = document.createElement('button');
   prevBtn.className = 'slide-nav-btn prev';
   prevBtn.innerHTML = '&#8249;';

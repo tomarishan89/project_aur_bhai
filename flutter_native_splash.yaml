@@ -1,9 +1,9 @@
 flutter_native_splash:
-  color: "#0B0F19"
+  color: "#070A12"
   image: "assets/images/aur_bhai_logo.png"
   
   android_12:
-    color: "#0B0F19"
+    color: "#070A12"
     image: "assets/images/aur_bhai_logo.png"
     
   android: true
