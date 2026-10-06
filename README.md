@@ -187,7 +187,7 @@ To author tools on your phone using desktop AI agents:
 * 📦 **Release APKs & Changelogs:** [GitHub Releases](https://github.com/tomarishan89/project_aur_bhai/releases)
 * 💬 **Community & Feature Discussions:** [GitHub Discussions](https://github.com/tomarishan89/project_aur_bhai/discussions)
 * 📖 **Master Ecosystem Manifest:** [`AUR_BHAI_MANIFEST.md`](AUR_BHAI_MANIFEST.md)
-* 🛠️ **Developer MCP Guide:** [`docs/DEVELOPER_MCP_GUIDE.md`](docs/DEVELOPER_MCP_GUIDE.md)
+* 🛠️ **Developer MCP Guide:** [`docs/DEVELOPER_MCP_GUIDE.md`](docs/DEVELOPER_MCP_GUIDE.md) ([Web Version](https://tomarishan89.github.io/project_aur_bhai/mcp-guide.html))
 
 ---
 
