@@ -3,6 +3,7 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Website](https://img.shields.io/badge/Website-Live_Demo-4B4B4B.svg)](https://tomarishan89.github.io/project_aur_bhai/)
+[![Discussions](https://img.shields.io/badge/Community-Discussions-blueviolet?logo=github)](https://github.com/tomarishan89/project_aur_bhai/discussions)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](https://flutter.dev)
 [![QuickJS](https://img.shields.io/badge/Runtime-Embedded_QuickJS-F7DF1E?logo=javascript)](https://bellard.org/quickjs/)
 [![MCP](https://img.shields.io/badge/Bridge-Model_Context_Protocol-00F0FF)](docs/DEVELOPER_MCP_GUIDE.md)
@@ -183,6 +184,8 @@ To author tools on your phone using desktop AI agents:
 ## 📄 Documentation & Links
 * 🌐 **Showcase Landing Page (Live):** [https://tomarishan89.github.io/project_aur_bhai/](https://tomarishan89.github.io/project_aur_bhai/)
 * 🏠 **Showcase Landing Page (Local):** [`docs/index.html`](docs/index.html)
+* 📦 **Release APKs & Changelogs:** [GitHub Releases](https://github.com/tomarishan89/project_aur_bhai/releases)
+* 💬 **Community & Feature Discussions:** [GitHub Discussions](https://github.com/tomarishan89/project_aur_bhai/discussions)
 * 📖 **Master Ecosystem Manifest:** [`AUR_BHAI_MANIFEST.md`](AUR_BHAI_MANIFEST.md)
 * 🛠️ **Developer MCP Guide:** [`docs/DEVELOPER_MCP_GUIDE.md`](docs/DEVELOPER_MCP_GUIDE.md)
 
